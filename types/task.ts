@@ -41,3 +41,56 @@ export interface TaskFilters {
   status: TaskStatus | "all";
   sort: TaskSort;
 }
+
+export interface TaskExample {
+  id: string;
+  input: string;
+  output: string;
+}
+
+export interface ProgrammingTaskDetail {
+  id: string;
+  taskNumber: number;
+  title: string;
+  description: string[];
+  topic: TaskTopic;
+  difficulty: TaskDifficulty;
+  status: TaskStatus;
+  estimatedMinutes: number;
+  progress: number;
+  language: "python";
+  learningObjectives: string[];
+  inputDescription: string;
+  outputDescription: string;
+  examples: TaskExample[];
+  constraints: string[];
+  helpfulReminder?: string;
+  starterCode: string;
+  codeRuns: number;
+  tutorInteractions: number;
+  lastSaved: string;
+}
+
+export type SaveStatus = "saved" | "saving" | "unsaved";
+
+export interface CodeEditorState {
+  taskId: string;
+  currentCode: string;
+  savedCode: string;
+  saveStatus: SaveStatus;
+}
+
+export interface EditorPreferences {
+  fontSize: 14 | 16 | 18;
+  wordWrap: boolean;
+  minimapEnabled: boolean;
+}
+
+export interface CodeEditorPanelProps {
+  taskId: string;
+  starterCode: string;
+  language: "python";
+  onRun?: (code: string) => void;
+  onCodeChange?: (code: string) => void;
+  onRunResultChange?: (result: import("@/types/code-run").CodeRunResult) => void;
+}
