@@ -8,7 +8,13 @@ export type ActivityAction = "completed" | "saved" | "ai_used" | "started";
 
 export type TaskDifficulty = "easy" | "medium" | "hard";
 
-export type ModuleIcon = "braces" | "gitBranch" | "refresh" | "sigma" | "list";
+export type ModuleIcon =
+  | "braces"
+  | "gitBranch"
+  | "refresh"
+  | "sigma"
+  | "list"
+  | "upload";
 
 export interface DashboardModule {
   id: string;
