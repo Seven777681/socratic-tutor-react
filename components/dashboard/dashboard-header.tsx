@@ -22,7 +22,7 @@ const menuItems = [
   { label: "Sign Out", href: "/login" },
 ];
 
-type ActiveNavItem = "dashboard" | "tasks" | "history";
+type ActiveNavItem = "dashboard" | "tasks" | "history" | "none";
 
 function NavLink({
   href,
