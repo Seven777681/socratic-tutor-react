@@ -32,6 +32,7 @@ export interface ProgrammingTaskSummary {
   estimatedMinutes: number;
   updatedAt: string;
   href: string;
+  imported?: boolean;
 }
 
 export interface TaskFilters {

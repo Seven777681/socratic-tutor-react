@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type {
   ProgrammingTaskSummary,
@@ -16,6 +16,10 @@ import { TaskGrid } from "@/components/tasks/task-grid";
 import { TaskStats } from "@/components/tasks/task-stats";
 import { TasksEmptyState } from "@/components/tasks/tasks-empty-state";
 import { TasksPageHeader } from "@/components/tasks/tasks-page-header";
+import {
+  loadImportedTasks,
+  toTaskSummary,
+} from "@/lib/imported-tasks-storage";
 
 const topicValues: TaskTopic[] = [
   "variables",
@@ -132,29 +136,42 @@ export function TasksPageContent({
   tasks: ProgrammingTaskSummary[];
 }) {
   const searchParams = useSearchParams();
+  const [importedTasks, setImportedTasks] = useState<ProgrammingTaskSummary[]>([]);
   const [filters, setFilters] = useState<TaskFilters>(() =>
     getInitialFilters(searchParams),
   );
 
+  useEffect(() => {
+    const imported = loadImportedTasks().map((task, index) =>
+      toTaskSummary(task, tasks.length + index + 1),
+    );
+    setImportedTasks(imported);
+  }, [tasks.length]);
+
+  const allTasks = useMemo(
+    () => [...tasks, ...importedTasks],
+    [importedTasks, tasks],
+  );
+
   const completedTasks = useMemo(
-    () => tasks.filter((task) => task.status === "completed").length,
-    [tasks],
+    () => allTasks.filter((task) => task.status === "completed").length,
+    [allTasks],
   );
 
   const counts = useMemo(
     () => ({
-      all: tasks.length,
-      in_progress: tasks.filter((task) => task.status === "in_progress").length,
+      all: allTasks.length,
+      in_progress: allTasks.filter((task) => task.status === "in_progress").length,
       completed: completedTasks,
-      not_started: tasks.filter((task) => task.status === "not_started").length,
-      locked: tasks.filter((task) => task.status === "locked").length,
+      not_started: allTasks.filter((task) => task.status === "not_started").length,
+      locked: allTasks.filter((task) => task.status === "locked").length,
     }),
-    [completedTasks, tasks],
+    [allTasks, completedTasks],
   );
 
   const filteredTasks = useMemo(
-    () => sortTasks(filterTasks(tasks, filters), filters.sort),
-    [filters, tasks],
+    () => sortTasks(filterTasks(allTasks, filters), filters.sort),
+    [allTasks, filters],
   );
 
   const activeStatus =
@@ -173,7 +190,7 @@ export function TasksPageContent({
     <div className="space-y-7">
       <TasksPageHeader
         completedTasks={completedTasks}
-        totalTasks={tasks.length}
+        totalTasks={allTasks.length}
       />
 
       <TaskStats
@@ -195,7 +212,7 @@ export function TasksPageContent({
         <p className="text-sm font-semibold text-slate-500">
           Showing{" "}
           <span className="text-[#101426]">{filteredTasks.length}</span> of{" "}
-          <span className="text-[#101426]">{tasks.length}</span> tasks
+          <span className="text-[#101426]">{allTasks.length}</span> tasks
         </p>
       </div>
 
