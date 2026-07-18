@@ -49,10 +49,16 @@ export interface TutorRequest {
   taskId: string;
   studentMessage: string;
   currentCode: string;
-  latestRunId?: string;
+  latestRunResult?: CodeRunResult;
   conversationId: string;
   stage: GuidanceStage;
   mode: TutorMode;
+  conversation: TutorMessage[];
+  action: TutorActionType;
+}
+
+export interface TutorResponse {
+  message: TutorMessage;
 }
 
 export interface TutorContextSnapshot {

@@ -14,7 +14,7 @@ import {
   createInitialTutorMessages,
   createSystemTutorMessage,
 } from "@/data/mock-tutor-conversations";
-import { getMockTutorResponse } from "@/services/mock-tutor-service";
+import { getTutorResponse } from "@/services/tutor-service";
 import {
   clearTutorConversation,
   loadTutorConversation,
@@ -161,15 +161,16 @@ export function useTutorConversation({
       setErrorMessage("");
 
       try {
-        const response = await getMockTutorResponse({
+        const response = await getTutorResponse({
           taskId,
           studentMessage,
           currentCode,
           latestRunResult,
           stage,
+          conversationId: conversation.id,
           conversation: conversation.messages,
           action,
-          tutorMode,
+          mode: tutorMode,
         });
 
         setConversation((current) => ({
