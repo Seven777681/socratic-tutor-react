@@ -67,15 +67,6 @@ export const courseModules: DashboardModule[] = [
     href: "/tasks?topic=loops",
     icon: "refresh",
   },
-  {
-    id: "assignment-import",
-    name: "Assignment Import",
-    description: "Turn class files into focused Python practice tasks.",
-    progress: 0,
-    status: "not_started",
-    href: "/imports",
-    icon: "upload",
-  },
 ];
 
 export const recentActivities: RecentActivity[] = [

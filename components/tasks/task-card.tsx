@@ -50,7 +50,14 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
         <p className="text-sm font-extrabold text-[#6255f6]">
           Task {String(task.taskNumber).padStart(2, "0")}
         </p>
-        <TaskStatusBadge status={task.status} />
+        <div className="flex flex-wrap justify-end gap-2">
+          {task.imported ? (
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+              Imported
+            </span>
+          ) : null}
+          <TaskStatusBadge status={task.status} />
+        </div>
       </div>
 
       <div className="mt-4 min-w-0">

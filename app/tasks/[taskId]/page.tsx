@@ -3,6 +3,7 @@ import { mockTasks } from "@/data/tasks";
 import { TaskNotFound } from "@/components/workspace/task-not-found";
 import { WorkspaceHeader } from "@/components/workspace/workspace-header";
 import { WorkspaceLayout } from "@/components/workspace/workspace-layout";
+import { ImportedTaskWorkspace } from "@/components/workspace/imported-task-workspace";
 
 export function generateStaticParams() {
   return mockTasks.map((task) => ({
@@ -18,6 +19,10 @@ export default function TaskWorkspacePage({
   const task = getTaskDetail(params.taskId);
 
   if (!task) {
+    if (params.taskId.startsWith("imported-task-")) {
+      return <ImportedTaskWorkspace taskId={params.taskId} />;
+    }
+
     return <TaskNotFound />;
   }
 
