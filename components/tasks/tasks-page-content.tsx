@@ -146,9 +146,7 @@ export function TasksPageContent({
       all: tasks.length,
       in_progress: tasks.filter((task) => task.status === "in_progress").length,
       completed: completedTasks,
-      not_started: tasks.filter(
-        (task) => task.status === "not_started" || task.status === "locked",
-      ).length,
+      not_started: tasks.filter((task) => task.status === "not_started").length,
       locked: tasks.filter((task) => task.status === "locked").length,
     }),
     [completedTasks, tasks],
@@ -162,7 +160,8 @@ export function TasksPageContent({
   const activeStatus =
     filters.status === "in_progress" ||
     filters.status === "completed" ||
-    filters.status === "not_started"
+    filters.status === "not_started" ||
+    filters.status === "locked"
       ? filters.status
       : "all";
 

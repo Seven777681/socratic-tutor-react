@@ -1,0 +1,21 @@
+
+> socratic-tutor-react@0.1.0 predev
+> node -e "require('fs').rmSync('.next',{recursive:true,force:true})"
+
+
+> socratic-tutor-react@0.1.0 dev
+> next dev -p 3000
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+ ✓ Ready in 3.4s
+ ○ Compiling /tasks ...
+ ✓ Compiled /tasks in 2.1s (535 modules)
+ GET /tasks 200 in 2305ms
+ ✓ Compiled in 212ms (273 modules)
+ ✓ Compiled in 44ms (259 modules)
+ GET /tasks 200 in 100ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 794ms (573 modules)

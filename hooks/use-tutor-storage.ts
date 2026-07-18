@@ -1,9 +1,29 @@
 "use client";
 
-import type { TutorConversation } from "@/types/tutor";
+import type { TutorConversation, TutorMode } from "@/types/tutor";
 
 export function getTutorStorageKey(taskId: string) {
   return `socratic-tutor-${taskId}`;
+}
+
+export function getTutorModeStorageKey(taskId: string) {
+  return `socratic-tutor-mode-${taskId}`;
+}
+
+export function loadTutorMode(taskId: string): TutorMode | undefined {
+  if (typeof window === "undefined") return undefined;
+  const mode = window.localStorage.getItem(getTutorModeStorageKey(taskId));
+  return mode === "step_by_step" ||
+    mode === "explore_strategies" ||
+    mode === "run_and_reflect"
+    ? mode
+    : undefined;
+}
+
+export function saveTutorMode(taskId: string, mode: TutorMode) {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(getTutorModeStorageKey(taskId), mode);
+  }
 }
 
 export function loadTutorConversation(taskId: string) {
@@ -39,6 +59,8 @@ export function saveTutorConversation(conversation: TutorConversation) {
       stage: message.stage,
       questionType: message.questionType,
       actionType: message.actionType,
+      mode: message.mode,
+      visibleReasoningSummary: message.visibleReasoningSummary,
     })),
   };
 

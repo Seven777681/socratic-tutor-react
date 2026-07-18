@@ -5,6 +5,7 @@ import type { CodeRunResult } from "@/types/code-run";
 import type { GuidanceStage, TutorContextSnapshot } from "@/types/tutor";
 import type { ProgrammingTaskDetail } from "@/types/task";
 import { GuidanceStageView } from "@/components/tutor/guidance-stage";
+import { GuidanceModeSelector } from "@/components/tutor/guidance-mode-selector";
 import { TutorClearDialog } from "@/components/tutor/tutor-clear-dialog";
 import { TutorComposer } from "@/components/tutor/tutor-composer";
 import { TutorContextSummary } from "@/components/tutor/tutor-context-summary";
@@ -56,6 +57,8 @@ export function SocraticTutorPanel({
   });
   const {
     conversation,
+    tutorMode,
+    changeTutorMode,
     status,
     errorMessage,
     sendMessage,
@@ -92,6 +95,7 @@ export function SocraticTutorPanel({
         onGuidelines={() => setIsGuidelinesOpen(true)}
       />
       <GuidanceStageView stage={conversation.stage} />
+      <GuidanceModeSelector mode={tutorMode} onChange={changeTutorMode} />
       <TutorContextSummary context={context} />
       <TutorConversation
         messages={conversation.messages}

@@ -2,12 +2,18 @@ import type { CodeRunResult } from "@/types/code-run";
 
 export type GuidanceStage = "understand" | "plan" | "code" | "debug" | "reflect";
 
+export type TutorMode =
+  | "step_by_step"
+  | "explore_strategies"
+  | "run_and_reflect";
+
 export type TutorQuestionType =
   | "understanding"
   | "decomposition"
   | "debugging"
   | "reflection"
-  | "transfer";
+  | "transfer"
+  | "strategy_comparison";
 
 export type TutorActionType =
   | "message"
@@ -25,12 +31,15 @@ export interface TutorMessage {
   questionType?: TutorQuestionType;
   stage?: GuidanceStage;
   actionType?: TutorActionType;
+  mode?: TutorMode;
+  visibleReasoningSummary?: string;
 }
 
 export interface TutorConversation {
   id: string;
   taskId: string;
   stage: GuidanceStage;
+  mode: TutorMode;
   messages: TutorMessage[];
   createdAt: string;
   updatedAt: string;
@@ -43,6 +52,7 @@ export interface TutorRequest {
   latestRunId?: string;
   conversationId: string;
   stage: GuidanceStage;
+  mode: TutorMode;
 }
 
 export interface TutorContextSnapshot {

@@ -1,10 +1,10 @@
-import type { GuidanceStage, TutorMessage, TutorQuestionType } from "@/types/tutor";
+import type { GuidanceStage, TutorMessage, TutorMode, TutorQuestionType } from "@/types/tutor";
 
 function createMessageId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`;
 }
 
-export function createInitialTutorMessages(stage: GuidanceStage): TutorMessage[] {
+export function createInitialTutorMessages(stage: GuidanceStage, mode: TutorMode): TutorMessage[] {
   const timestamp = new Date().toISOString();
 
   return [
@@ -24,6 +24,8 @@ export function createInitialTutorMessages(stage: GuidanceStage): TutorMessage[]
       timestamp,
       questionType: "debugging",
       stage,
+      mode,
+      visibleReasoningSummary: "Uses the latest observable run result to ask a debugging question.",
     },
   ];
 }
@@ -32,6 +34,7 @@ export function createTutorMessage(
   content: string,
   stage: GuidanceStage,
   questionType: TutorQuestionType = "debugging",
+  mode?: TutorMode,
 ): TutorMessage {
   return {
     id: createMessageId("tutor"),
@@ -40,6 +43,14 @@ export function createTutorMessage(
     timestamp: new Date().toISOString(),
     questionType,
     stage,
+    mode,
+    visibleReasoningSummary: mode
+      ? {
+          step_by_step: "Breaks the task into one visible learning step.",
+          explore_strategies: "Surfaces alternatives for the student to compare.",
+          run_and_reflect: "Connects an observable run result to a debugging question.",
+        }[mode]
+      : undefined,
   };
 }
 

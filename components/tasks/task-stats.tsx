@@ -11,12 +11,13 @@ type StatFilter = TaskStatus | "all";
 const statItems: Array<{
   id: StatFilter;
   label: string;
-  icon: "all" | "progress" | "completed" | "not_started";
+  icon: "all" | "progress" | "completed" | "not_started" | "locked";
 }> = [
   { id: "all", label: "All Tasks", icon: "all" },
   { id: "in_progress", label: "In Progress", icon: "progress" },
   { id: "completed", label: "Completed", icon: "completed" },
   { id: "not_started", label: "Not Started", icon: "not_started" },
+  { id: "locked", label: "Locked", icon: "locked" },
 ];
 
 function StatIcon({ icon }: { icon: (typeof statItems)[number]["icon"] }) {
@@ -48,7 +49,7 @@ export function TaskStats({
 }) {
   return (
     <section
-      className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
       aria-label="Task status overview"
     >
       {statItems.map((item) => {
