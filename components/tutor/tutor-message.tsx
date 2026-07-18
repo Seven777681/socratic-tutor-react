@@ -27,12 +27,19 @@ const questionTypeLabels = {
   debugging: "Debugging Question",
   reflection: "Reflection Question",
   transfer: "Transfer Question",
+  strategy_comparison: "Strategy Comparison",
+};
+
+const modeLabels = {
+  step_by_step: "Step-by-Step",
+  explore_strategies: "Strategy Check",
+  run_and_reflect: "Run Reflection",
 };
 
 export function TutorMessage({ message }: { message: TutorMessageType }) {
   if (message.role === "system") {
     return (
-      <div className="mx-auto max-w-[95%] rounded-full bg-slate-100 px-3 py-1.5 text-center text-xs font-semibold leading-5 text-slate-600">
+      <div aria-live="polite" className="mx-auto w-full max-w-[95%] rounded-lg bg-slate-100 px-3 py-1.5 text-center text-xs font-semibold leading-5 text-slate-600 whitespace-pre-line">
         {message.content}
       </div>
     );
@@ -55,6 +62,11 @@ export function TutorMessage({ message }: { message: TutorMessageType }) {
         <BotIcon className="h-4 w-4" />
       </span>
       <div className="rounded-2xl border border-[#E4E7F0] bg-[#F7F8FF] px-3 py-2 text-sm leading-6 text-slate-700">
+        {message.mode ? (
+          <span className="mb-1 inline-flex rounded-full bg-[#eceaff] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#6255f6]">
+            {modeLabels[message.mode]}
+          </span>
+        ) : null}
         {message.questionType ? (
           <p className="mb-1 text-xs font-extrabold text-[#6255f6]">
             {questionTypeLabels[message.questionType]}

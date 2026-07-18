@@ -9,14 +9,14 @@ export const dashboardStats: DashboardStat[] = [
   {
     id: "overall-progress",
     title: "Overall Progress",
-    value: "40%",
-    progress: 40,
+    value: "67%",
+    progress: 67,
     icon: "progress",
   },
   {
     id: "completed-tasks",
     title: "Completed Tasks",
-    value: "8 / 20",
+    value: "2 / 3",
     icon: "completed",
   },
   {
@@ -28,15 +28,15 @@ export const dashboardStats: DashboardStat[] = [
 ];
 
 export const continueTask: ContinueTask = {
-  id: "task-004",
-  title: "Task 04: Loop and Sum",
+  id: "task-003",
+  title: "Task 03: Loop and Sum",
   topic: "Loops",
   difficulty: "medium",
   progress: 60,
   lastStudied: "2 hours ago",
   description:
     "Practice using loops to calculate the sum of a sequence of numbers.",
-  href: "/tasks/task-004",
+  href: "/tasks/task-003",
 };
 
 export const courseModules: DashboardModule[] = [
@@ -53,8 +53,8 @@ export const courseModules: DashboardModule[] = [
     id: "conditionals",
     name: "Conditionals",
     description: "Choose different code paths with clear logical tests.",
-    progress: 75,
-    status: "in_progress",
+    progress: 100,
+    status: "completed",
     href: "/tasks?topic=conditionals",
     icon: "gitBranch",
   },
@@ -66,24 +66,6 @@ export const courseModules: DashboardModule[] = [
     status: "in_progress",
     href: "/tasks?topic=loops",
     icon: "refresh",
-  },
-  {
-    id: "functions",
-    name: "Functions",
-    description: "Package reusable steps into focused blocks of logic.",
-    progress: 20,
-    status: "started",
-    href: "/tasks?topic=functions",
-    icon: "sigma",
-  },
-  {
-    id: "lists",
-    name: "Lists",
-    description: "Organize collections of values and work with them safely.",
-    progress: 0,
-    status: "not_started",
-    href: "/tasks?topic=lists",
-    icon: "list",
   },
   {
     id: "assignment-import",
@@ -99,17 +81,10 @@ export const courseModules: DashboardModule[] = [
 export const recentActivities: RecentActivity[] = [
   {
     id: "activity-001",
-    taskTitle: "Task 03: Number Comparison",
-    action: "completed",
-    timestamp: "Today, 10:30 AM",
-    href: "/tasks/task-003",
-  },
-  {
-    id: "activity-002",
-    taskTitle: "Task 04: Loop and Sum",
+    taskTitle: "Task 03: Loop and Sum",
     action: "saved",
     timestamp: "Yesterday, 4:20 PM",
-    href: "/tasks/task-004",
+    href: "/tasks/task-003",
   },
   {
     id: "activity-003",

@@ -7,6 +7,7 @@ import type {
   TutorActionType,
   TutorConversation,
   TutorMessage,
+  TutorMode,
   TutorStatus,
 } from "@/types/tutor";
 import {
@@ -17,16 +18,19 @@ import { getMockTutorResponse } from "@/services/mock-tutor-service";
 import {
   clearTutorConversation,
   loadTutorConversation,
+  loadTutorMode,
   saveTutorConversation,
+  saveTutorMode,
 } from "@/hooks/use-tutor-storage";
 
-function createConversation(taskId: string, stage: GuidanceStage): TutorConversation {
+function createConversation(taskId: string, stage: GuidanceStage, mode: TutorMode): TutorConversation {
   const timestamp = new Date().toISOString();
   return {
     id: `conversation-${taskId}-${Date.now()}`,
     taskId,
     stage,
-    messages: createInitialTutorMessages(stage),
+    mode,
+    messages: createInitialTutorMessages(stage, mode),
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -80,20 +84,23 @@ export function useTutorConversation({
   stage: GuidanceStage;
 }) {
   const [conversation, setConversation] = useState<TutorConversation>(() =>
-    createConversation(taskId, stage),
+    createConversation(taskId, stage, "run_and_reflect"),
   );
+  const [tutorMode, setTutorMode] = useState<TutorMode>("run_and_reflect");
   const [status, setStatus] = useState<TutorStatus>("ready");
   const [errorMessage, setErrorMessage] = useState("");
   const [lastHandledRunId, setLastHandledRunId] = useState<string | undefined>();
 
   useEffect(() => {
     const stored = loadTutorConversation(taskId);
+    const storedMode = loadTutorMode(taskId) ?? "run_and_reflect";
+    setTutorMode(storedMode);
     if (stored) {
-      setConversation({ ...stored, stage });
+      setConversation({ ...stored, stage, mode: storedMode });
       return;
     }
 
-    setConversation(createConversation(taskId, stage));
+    setConversation(createConversation(taskId, stage, storedMode));
   }, [stage, taskId]);
 
   useEffect(() => {
@@ -162,6 +169,7 @@ export function useTutorConversation({
           stage,
           conversation: conversation.messages,
           action,
+          tutorMode,
         });
 
         setConversation((current) => ({
@@ -188,6 +196,7 @@ export function useTutorConversation({
       latestRunResult,
       stage,
       taskId,
+      tutorMode,
     ],
   );
 
@@ -246,9 +255,9 @@ export function useTutorConversation({
 
   const startNewConversation = useCallback(() => {
     clearTutorConversation(taskId);
-    setConversation(createConversation(taskId, stage));
+    setConversation(createConversation(taskId, stage, tutorMode));
     setErrorMessage("");
-  }, [stage, taskId]);
+  }, [stage, taskId, tutorMode]);
 
   const clearConversation = useCallback(() => {
     clearTutorConversation(taskId);
@@ -257,12 +266,39 @@ export function useTutorConversation({
       id: `conversation-${taskId}-${Date.now()}`,
       taskId,
       stage,
+      mode: tutorMode,
       messages: [],
       createdAt: timestamp,
       updatedAt: timestamp,
     });
     setErrorMessage("");
-  }, [stage, taskId]);
+  }, [stage, taskId, tutorMode]);
+
+  const changeTutorMode = useCallback((nextMode: TutorMode) => {
+    if (nextMode === tutorMode) return;
+    const modeCopy: Record<TutorMode, string> = {
+      step_by_step: "Guidance mode changed to Step-by-Step Guide.\nThe tutor will break the task into smaller learning steps.",
+      explore_strategies: "Guidance mode changed to Explore Strategies.\nThe tutor will help you compare possible approaches.",
+      run_and_reflect: "Guidance mode changed to Run & Reflect.\nThe tutor will now use your latest code and run result as context.",
+    };
+    setTutorMode(nextMode);
+    saveTutorMode(taskId, nextMode);
+    setConversation((current) => ({
+      ...current,
+      mode: nextMode,
+      updatedAt: new Date().toISOString(),
+      messages: [...current.messages, { ...createSystemTutorMessage(modeCopy[nextMode], stage), mode: nextMode }],
+    }));
+    if (process.env.NODE_ENV === "development") {
+      console.info("learning_event", {
+        eventType: "tutor_mode_changed",
+        taskId,
+        timestamp: new Date().toISOString(),
+        sessionId: "mock-session",
+        metadata: { mode: nextMode },
+      });
+    }
+  }, [stage, taskId, tutorMode]);
 
   const beginWithQuestion = useCallback(() => {
     setConversation((current) => ({
@@ -284,6 +320,8 @@ export function useTutorConversation({
 
   return {
     conversation,
+    tutorMode,
+    changeTutorMode,
     status,
     errorMessage,
     hasStudentMessage,

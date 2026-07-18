@@ -244,7 +244,7 @@ export function AssignmentImportPage() {
               </div>
 
               <Link
-                href="/tasks/task-004"
+                href="/tasks/task-003"
                 aria-disabled={!isReady}
                 className={`group inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-indigo-200/70 transition focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 ${
                   isReady
