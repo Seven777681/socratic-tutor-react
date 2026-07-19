@@ -3,7 +3,6 @@ import {
   CheckCircleIcon,
   CircleIcon,
   ClockIcon,
-  LockIcon,
   PlayCircleIcon,
 } from "@/components/dashboard/dashboard-icons";
 import { statusLabels } from "@/components/tasks/task-formatters";
@@ -12,7 +11,6 @@ const statusClasses: Record<TaskStatus, string> = {
   completed: "bg-emerald-50 text-emerald-700",
   in_progress: "bg-[#eceaff] text-[#6255f6]",
   not_started: "bg-slate-100 text-slate-600",
-  locked: "bg-slate-100 text-slate-500",
 };
 
 function StatusIcon({ status }: { status: TaskStatus }) {
@@ -24,10 +22,6 @@ function StatusIcon({ status }: { status: TaskStatus }) {
 
   if (status === "in_progress") {
     return <PlayCircleIcon className={className} />;
-  }
-
-  if (status === "locked") {
-    return <LockIcon className={className} />;
   }
 
   return <CircleIcon className={className} />;
@@ -52,28 +46,14 @@ export function TaskProgressMessage({
   progress: number;
 }) {
   if (status === "completed") {
-    return (
-      <p className="flex items-center gap-2 text-sm font-bold text-emerald-700">
-        <CheckCircleIcon className="h-4 w-4" />
-        Completed
-      </p>
-    );
-  }
-
-  if (status === "locked") {
-    return (
-      <p className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-        <LockIcon className="h-4 w-4" />
-        Complete the previous task to unlock.
-      </p>
-    );
+    return <div className="h-2" aria-hidden="true" />;
   }
 
   if (status === "in_progress") {
     return (
       <p className="flex items-center gap-2 text-sm font-semibold text-[#6255f6]">
         <ClockIcon className="h-4 w-4" />
-        {progress}% complete
+        {progress}% thinking progress
       </p>
     );
   }
@@ -81,7 +61,7 @@ export function TaskProgressMessage({
   return (
     <p className="flex items-center gap-2 text-sm font-semibold text-slate-500">
       <CircleIcon className="h-4 w-4" />
-      Ready to start
+      Ready to think
     </p>
   );
 }

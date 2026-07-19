@@ -7,6 +7,7 @@ import type {
 } from "@/types/task";
 import { TaskFilterSelect } from "@/components/tasks/task-filter-select";
 import { TaskSearchInput } from "@/components/tasks/task-search-input";
+import { TaskViewToggle } from "@/components/tasks/task-view-toggle";
 
 const topicOptions: Array<{ value: TaskTopic | "all"; label: string }> = [
   { value: "all", label: "All Topics" },
@@ -21,10 +22,10 @@ const difficultyOptions: Array<{
   value: TaskDifficulty | "all";
   label: string;
 }> = [
-  { value: "all", label: "All Difficulties" },
-  { value: "easy", label: "Easy" },
-  { value: "medium", label: "Medium" },
-  { value: "hard", label: "Hard" },
+  { value: "all", label: "All Thinking Depths" },
+  { value: "easy", label: "Foundational" },
+  { value: "medium", label: "Intermediate" },
+  { value: "hard", label: "Deep Dive" },
 ];
 
 const statusOptions: Array<{ value: TaskStatus | "all"; label: string }> = [
@@ -32,34 +33,47 @@ const statusOptions: Array<{ value: TaskStatus | "all"; label: string }> = [
   { value: "not_started", label: "Not Started" },
   { value: "in_progress", label: "In Progress" },
   { value: "completed", label: "Completed" },
-  { value: "locked", label: "Locked" },
 ];
 
 const sortOptions: Array<{ value: TaskSort; label: string }> = [
   { value: "recommended", label: "Recommended" },
-  { value: "difficulty_asc", label: "Difficulty: Easy to Hard" },
-  { value: "difficulty_desc", label: "Difficulty: Hard to Easy" },
-  { value: "progress", label: "Progress" },
+  { value: "newest", label: "Newest First" },
+  { value: "source_file", label: "By Source File" },
+  { value: "thinking_progress", label: "Thinking Progress" },
   { value: "recently_updated", label: "Recently Updated" },
 ];
 
 export function TaskFilterBar({
   filters,
+  sourceFiles,
   hasActiveFilters,
   onFiltersChange,
   onClearFilters,
 }: {
   filters: TaskFilters;
+  sourceFiles: Array<{ id: string; name: string }>;
   hasActiveFilters: boolean;
   onFiltersChange: (filters: TaskFilters) => void;
   onClearFilters: () => void;
 }) {
   return (
     <section className="rounded-[20px] border border-[#E4E7F0] bg-white p-4 shadow-[0_16px_45px_rgba(78,91,130,0.08)] sm:p-5">
-      <div className="grid gap-3 lg:grid-cols-[minmax(280px,1fr)_190px_190px_180px_220px]">
+      <div className="grid gap-3 xl:grid-cols-[minmax(240px,1fr)_210px_170px_190px_170px_190px_150px]">
         <TaskSearchInput
           value={filters.query}
           onChange={(query) => onFiltersChange({ ...filters, query })}
+        />
+        <TaskFilterSelect
+          label="Filter by source file"
+          value={filters.source}
+          options={[
+            { value: "all", label: "All Source Files" },
+            ...sourceFiles.map((source) => ({
+              value: source.id,
+              label: source.name,
+            })),
+          ]}
+          onChange={(source) => onFiltersChange({ ...filters, source })}
         />
         <TaskFilterSelect
           label="Filter by topic"
@@ -68,11 +82,11 @@ export function TaskFilterBar({
           onChange={(topic) => onFiltersChange({ ...filters, topic })}
         />
         <TaskFilterSelect
-          label="Filter by difficulty"
-          value={filters.difficulty}
+          label="Filter by thinking depth"
+          value={filters.depth}
           options={difficultyOptions}
-          onChange={(difficulty) =>
-            onFiltersChange({ ...filters, difficulty })
+          onChange={(depth) =>
+            onFiltersChange({ ...filters, depth })
           }
         />
         <TaskFilterSelect
@@ -86,6 +100,10 @@ export function TaskFilterBar({
           value={filters.sort}
           options={sortOptions}
           onChange={(sort) => onFiltersChange({ ...filters, sort })}
+        />
+        <TaskViewToggle
+          value={filters.view}
+          onChange={(view) => onFiltersChange({ ...filters, view })}
         />
       </div>
 

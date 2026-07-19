@@ -14,18 +14,18 @@ export function TasksPageHeader({
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <h1 className="text-[34px] font-extrabold leading-tight tracking-normal text-[#101426] sm:text-[38px] lg:text-[40px]">
-            Programming Tasks
+            Guided Thinking Tasks
           </h1>
           <p className="mt-3 max-w-[760px] text-base leading-7 text-slate-600">
-            Practice programming concepts step by step with guidance from your
-            Socratic AI tutor.
+            Socratic questions generated from your uploaded files, guiding you
+            to think deeper, not just practice.
           </p>
         </div>
 
         <div className="w-full rounded-[18px] border border-[#E4E7F0] bg-white/80 p-5 shadow-sm lg:w-[320px]">
           <div className="flex items-center justify-between gap-4">
             <p className="text-sm font-bold text-slate-600">
-              {completedTasks} of {totalTasks} tasks completed
+              {completedTasks} of {totalTasks} thinking tasks completed
             </p>
             <p className="text-sm font-extrabold text-[#6255f6]">
               {completionPercentage}%
@@ -34,7 +34,7 @@ export function TasksPageHeader({
           <div
             className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#EEF2FF]"
             role="progressbar"
-            aria-label={`Overall task completion: ${completionPercentage}%`}
+            aria-label={`Overall thinking task completion: ${completionPercentage}%`}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={completionPercentage}

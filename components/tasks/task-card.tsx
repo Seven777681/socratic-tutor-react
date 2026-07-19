@@ -4,8 +4,8 @@ import {
   ArrowRightIcon,
   BookOpenIcon,
   ClockIcon,
+  FileCodeIcon,
   GaugeIcon,
-  LockIcon,
 } from "@/components/dashboard/dashboard-icons";
 import {
   difficultyLabels,
@@ -26,18 +26,14 @@ const difficultyClasses: Record<TaskDifficulty, string> = {
 
 function actionLabel(task: ProgrammingTaskSummary) {
   if (task.status === "completed") {
-    return "Review Task";
+    return "Review & Reflect";
   }
 
   if (task.status === "in_progress") {
-    return "Continue Task";
+    return "Continue Thinking";
   }
 
-  if (task.status === "locked") {
-    return "Locked";
-  }
-
-  return "Start Task";
+  return "Start Thinking";
 }
 
 function CardContent({ task }: { task: ProgrammingTaskSummary }) {
@@ -61,6 +57,16 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
       </div>
 
       <div className="mt-4 min-w-0">
+        <p
+          className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-500"
+          title={task.sourceFileName}
+        >
+          <FileCodeIcon className="h-3.5 w-3.5 shrink-0 text-[#6255f6]" />
+          <span className="shrink-0">Generated from:</span>
+          <span className="truncate font-bold text-slate-600">
+            {task.sourceFileName}
+          </span>
+        </p>
         <h2 className="text-xl font-extrabold tracking-normal text-[#101426]">
           {task.title}
         </h2>
@@ -88,26 +94,21 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
 
       <div className="mt-auto pt-6">
         {task.status === "in_progress" ? (
-          <TaskProgress progress={task.progress} label="Task progress" />
+          <TaskProgress progress={task.progress} label="Thinking progress" />
         ) : (
           <TaskProgressMessage status={task.status} progress={task.progress} />
         )}
 
         <span
           className={`mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${
-            task.status === "locked"
-              ? "cursor-not-allowed bg-slate-100 text-slate-400"
-              : isPrimaryAction
+            isPrimaryAction
                 ? "bg-[linear-gradient(90deg,#6657f5,#4678ff)] text-white shadow-lg shadow-indigo-200/80 group-hover:shadow-xl group-hover:shadow-indigo-200"
                 : "border border-[#b9b2ff] bg-white text-[#6255f6] group-hover:border-[#6255f6] group-hover:bg-indigo-50/70"
           }`}
           aria-hidden="true"
         >
-          {task.status === "locked" ? <LockIcon className="h-4 w-4" /> : null}
           {actionLabel(task)}
-          {task.status !== "locked" ? (
-            <ArrowRightIcon className="h-4 w-4 transition group-hover:translate-x-0.5" />
-          ) : null}
+          <ArrowRightIcon className="h-4 w-4 transition group-hover:translate-x-0.5" />
         </span>
       </div>
     </div>
@@ -115,17 +116,6 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
 }
 
 export function TaskCard({ task }: { task: ProgrammingTaskSummary }) {
-  if (task.status === "locked") {
-    return (
-      <article
-        className="group opacity-80"
-        aria-label={`${task.title}. ${statusLabels[task.status]}. Complete the previous task to unlock.`}
-      >
-        <CardContent task={task} />
-      </article>
-    );
-  }
-
   return (
     <Link
       href={task.href}

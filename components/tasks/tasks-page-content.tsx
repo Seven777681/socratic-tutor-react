@@ -9,8 +9,10 @@ import type {
   TaskSort,
   TaskStatus,
   TaskTopic,
+  TaskViewMode,
 } from "@/types/task";
 import { difficultyRank, topicLabels } from "@/components/tasks/task-formatters";
+import { GroupedBySourceView } from "@/components/tasks/grouped-by-source-view";
 import { TaskFilterBar } from "@/components/tasks/task-filter-bar";
 import { TaskGrid } from "@/components/tasks/task-grid";
 import { TaskStats } from "@/components/tasks/task-stats";
@@ -34,15 +36,24 @@ const statusValues: TaskStatus[] = [
   "not_started",
   "in_progress",
   "completed",
-  "locked",
 ];
+const sortValues: TaskSort[] = [
+  "recommended",
+  "newest",
+  "source_file",
+  "thinking_progress",
+  "recently_updated",
+];
+const viewValues: TaskViewMode[] = ["cards", "by-file"];
 
 const defaultFilters: TaskFilters = {
   query: "",
+  source: "all",
   topic: "all",
-  difficulty: "all",
+  depth: "all",
   status: "all",
   sort: "recommended",
+  view: "cards",
 };
 
 function readParam<Value extends string>(
@@ -59,19 +70,28 @@ function readParam<Value extends string>(
 function getInitialFilters(searchParams: URLSearchParams): TaskFilters {
   return {
     ...defaultFilters,
+    source: searchParams.get("source") || "all",
     topic: readParam(searchParams.get("topic"), topicValues),
-    difficulty: readParam(searchParams.get("difficulty"), difficultyValues),
+    depth: readParam(searchParams.get("depth"), difficultyValues),
     status: readParam(searchParams.get("status"), statusValues),
+    sort: readParam(searchParams.get("sort"), sortValues) === "all"
+      ? "recommended"
+      : (readParam(searchParams.get("sort"), sortValues) as TaskSort),
+    view: readParam(searchParams.get("view"), viewValues) === "all"
+      ? "cards"
+      : (readParam(searchParams.get("view"), viewValues) as TaskViewMode),
   };
 }
 
 function hasFilters(filters: TaskFilters) {
   return (
     filters.query.trim() !== "" ||
+    filters.source !== "all" ||
     filters.topic !== "all" ||
-    filters.difficulty !== "all" ||
+    filters.depth !== "all" ||
     filters.status !== "all" ||
-    filters.sort !== "recommended"
+    filters.sort !== "recommended" ||
+    filters.view !== "cards"
   );
 }
 
@@ -83,17 +103,20 @@ function filterTasks(tasks: ProgrammingTaskSummary[], filters: TaskFilters) {
       !query ||
       task.title.toLowerCase().includes(query) ||
       task.description.toLowerCase().includes(query) ||
-      topicLabels[task.topic].toLowerCase().includes(query);
+      topicLabels[task.topic].toLowerCase().includes(query) ||
+      task.sourceFileName.toLowerCase().includes(query);
 
+    const matchesSource =
+      filters.source === "all" || task.sourceFileId === filters.source;
     const matchesTopic =
       filters.topic === "all" || task.topic === filters.topic;
-    const matchesDifficulty =
-      filters.difficulty === "all" || task.difficulty === filters.difficulty;
+    const matchesDepth =
+      filters.depth === "all" || task.difficulty === filters.depth;
     const matchesStatus =
       filters.status === "all" || task.status === filters.status;
 
     return (
-      matchesQuery && matchesTopic && matchesDifficulty && matchesStatus
+      matchesQuery && matchesSource && matchesTopic && matchesDepth && matchesStatus
     );
   });
 }
@@ -101,21 +124,22 @@ function filterTasks(tasks: ProgrammingTaskSummary[], filters: TaskFilters) {
 function sortTasks(tasks: ProgrammingTaskSummary[], sort: TaskSort) {
   const sortedTasks = [...tasks];
 
-  if (sort === "difficulty_asc") {
+  if (sort === "newest") {
     return sortedTasks.sort(
       (first, second) =>
-        difficultyRank[first.difficulty] - difficultyRank[second.difficulty],
+        new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime(),
     );
   }
 
-  if (sort === "difficulty_desc") {
+  if (sort === "source_file") {
     return sortedTasks.sort(
       (first, second) =>
-        difficultyRank[second.difficulty] - difficultyRank[first.difficulty],
+        first.sourceFileName.localeCompare(second.sourceFileName) ||
+        first.taskNumber - second.taskNumber,
     );
   }
 
-  if (sort === "progress") {
+  if (sort === "thinking_progress") {
     return sortedTasks.sort((first, second) => second.progress - first.progress);
   }
 
@@ -127,7 +151,11 @@ function sortTasks(tasks: ProgrammingTaskSummary[], sort: TaskSort) {
     );
   }
 
-  return sortedTasks.sort((first, second) => first.taskNumber - second.taskNumber);
+  return sortedTasks.sort(
+    (first, second) =>
+      difficultyRank[first.difficulty] - difficultyRank[second.difficulty] ||
+      first.taskNumber - second.taskNumber,
+  );
 }
 
 export function TasksPageContent({
@@ -164,9 +192,24 @@ export function TasksPageContent({
       in_progress: allTasks.filter((task) => task.status === "in_progress").length,
       completed: completedTasks,
       not_started: allTasks.filter((task) => task.status === "not_started").length,
-      locked: allTasks.filter((task) => task.status === "locked").length,
     }),
     [allTasks, completedTasks],
+  );
+
+  const sourceFiles = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          allTasks.map((task) => [
+            task.sourceFileId,
+            {
+              id: task.sourceFileId,
+              name: task.sourceFileName,
+            },
+          ]),
+        ).values(),
+      ),
+    [allTasks],
   );
 
   const filteredTasks = useMemo(
@@ -177,8 +220,7 @@ export function TasksPageContent({
   const activeStatus =
     filters.status === "in_progress" ||
     filters.status === "completed" ||
-    filters.status === "not_started" ||
-    filters.status === "locked"
+    filters.status === "not_started"
       ? filters.status
       : "all";
 
@@ -203,6 +245,7 @@ export function TasksPageContent({
 
       <TaskFilterBar
         filters={filters}
+        sourceFiles={sourceFiles}
         hasActiveFilters={hasActiveFilters}
         onFiltersChange={setFilters}
         onClearFilters={clearFilters}
@@ -212,15 +255,22 @@ export function TasksPageContent({
         <p className="text-sm font-semibold text-slate-500">
           Showing{" "}
           <span className="text-[#101426]">{filteredTasks.length}</span> of{" "}
-          <span className="text-[#101426]">{allTasks.length}</span> tasks
+          <span className="text-[#101426]">{allTasks.length}</span> thinking tasks
         </p>
       </div>
 
       <div className="motion-safe:animate-[fadeIn_250ms_ease-out]">
         {filteredTasks.length > 0 ? (
-          <TaskGrid tasks={filteredTasks} />
+          filters.view === "by-file" ? (
+            <GroupedBySourceView tasks={filteredTasks} />
+          ) : (
+            <TaskGrid tasks={filteredTasks} />
+          )
         ) : (
-          <TasksEmptyState onClearFilters={clearFilters} />
+          <TasksEmptyState
+            hasActiveFilters={hasActiveFilters}
+            onClearFilters={clearFilters}
+          />
         )}
       </div>
     </div>

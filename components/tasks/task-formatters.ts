@@ -13,16 +13,17 @@ export const topicLabels: Record<TaskTopic, string> = {
 };
 
 export const difficultyLabels: Record<TaskDifficulty, string> = {
-  easy: "Easy",
-  medium: "Medium",
-  hard: "Hard",
+  easy: "Foundational",
+  medium: "Intermediate",
+  hard: "Deep Dive",
 };
+
+export const thinkingDepthLabels = difficultyLabels;
 
 export const statusLabels: Record<TaskStatus, string> = {
   not_started: "Not Started",
   in_progress: "In Progress",
   completed: "Completed",
-  locked: "Locked",
 };
 
 export const difficultyRank: Record<TaskDifficulty, number> = {
