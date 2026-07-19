@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { RecentUpload } from "@/types/dashboard";
-import { mockRecentUploads } from "@/data/dashboard";
 import {
   loadImportHistory,
-  loadImportedTasks,
+  getGeneratedTasks,
 } from "@/lib/imported-tasks-storage";
 
 function formatImportedAt(value: string) {
@@ -43,16 +42,11 @@ function formatImportedAt(value: string) {
 }
 
 export function useDashboardUploads() {
-  const [uploads, setUploads] = useState<RecentUpload[]>(mockRecentUploads);
+  const [uploads, setUploads] = useState<RecentUpload[]>([]);
 
   useEffect(() => {
     const history = loadImportHistory();
-    const importedTasks = loadImportedTasks();
-
-    if (!history.length) {
-      setUploads(mockRecentUploads);
-      return;
-    }
+    const importedTasks = getGeneratedTasks();
 
     const nextUploads = history.map((entry) => {
       const sourceTasks = importedTasks.filter((task) =>

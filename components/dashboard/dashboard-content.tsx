@@ -8,11 +8,12 @@ import { StatCard } from "@/components/dashboard/stat-card";
 import { WelcomeSection } from "@/components/dashboard/welcome-section";
 import { useDashboardStats } from "@/hooks/use-dashboard-stats";
 import { useDashboardUploads } from "@/hooks/use-dashboard-uploads";
-import { continueTask } from "@/data/dashboard";
+import { useDashboardLearning } from "@/hooks/use-dashboard-learning";
 
 export function DashboardContent() {
   const dashboardStats = useDashboardStats();
   const { uploads } = useDashboardUploads();
+  const { task } = useDashboardLearning();
 
   return (
     <div className="space-y-7">
@@ -28,7 +29,7 @@ export function DashboardContent() {
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,65fr)_minmax(320px,35fr)]">
-        <ContinueLearningCard task={continueTask} />
+        <ContinueLearningCard task={task} />
         <QuickUploadCard />
       </section>
 

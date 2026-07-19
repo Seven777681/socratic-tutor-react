@@ -4,11 +4,16 @@ import type {
   ImportedAssignmentFile,
 } from "@/types/import";
 import type { ProgrammingTaskDetail, ProgrammingTaskSummary } from "@/types/task";
+import { devDemoTasks } from "@/data/dev-demo-tasks";
 
 export const importedTasksStorageKey = "socratic-imported-tasks";
 export const importHistoryStorageKey = "socratic-import-history";
 export const generatedTasksStorageKey = "socratic-generated-import-tasks";
 const importedFilesStorageKey = "socratic-imported-files";
+
+export function isDemoTasksEnabled() {
+  return process.env.NEXT_PUBLIC_ENABLE_DEMO_TASKS === "true";
+}
 
 function canUseStorage() {
   return typeof window !== "undefined" && Boolean(window.localStorage);
@@ -39,8 +44,16 @@ export function loadImportedTasks() {
   return readJsonArray<GeneratedPracticeTask>(importedTasksStorageKey);
 }
 
+export function getGeneratedTasks() {
+  return loadImportedTasks();
+}
+
 export function saveImportedTasks(tasks: GeneratedPracticeTask[]) {
   writeJsonArray(importedTasksStorageKey, tasks);
+}
+
+export function saveGeneratedTasks(tasks: GeneratedPracticeTask[]) {
+  saveImportedTasks(tasks);
 }
 
 export function loadGeneratedImportTasks() {
@@ -61,6 +74,10 @@ export function appendImportedTasks(tasks: GeneratedPracticeTask[]) {
   return next;
 }
 
+export function addGeneratedTasks(tasks: GeneratedPracticeTask[]) {
+  return appendImportedTasks(tasks);
+}
+
 export function loadImportHistory() {
   return readJsonArray<ImportHistoryEntry>(importHistoryStorageKey);
 }
@@ -75,6 +92,21 @@ export function loadImportedFiles() {
 
 export function saveImportedFiles(files: ImportedAssignmentFile[]) {
   writeJsonArray(importedFilesStorageKey, files);
+}
+
+export function getGeneratedSourceFiles() {
+  return loadImportedFiles();
+}
+
+export function clearGeneratedTasksForTesting() {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  window.localStorage.removeItem(importedTasksStorageKey);
+  window.localStorage.removeItem(importHistoryStorageKey);
+  window.localStorage.removeItem(generatedTasksStorageKey);
+  window.localStorage.removeItem(importedFilesStorageKey);
 }
 
 export function toTaskSummary(
@@ -129,13 +161,29 @@ export function toTaskDetail(
   };
 }
 
-export function findImportedTaskDetail(taskId: string, baseTaskCount: number) {
-  const importedTask = loadImportedTasks().find((task) => task.id === taskId);
+export function getGeneratedTaskSummaries() {
+  const generated = getGeneratedTasks().map((task, index) =>
+    toTaskSummary(task, index + 1),
+  );
+
+  if (!isDemoTasksEnabled()) {
+    return generated;
+  }
+
+  return [...devDemoTasks, ...generated.map((task, index) => ({
+    ...task,
+    taskNumber: devDemoTasks.length + index + 1,
+  }))];
+}
+
+export function getGeneratedTaskById(taskId: string) {
+  const generatedTasks = getGeneratedTasks();
+  const importedTask = generatedTasks.find((task) => task.id === taskId);
 
   if (!importedTask) {
     return undefined;
   }
 
-  const importedIndex = loadImportedTasks().findIndex((task) => task.id === taskId);
-  return toTaskDetail(importedTask, baseTaskCount + importedIndex + 1);
+  const importedIndex = generatedTasks.findIndex((task) => task.id === taskId);
+  return toTaskDetail(importedTask, importedIndex + 1);
 }

@@ -1,8 +1,8 @@
 import type { ProgrammingTaskDetail } from "@/types/task";
-import { mockTasks } from "@/data/tasks";
+import { devDemoTasks } from "@/data/dev-demo-tasks";
 
 function requireTask(taskId: string) {
-  const task = mockTasks.find((candidate) => candidate.id === taskId);
+  const task = devDemoTasks.find((candidate) => candidate.id === taskId);
 
   if (!task) {
     throw new Error(`Task ${taskId} summary is required for task details.`);

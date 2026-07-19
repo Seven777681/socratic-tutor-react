@@ -1,14 +1,17 @@
 import { getTaskDetail } from "@/data/task-details";
-import { mockTasks } from "@/data/tasks";
+import { devDemoTasks } from "@/data/dev-demo-tasks";
 import { TaskNotFound } from "@/components/workspace/task-not-found";
 import { WorkspaceHeader } from "@/components/workspace/workspace-header";
 import { WorkspaceLayout } from "@/components/workspace/workspace-layout";
 import { ImportedTaskWorkspace } from "@/components/workspace/imported-task-workspace";
+import { isDemoTasksEnabled } from "@/lib/imported-tasks-storage";
 
 export function generateStaticParams() {
-  return mockTasks.map((task) => ({
-    taskId: task.id,
-  }));
+  if (!isDemoTasksEnabled()) {
+    return [];
+  }
+
+  return devDemoTasks.map((task) => ({ taskId: task.id }));
 }
 
 export default function TaskWorkspacePage({
@@ -16,14 +19,10 @@ export default function TaskWorkspacePage({
 }: {
   params: { taskId: string };
 }) {
-  const task = getTaskDetail(params.taskId);
+  const task = isDemoTasksEnabled() ? getTaskDetail(params.taskId) : undefined;
 
   if (!task) {
-    if (params.taskId.startsWith("imported-task-")) {
-      return <ImportedTaskWorkspace taskId={params.taskId} />;
-    }
-
-    return <TaskNotFound />;
+    return <ImportedTaskWorkspace taskId={params.taskId} />;
   }
 
   return (

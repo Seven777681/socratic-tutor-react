@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { mockTasks } from "@/data/tasks";
-import { findImportedTaskDetail } from "@/lib/imported-tasks-storage";
+import { getGeneratedTaskById } from "@/lib/imported-tasks-storage";
 import type { ProgrammingTaskDetail } from "@/types/task";
 import { TaskNotFound } from "@/components/workspace/task-not-found";
 import { WorkspaceHeader } from "@/components/workspace/workspace-header";
@@ -12,7 +11,7 @@ export function ImportedTaskWorkspace({ taskId }: { taskId: string }) {
   const [task, setTask] = useState<ProgrammingTaskDetail | null | undefined>(undefined);
 
   useEffect(() => {
-    setTask(findImportedTaskDetail(taskId, mockTasks.length) ?? null);
+    setTask(getGeneratedTaskById(taskId) ?? null);
   }, [taskId]);
 
   if (task === undefined) {

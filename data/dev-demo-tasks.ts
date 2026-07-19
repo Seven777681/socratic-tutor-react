@@ -1,6 +1,6 @@
 import type { ProgrammingTaskSummary } from "@/types/task";
 
-export const mockTasks: ProgrammingTaskSummary[] = [
+export const devDemoTasks: ProgrammingTaskSummary[] = [
   {
     id: "task-001",
     taskNumber: 1,
