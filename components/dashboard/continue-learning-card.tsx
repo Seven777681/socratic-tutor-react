@@ -1,14 +1,14 @@
 import Link from "next/link";
 import type { ContinueTask } from "@/types/dashboard";
-import { ArrowRightIcon, CodeIcon } from "@/components/dashboard/dashboard-icons";
+import {
+  ArrowRightIcon,
+  CodeIcon,
+  FileCodeIcon,
+} from "@/components/dashboard/dashboard-icons";
 
 function difficultyLabel(difficulty: ContinueTask["difficulty"]) {
   return difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
 }
-
-const progressClasses: Record<number, string> = {
-  60: "w-3/5",
-};
 
 export function ContinueLearningCard({ task }: { task: ContinueTask }) {
   return (
@@ -19,6 +19,18 @@ export function ContinueLearningCard({ task }: { task: ContinueTask }) {
           <h2 className="mt-3 text-2xl font-extrabold tracking-normal text-[#101426]">
             {task.title}
           </h2>
+          {task.sourceFileName ? (
+            <p
+              className="mt-2 flex max-w-[620px] items-center gap-2 text-sm font-semibold text-slate-500"
+              title={task.sourceFileName}
+            >
+              <FileCodeIcon className="h-4 w-4 shrink-0 text-[#6255f6]" />
+              <span className="shrink-0">Generated from</span>
+              <span className="truncate font-extrabold text-[#101426]">
+                {task.sourceFileName}
+              </span>
+            </p>
+          ) : null}
           <p className="mt-3 max-w-[620px] text-base leading-7 text-slate-600">
             {task.description}
           </p>
@@ -46,7 +58,8 @@ export function ContinueLearningCard({ task }: { task: ContinueTask }) {
               aria-valuenow={task.progress}
             >
               <div
-                className={`h-full rounded-full bg-[linear-gradient(90deg,#6657f5,#4F7CFF)] transition-[width] duration-300 ${progressClasses[task.progress]}`}
+                className="h-full rounded-full bg-[linear-gradient(90deg,#6657f5,#4F7CFF)] transition-[width] duration-300"
+                style={{ width: `${task.progress}%` }}
               />
             </div>
           </div>

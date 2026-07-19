@@ -1,31 +1,15 @@
 import type {
   ContinueTask,
-  DashboardModule,
-  DashboardStat,
-  RecentActivity,
+  DashboardStats,
+  RecentUpload,
 } from "@/types/dashboard";
 
-export const dashboardStats: DashboardStat[] = [
-  {
-    id: "overall-progress",
-    title: "Overall Progress",
-    value: "67%",
-    progress: 67,
-    icon: "progress",
-  },
-  {
-    id: "completed-tasks",
-    title: "Completed Tasks",
-    value: "2 / 3",
-    icon: "completed",
-  },
-  {
-    id: "current-streak",
-    title: "Current Streak",
-    value: "5 days",
-    icon: "streak",
-  },
-];
+export const mockDashboardStats: DashboardStats = {
+  filesAnalysed: 3,
+  questionsCompleted: 2,
+  questionsTotal: 3,
+  learningStreakDays: 5,
+};
 
 export const continueTask: ContinueTask = {
   id: "task-003",
@@ -37,58 +21,46 @@ export const continueTask: ContinueTask = {
   description:
     "Practice using loops to calculate the sum of a sequence of numbers.",
   href: "/tasks/task-003",
+  sourceFileName: "intro-loops-assignment.pdf",
+  sourceFileId: "upload-001",
+  sourceType: "imported",
 };
 
-export const courseModules: DashboardModule[] = [
+export const mockRecentUploads: RecentUpload[] = [
   {
-    id: "variables",
-    name: "Variables",
-    description: "Store values and use names to make programs easier to read.",
+    id: "upload-001",
+    fileName: "intro-loops-assignment.pdf",
+    fileType: "pdf",
+    language: "Python",
+    generatedTaskCount: 3,
+    completedTaskCount: 2,
+    progress: 67,
+    importedAt: "2 hours ago",
+    continueTaskId: "task-003",
+    sourceTaskIds: ["task-001", "task-002", "task-003"],
+  },
+  {
+    id: "upload-002",
+    fileName: "conditionals-practice.docx",
+    fileType: "docx",
+    language: "Python",
+    generatedTaskCount: 2,
+    completedTaskCount: 1,
+    progress: 50,
+    importedAt: "Yesterday",
+    continueTaskId: "imported-task-002",
+    sourceTaskIds: ["imported-task-001", "imported-task-002"],
+  },
+  {
+    id: "upload-003",
+    fileName: "variables-notes.md",
+    fileType: "markdown",
+    language: "Python",
+    generatedTaskCount: 1,
+    completedTaskCount: 1,
     progress: 100,
-    status: "completed",
-    href: "/tasks?topic=variables",
-    icon: "braces",
-  },
-  {
-    id: "conditionals",
-    name: "Conditionals",
-    description: "Choose different code paths with clear logical tests.",
-    progress: 100,
-    status: "completed",
-    href: "/tasks?topic=conditionals",
-    icon: "gitBranch",
-  },
-  {
-    id: "loops",
-    name: "Loops",
-    description: "Repeat actions while keeping code compact and predictable.",
-    progress: 60,
-    status: "in_progress",
-    href: "/tasks?topic=loops",
-    icon: "refresh",
-  },
-];
-
-export const recentActivities: RecentActivity[] = [
-  {
-    id: "activity-001",
-    taskTitle: "Task 03: Loop and Sum",
-    action: "saved",
-    timestamp: "Yesterday, 4:20 PM",
-    href: "/tasks/task-003",
-  },
-  {
-    id: "activity-003",
-    taskTitle: "Task 02: Grade Calculator",
-    action: "ai_used",
-    timestamp: "July 2, 2:15 PM",
-    href: "/tasks/task-002",
-  },
-  {
-    id: "activity-004",
-    taskTitle: "Task 01: Variables Basics",
-    action: "completed",
-    timestamp: "July 1, 11:40 AM",
-    href: "/tasks/task-001",
+    importedAt: "July 18",
+    continueTaskId: "task-001",
+    sourceTaskIds: ["task-001"],
   },
 ];

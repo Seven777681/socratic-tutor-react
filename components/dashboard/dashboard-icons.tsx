@@ -1,7 +1,7 @@
 import type { SVGProps } from "react";
-import type { ActivityAction, ModuleIcon } from "@/types/dashboard";
 
 type IconProps = SVGProps<SVGSVGElement>;
+type ModuleIcon = "braces" | "gitBranch" | "refresh" | "sigma" | "list" | "upload";
 
 function IconBase({ children, ...props }: IconProps) {
   return (
@@ -772,26 +772,4 @@ export function ModuleIconView({
       />
     </IconBase>
   );
-}
-
-export function ActivityIcon({
-  action,
-  className,
-}: {
-  action: ActivityAction;
-  className?: string;
-}) {
-  if (action === "completed") {
-    return <CheckCircleIcon className={className} />;
-  }
-
-  if (action === "saved") {
-    return <SaveIcon className={className} />;
-  }
-
-  if (action === "ai_used") {
-    return <BotIcon className={className} />;
-  }
-
-  return <PlayCircleIcon className={className} />;
 }
