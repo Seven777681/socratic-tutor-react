@@ -81,16 +81,25 @@ export function toTaskSummary(
   task: GeneratedPracticeTask,
   taskNumber: number,
 ): ProgrammingTaskSummary {
+  const sourceFile =
+    loadImportedFiles().find((file) => file.id === task.sourceFileId) ??
+    loadImportHistory().find((entry) => entry.file.id === task.sourceFileId)?.file;
+
   return {
     id: task.id,
     taskNumber,
     title: task.title,
     description: task.description,
+    sourceFileId: task.sourceFileId,
+    sourceFileName: sourceFile?.name ?? "Uploaded class file",
+    sourceFileType: sourceFile?.type,
+    language: "Python",
     topic: task.topic,
     difficulty: task.difficulty,
     status: task.status,
     progress: task.progress,
     estimatedMinutes: task.estimatedMinutes,
+    createdAt: task.createdAt,
     updatedAt: task.createdAt,
     href: `/tasks/${task.id}`,
     imported: true,

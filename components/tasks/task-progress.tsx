@@ -1,12 +1,3 @@
-const progressClasses: Record<number, string> = {
-  0: "w-0",
-  20: "w-1/5",
-  30: "w-[30%]",
-  45: "w-[45%]",
-  60: "w-3/5",
-  100: "w-full",
-};
-
 export function TaskProgress({
   progress,
   label,
@@ -29,7 +20,8 @@ export function TaskProgress({
         aria-valuenow={progress}
       >
         <div
-          className={`h-full rounded-full bg-[linear-gradient(90deg,#6657f5,#4F7CFF)] transition-[width] duration-300 ${progressClasses[progress]}`}
+          className="h-full rounded-full bg-[linear-gradient(90deg,#6657f5,#4F7CFF)] transition-[width] duration-300"
+          style={{ width: `${progress}%` }}
         />
       </div>
     </div>

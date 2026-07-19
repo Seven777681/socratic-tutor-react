@@ -76,7 +76,7 @@ function createTask(
       status: "not_started",
       progress: 0,
       estimatedMinutes: 20,
-      description: "Use conditional statements to classify numeric scores.",
+      description: "Reason through conditional choices by testing score ranges and edge cases.",
       problemDescription: [
         "Write a Python program that reads a numeric score.",
         "Use conditions to decide which category the score belongs to.",
@@ -103,7 +103,7 @@ function createTask(
       status: "not_started",
       progress: 0,
       estimatedMinutes: 25,
-      description: "Use a loop and an accumulator variable to calculate a total.",
+      description: "Unpack how a loop updates an accumulator, then trace the total step by step.",
       problemDescription: [
         "Write a Python program that reads a positive integer n.",
         "Use a loop to build the total step by step, then print the result.",
@@ -130,7 +130,7 @@ function createTask(
       status: "not_started",
       progress: 0,
       estimatedMinutes: 25,
-      description: "Break a small calculation into a reusable Python function.",
+      description: "Explore how a reusable function can organize a small calculation.",
       problemDescription: ["Write a helper function, then call it with input values."],
       learningObjectives: ["Define a function", "Use parameters", "Return a computed value"],
       inputDescription: "One or more values needed by the helper function.",
@@ -153,7 +153,7 @@ function createTask(
     status: "not_started",
     progress: 0,
     estimatedMinutes: 15,
-    description: "Practice reading user input and storing values in variables.",
+    description: "Explore how input values become named variables that shape program output.",
     problemDescription: [
       "Write a Python program that asks for basic input values.",
       "Store the inputs in variables and print a clear result.",

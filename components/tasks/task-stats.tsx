@@ -6,18 +6,17 @@ import {
   PlayCircleIcon,
 } from "@/components/dashboard/dashboard-icons";
 
-type StatFilter = TaskStatus | "all";
+type VisibleStatFilter = TaskStatus | "all";
 
 const statItems: Array<{
-  id: StatFilter;
+  id: VisibleStatFilter;
   label: string;
-  icon: "all" | "progress" | "completed" | "not_started" | "locked";
+  icon: "all" | "progress" | "completed" | "not_started";
 }> = [
   { id: "all", label: "All Tasks", icon: "all" },
   { id: "in_progress", label: "In Progress", icon: "progress" },
   { id: "completed", label: "Completed", icon: "completed" },
   { id: "not_started", label: "Not Started", icon: "not_started" },
-  { id: "locked", label: "Locked", icon: "locked" },
 ];
 
 function StatIcon({ icon }: { icon: (typeof statItems)[number]["icon"] }) {
@@ -43,13 +42,13 @@ export function TaskStats({
   activeStatus,
   onStatusChange,
 }: {
-  counts: Record<StatFilter, number>;
-  activeStatus: StatFilter;
-  onStatusChange: (status: StatFilter) => void;
+  counts: Record<VisibleStatFilter, number>;
+  activeStatus: VisibleStatFilter;
+  onStatusChange: (status: VisibleStatFilter) => void;
 }) {
   return (
     <section
-      className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
+      className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
       aria-label="Task status overview"
     >
       {statItems.map((item) => {
@@ -71,6 +70,11 @@ export function TaskStats({
               <span className="mt-1 block text-2xl font-extrabold text-[#101426]">
                 {counts[item.id]}
               </span>
+              {isActive ? (
+                <span className="mt-1 block text-xs font-bold text-[#6255f6]">
+                  Selected
+                </span>
+              ) : null}
             </span>
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-[#6255f6]">
               <StatIcon icon={item.icon} />

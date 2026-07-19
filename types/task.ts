@@ -1,8 +1,7 @@
 export type TaskStatus =
   | "not_started"
   | "in_progress"
-  | "completed"
-  | "locked";
+  | "completed";
 
 export type TaskDifficulty = "easy" | "medium" | "hard";
 
@@ -15,21 +14,28 @@ export type TaskTopic =
 
 export type TaskSort =
   | "recommended"
-  | "difficulty_asc"
-  | "difficulty_desc"
-  | "progress"
+  | "newest"
+  | "source_file"
+  | "thinking_progress"
   | "recently_updated";
+
+export type TaskViewMode = "cards" | "by-file";
 
 export interface ProgrammingTaskSummary {
   id: string;
   taskNumber: number;
   title: string;
   description: string;
+  sourceFileId: string;
+  sourceFileName: string;
+  sourceFileType?: "pdf" | "docx" | "pptx" | "txt" | "markdown";
+  language: "Python";
   topic: TaskTopic;
   difficulty: TaskDifficulty;
   status: TaskStatus;
   progress: number;
   estimatedMinutes: number;
+  createdAt: string;
   updatedAt: string;
   href: string;
   imported?: boolean;
@@ -37,10 +43,12 @@ export interface ProgrammingTaskSummary {
 
 export interface TaskFilters {
   query: string;
+  source: string | "all";
   topic: TaskTopic | "all";
-  difficulty: TaskDifficulty | "all";
+  depth: TaskDifficulty | "all";
   status: TaskStatus | "all";
   sort: TaskSort;
+  view: TaskViewMode;
 }
 
 export interface TaskExample {
