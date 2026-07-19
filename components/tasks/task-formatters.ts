@@ -10,6 +10,7 @@ export const topicLabels: Record<TaskTopic, string> = {
   loops: "Loops",
   functions: "Functions",
   lists: "Lists",
+  strings: "Strings",
 };
 
 export const difficultyLabels: Record<TaskDifficulty, string> = {

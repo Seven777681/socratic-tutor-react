@@ -42,13 +42,13 @@ export function RecentUploads({ uploads }: { uploads: RecentUpload[] }) {
             No uploads yet
           </h3>
           <p className="mx-auto mt-2 max-w-[420px] text-sm leading-6 text-slate-500">
-            Upload an assignment file to generate your first programming tasks.
+            Upload an assignment or lecture file to generate thinking tasks.
           </p>
           <Link
             href="/assignment-import"
             className="mt-5 inline-flex h-11 items-center justify-center rounded-lg bg-[linear-gradient(90deg,#6657f5,#4678ff)] px-4 text-sm font-bold text-white shadow-lg shadow-indigo-200/80 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15"
           >
-            Import Assignment
+            Upload File
           </Link>
         </div>
       )}

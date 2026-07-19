@@ -1,20 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { mockDashboardStats } from "@/data/dashboard";
+import { emptyDashboardStats } from "@/data/dashboard";
 import {
   loadImportHistory,
-  loadImportedTasks,
+  getGeneratedTasks,
 } from "@/lib/imported-tasks-storage";
 import type { DashboardStat, DashboardStats } from "@/types/dashboard";
 
 export function getDashboardStats(): DashboardStats {
   const importHistory = loadImportHistory();
-  const importedTasks = loadImportedTasks();
-
-  if (!importHistory.length && !importedTasks.length) {
-    return mockDashboardStats;
-  }
+  const importedTasks = getGeneratedTasks();
 
   const questionsTotal = importedTasks.length;
   const questionsCompleted = importedTasks.filter(
@@ -25,7 +21,7 @@ export function getDashboardStats(): DashboardStats {
     filesAnalysed: importHistory.length,
     questionsCompleted,
     questionsTotal,
-    learningStreakDays: mockDashboardStats.learningStreakDays,
+    learningStreakDays: emptyDashboardStats.learningStreakDays,
   };
 }
 
@@ -56,7 +52,7 @@ function toDashboardStatCards(stats: DashboardStats): DashboardStat[] {
 }
 
 export function useDashboardStats() {
-  const [stats, setStats] = useState<DashboardStats>(mockDashboardStats);
+  const [stats, setStats] = useState<DashboardStats>(emptyDashboardStats);
 
   useEffect(() => {
     setStats(getDashboardStats());

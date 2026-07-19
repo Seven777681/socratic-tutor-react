@@ -10,7 +10,8 @@ export type TaskTopic =
   | "conditionals"
   | "loops"
   | "functions"
-  | "lists";
+  | "lists"
+  | "strings";
 
 export type TaskSort =
   | "recommended"

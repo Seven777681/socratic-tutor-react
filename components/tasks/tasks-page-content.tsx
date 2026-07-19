@@ -19,8 +19,7 @@ import { TaskStats } from "@/components/tasks/task-stats";
 import { TasksEmptyState } from "@/components/tasks/tasks-empty-state";
 import { TasksPageHeader } from "@/components/tasks/tasks-page-header";
 import {
-  loadImportedTasks,
-  toTaskSummary,
+  getGeneratedTaskSummaries,
 } from "@/lib/imported-tasks-storage";
 
 const topicValues: TaskTopic[] = [
@@ -29,6 +28,7 @@ const topicValues: TaskTopic[] = [
   "loops",
   "functions",
   "lists",
+  "strings",
 ];
 
 const difficultyValues: TaskDifficulty[] = ["easy", "medium", "hard"];
@@ -159,26 +159,23 @@ function sortTasks(tasks: ProgrammingTaskSummary[], sort: TaskSort) {
 }
 
 export function TasksPageContent({
-  tasks,
+  tasks = [],
 }: {
-  tasks: ProgrammingTaskSummary[];
+  tasks?: ProgrammingTaskSummary[];
 }) {
   const searchParams = useSearchParams();
-  const [importedTasks, setImportedTasks] = useState<ProgrammingTaskSummary[]>([]);
+  const [generatedTasks, setGeneratedTasks] = useState<ProgrammingTaskSummary[]>(tasks);
   const [filters, setFilters] = useState<TaskFilters>(() =>
     getInitialFilters(searchParams),
   );
 
   useEffect(() => {
-    const imported = loadImportedTasks().map((task, index) =>
-      toTaskSummary(task, tasks.length + index + 1),
-    );
-    setImportedTasks(imported);
-  }, [tasks.length]);
+    setGeneratedTasks(getGeneratedTaskSummaries());
+  }, []);
 
   const allTasks = useMemo(
-    () => [...tasks, ...importedTasks],
-    [importedTasks, tasks],
+    () => generatedTasks,
+    [generatedTasks],
   );
 
   const completedTasks = useMemo(
@@ -227,6 +224,7 @@ export function TasksPageContent({
   const hasActiveFilters = hasFilters(filters);
 
   const clearFilters = () => setFilters(defaultFilters);
+  const hasTasks = allTasks.length > 0;
 
   return (
     <div className="space-y-7">
@@ -235,32 +233,41 @@ export function TasksPageContent({
         totalTasks={allTasks.length}
       />
 
-      <TaskStats
-        counts={counts}
-        activeStatus={activeStatus}
-        onStatusChange={(status) =>
-          setFilters((current) => ({ ...current, status }))
-        }
-      />
+      {hasTasks ? (
+        <>
+          <TaskStats
+            counts={counts}
+            activeStatus={activeStatus}
+            onStatusChange={(status) =>
+              setFilters((current) => ({ ...current, status }))
+            }
+          />
 
-      <TaskFilterBar
-        filters={filters}
-        sourceFiles={sourceFiles}
-        hasActiveFilters={hasActiveFilters}
-        onFiltersChange={setFilters}
-        onClearFilters={clearFilters}
-      />
+          <TaskFilterBar
+            filters={filters}
+            sourceFiles={sourceFiles}
+            hasActiveFilters={hasActiveFilters}
+            onFiltersChange={setFilters}
+            onClearFilters={clearFilters}
+          />
 
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm font-semibold text-slate-500">
-          Showing{" "}
-          <span className="text-[#101426]">{filteredTasks.length}</span> of{" "}
-          <span className="text-[#101426]">{allTasks.length}</span> thinking tasks
-        </p>
-      </div>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm font-semibold text-slate-500">
+              Showing{" "}
+              <span className="text-[#101426]">{filteredTasks.length}</span> of{" "}
+              <span className="text-[#101426]">{allTasks.length}</span> thinking tasks
+            </p>
+          </div>
+        </>
+      ) : null}
 
       <div className="motion-safe:animate-[fadeIn_250ms_ease-out]">
-        {filteredTasks.length > 0 ? (
+        {!hasTasks ? (
+          <TasksEmptyState
+            hasActiveFilters={false}
+            onClearFilters={clearFilters}
+          />
+        ) : filteredTasks.length > 0 ? (
           filters.view === "by-file" ? (
             <GroupedBySourceView tasks={filteredTasks} />
           ) : (

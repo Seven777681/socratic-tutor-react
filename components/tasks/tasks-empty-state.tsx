@@ -18,7 +18,7 @@ export function TasksEmptyState({
           No thinking tasks yet
         </h2>
         <p className="mx-auto mt-2 max-w-[520px] text-sm leading-6 text-slate-500">
-          Upload your first code file, and the AI will generate customized
+          Upload your first class file, and the AI will generate customized
           Socratic questions for you.
         </p>
         <Link

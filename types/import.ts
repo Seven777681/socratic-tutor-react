@@ -11,6 +11,7 @@ export type ImportPipelineStatus =
   | "idle"
   | "file_selected"
   | "extracting"
+  | "detecting_concepts"
   | "generating"
   | "ready"
   | "imported"
@@ -27,13 +28,18 @@ export interface ImportedAssignmentFile {
 export interface ExtractedConcept {
   id: string;
   name: string;
-  confidence?: number;
-  sourceNote?: string;
+  topic: TaskTopic;
+  confidence: number;
+  sourceNote: string;
+  matchedKeywords: string[];
 }
 
 export interface GeneratedPracticeTask {
   id: string;
+  taskNumber: number;
   sourceFileId: string;
+  sourceFileName: string;
+  sourceFileType: ImportedTaskSourceType;
   title: string;
   topic: TaskTopic;
   difficulty: TaskDifficulty;
@@ -51,10 +57,22 @@ export interface GeneratedPracticeTask {
     output: string;
   }[];
   constraints: string[];
+  helpfulReminder: string;
   starterCode: string;
   language: "python";
   imported: true;
   createdAt: string;
+  updatedAt: string;
+  href: string;
+}
+
+export interface AssignmentAnalysisResponse {
+  assignmentFile: ImportedAssignmentFile;
+  extractedText: string;
+  textPreview: string;
+  detectedConcepts: ExtractedConcept[];
+  generatedTasks: GeneratedPracticeTask[];
+  warnings?: string[];
 }
 
 export interface ImportHistoryEntry {

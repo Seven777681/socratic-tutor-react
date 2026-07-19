@@ -19,15 +19,10 @@ import {
   appendImportedTasks,
   loadImportHistory,
   loadImportedFiles,
-  loadImportedTasks,
   saveImportHistory,
-  saveGeneratedImportTasks,
   saveImportedFiles,
 } from "@/lib/imported-tasks-storage";
-import {
-  mockExtractConcepts,
-  mockGenerateTasks,
-} from "@/services/mock-assignment-importer";
+import { analyzeAssignmentFile } from "@/services/assignments-service";
 import type {
   ExtractedConcept,
   GeneratedPracticeTask,
@@ -44,7 +39,8 @@ const acceptedExtensions = [".pdf", ".docx", ".pptx", ".txt", ".md"];
 const statusLabels: Record<ImportPipelineStatus, string> = {
   idle: "Idle",
   file_selected: "File selected",
-  extracting: "Extracting concepts",
+  extracting: "Extracting text",
+  detecting_concepts: "Detecting concepts",
   generating: "Generating tasks",
   ready: "Ready to review",
   imported: "Imported",
@@ -55,6 +51,7 @@ const statusOrder: ImportPipelineStatus[] = [
   "idle",
   "file_selected",
   "extracting",
+  "detecting_concepts",
   "generating",
   "ready",
   "imported",
@@ -89,16 +86,6 @@ function createFileMeta(file: File, type: ImportedTaskSourceType): ImportedAssig
   };
 }
 
-async function readTextFile(file: File) {
-  const type = sourceTypeFromFile(file);
-
-  if (type !== "txt" && type !== "markdown") {
-    return undefined;
-  }
-
-  return file.text();
-}
-
 function PipelineStatus({ status }: { status: ImportPipelineStatus }) {
   const currentIndex = Math.max(0, statusOrder.indexOf(status));
   const progress = status === "error" ? 0 : Math.round((currentIndex / (statusOrder.length - 1)) * 100);
@@ -108,7 +95,7 @@ function PipelineStatus({ status }: { status: ImportPipelineStatus }) {
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm font-bold text-slate-600">Import pipeline</p>
         <span className="inline-flex items-center gap-2 rounded-full bg-[#eceaff] px-3 py-1 text-xs font-extrabold text-[#6255f6]">
-          {status === "extracting" || status === "generating" ? (
+          {status === "extracting" || status === "detecting_concepts" || status === "generating" ? (
             <LoaderCircleIcon className="h-3.5 w-3.5 motion-safe:animate-spin" />
           ) : (
             <CheckCircleIcon className="h-3.5 w-3.5" />
@@ -146,12 +133,23 @@ function ConceptsPanel({ concepts }: { concepts: ExtractedConcept[] }) {
     <section className="rounded-[20px] border border-[#E4E7F0] bg-white p-5 shadow-[0_16px_45px_rgba(78,91,130,0.08)] sm:p-6">
       <h2 className="text-xl font-extrabold tracking-normal text-[#101426]">Detected Concepts</h2>
       {concepts.length ? (
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 grid gap-3">
           {concepts.map((concept) => (
-            <span key={concept.id} className="rounded-2xl border border-indigo-100 bg-[#FBFCFF] px-4 py-3">
-              <span className="block text-sm font-extrabold text-[#6255f6]">{concept.name}</span>
-              <span className="mt-1 block text-xs font-semibold text-slate-500">{concept.sourceNote}</span>
-            </span>
+            <article key={concept.id} className="rounded-2xl border border-indigo-100 bg-[#FBFCFF] px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-extrabold text-[#6255f6]">{concept.name}</h3>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-slate-600">
+                  Confidence: {Math.round(concept.confidence * 100)}%
+                </span>
+              </div>
+              <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{concept.sourceNote}</p>
+              <p className="mt-2 text-xs font-bold text-slate-600">
+                Matched:{" "}
+                <span className="font-semibold text-slate-500">
+                  {concept.matchedKeywords.length ? concept.matchedKeywords.join(", ") : "No strong keyword match"}
+                </span>
+              </p>
+            </article>
           ))}
         </div>
       ) : (
@@ -159,6 +157,53 @@ function ConceptsPanel({ concepts }: { concepts: ExtractedConcept[] }) {
           Upload a class file to see detected programming concepts.
         </p>
       )}
+    </section>
+  );
+}
+
+function ExtractedTextPreview({
+  extractedText,
+  textPreview,
+  keywordCount,
+}: {
+  extractedText: string;
+  textPreview: string;
+  keywordCount: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const hasText = extractedText.trim().length > 0;
+  const visibleText = expanded ? extractedText : textPreview;
+
+  return (
+    <section className="rounded-[20px] border border-[#E4E7F0] bg-white p-5 shadow-[0_16px_45px_rgba(78,91,130,0.08)] sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-extrabold tracking-normal text-[#101426]">Extracted Text Preview</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">
+            {hasText
+              ? `${extractedText.length.toLocaleString()} characters extracted · ${keywordCount} keywords detected`
+              : "No readable text was extracted from this file."}
+          </p>
+        </div>
+        {hasText && extractedText.length > textPreview.length ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((current) => !current)}
+            className="rounded-lg border border-[#b9b2ff] bg-white px-3 py-2 text-xs font-bold text-[#6255f6] focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15"
+          >
+            {expanded ? "Collapse" : "View More"}
+          </button>
+        ) : null}
+      </div>
+      <div className="mt-4 rounded-[16px] border border-[#E4E7F0] bg-[#FBFCFF] p-4">
+        {hasText ? (
+          <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{visibleText}</p>
+        ) : (
+          <p className="text-sm font-semibold leading-6 text-slate-500">
+            Try uploading a text-based PDF, DOCX, TXT, or Markdown file.
+          </p>
+        )}
+      </div>
     </section>
   );
 }
@@ -184,6 +229,9 @@ function TaskCard({
         <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">Draft</span>
       </div>
       <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">{task.description}</p>
+      <p className="mt-3 truncate text-xs font-bold text-slate-500" title={task.sourceFileName}>
+        Source File: <span className="text-slate-700">{task.sourceFileName}</span>
+      </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[#eceaff] px-3 py-1 text-xs font-bold text-[#6255f6]">
           <BookOpenIcon className="h-3.5 w-3.5" />
@@ -198,6 +246,15 @@ function TaskCard({
           {task.estimatedMinutes} min
         </span>
       </div>
+      <div className="mt-4 rounded-[14px] border border-[#E4E7F0] bg-[#FBFCFF] p-4">
+        <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-slate-400">Problem Preview</p>
+        <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">
+          {task.problemDescription.join(" ")}
+        </p>
+      </div>
+      <p className="mt-4 text-xs font-extrabold uppercase tracking-[0.12em] text-slate-400">
+        Starter Code Preview
+      </p>
       <pre className="mt-4 max-h-36 overflow-auto rounded-[14px] bg-slate-950 p-4 text-xs leading-5 text-slate-100">
         <code>{task.starterCode}</code>
       </pre>
@@ -315,8 +372,12 @@ function TaskEditor({
 }
 
 export function AssignmentImportPage() {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileMeta, setFileMeta] = useState<ImportedAssignmentFile | null>(null);
-  const [rawText, setRawText] = useState<string | undefined>();
+  const [extractedText, setExtractedText] = useState("");
+  const [textPreview, setTextPreview] = useState("");
+  const [keywordCount, setKeywordCount] = useState(0);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [status, setStatus] = useState<ImportPipelineStatus>("idle");
   const [error, setError] = useState("");
   const [concepts, setConcepts] = useState<ExtractedConcept[]>([]);
@@ -330,7 +391,10 @@ export function AssignmentImportPage() {
   }, []);
 
   const hasReviewTasks = tasks.length > 0 && (status === "ready" || status === "imported");
-  const processing = status === "extracting" || status === "generating";
+  const processing =
+    status === "extracting" ||
+    status === "detecting_concepts" ||
+    status === "generating";
 
   const selectFile = async (file: File | null) => {
     if (!file) {
@@ -355,13 +419,17 @@ export function AssignmentImportPage() {
     setSuccessMessage("");
     setTasks([]);
     setConcepts([]);
-    setRawText(await readTextFile(file));
+    setSelectedFile(file);
+    setExtractedText("");
+    setTextPreview("");
+    setKeywordCount(0);
+    setWarnings([]);
     setFileMeta(createFileMeta(file, type));
     setStatus("file_selected");
   };
 
   const generateTasks = async () => {
-    if (!fileMeta) {
+    if (!selectedFile) {
       return;
     }
 
@@ -369,16 +437,22 @@ export function AssignmentImportPage() {
       setError("");
       setSuccessMessage("");
       setStatus("extracting");
-      const nextConcepts = await mockExtractConcepts(fileMeta, rawText);
-      setConcepts(nextConcepts);
+      const analysis = await analyzeAssignmentFile(selectedFile);
+      setFileMeta(analysis.assignmentFile);
+      setExtractedText(analysis.extractedText);
+      setTextPreview(analysis.textPreview);
+      setKeywordCount(analysis.keywordCount);
+      setWarnings(analysis.warnings ?? []);
+      setStatus("detecting_concepts");
+      setConcepts(analysis.detectedConcepts);
       setStatus("generating");
-      const generated = await mockGenerateTasks({ file: fileMeta, concepts: nextConcepts, rawText });
-      saveGeneratedImportTasks(generated);
-      setTasks(generated);
+      setTasks(analysis.generatedTasks);
       setStatus("ready");
-    } catch {
+    } catch (caughtError) {
       setStatus("error");
-      setError("Task generation failed. Try again with the same file.");
+      setError(caughtError instanceof Error
+        ? caughtError.message
+        : "Task generation failed. Try again with the same file.");
     }
   };
 
@@ -388,11 +462,16 @@ export function AssignmentImportPage() {
     }
 
     const importedAt = new Date().toISOString();
-    const existingImportedCount = loadImportedTasks().length;
     const importedTasks = tasks.map((task, index) => ({
       ...task,
-      id: `imported-task-${String(existingImportedCount + index + 1).padStart(3, "0")}`,
+      id: `${fileMeta.id}-task-${String(index + 1).padStart(3, "0")}`,
+      taskNumber: index + 1,
+      sourceFileId: fileMeta.id,
+      sourceFileName: fileMeta.name,
+      sourceFileType: fileMeta.type,
       createdAt: importedAt,
+      updatedAt: importedAt,
+      href: `/tasks/${fileMeta.id}-task-${String(index + 1).padStart(3, "0")}`,
     }));
     appendImportedTasks(importedTasks);
     saveImportedFiles([fileMeta, ...loadImportedFiles()]);
@@ -414,8 +493,8 @@ export function AssignmentImportPage() {
   };
 
   const fileHint = fileMeta && (fileMeta.type === "pdf" || fileMeta.type === "docx" || fileMeta.type === "pptx")
-    ? "Content extraction is mocked in this frontend version. Backend parsing can be connected later."
-    : "In this prototype, files stay in your browser. Backend extraction can be connected later.";
+    ? "This file will be sent to the local Next.js API route for server-side text extraction."
+    : "TXT and Markdown files are read by the local Next.js API route and never leave this prototype.";
 
   return (
     <div className="space-y-7">
@@ -471,7 +550,7 @@ export function AssignmentImportPage() {
                     <p className="mt-1 font-semibold text-slate-500">{fileMeta.type.toUpperCase()} · {formatFileSize(fileMeta.size)}</p>
                     <p className="mt-1 font-semibold text-slate-500">Uploaded {new Date(fileMeta.uploadedAt).toLocaleString()}</p>
                   </div>
-                  <button type="button" onClick={() => { setFileMeta(null); setTasks([]); setConcepts([]); setStatus("idle"); }} className="rounded-lg border border-[#E4E7F0] px-3 py-2 text-xs font-bold text-slate-600 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15">
+                  <button type="button" onClick={() => { setSelectedFile(null); setFileMeta(null); setTasks([]); setConcepts([]); setWarnings([]); setExtractedText(""); setTextPreview(""); setKeywordCount(0); setStatus("idle"); }} className="rounded-lg border border-[#E4E7F0] px-3 py-2 text-xs font-bold text-slate-600 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15">
                     Remove File
                   </button>
                 </div>
@@ -479,6 +558,20 @@ export function AssignmentImportPage() {
               </div>
             ) : null}
           </section>
+          {warnings.length ? (
+            <div className="rounded-[18px] border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-bold leading-6 text-amber-800">
+              {warnings.map((warning) => (
+                <p key={warning}>{warning}</p>
+              ))}
+            </div>
+          ) : null}
+          {(status === "ready" || status === "imported" || extractedText || textPreview) ? (
+            <ExtractedTextPreview
+              extractedText={extractedText}
+              textPreview={textPreview}
+              keywordCount={keywordCount}
+            />
+          ) : null}
           <ConceptsPanel concepts={concepts} />
         </div>
 
