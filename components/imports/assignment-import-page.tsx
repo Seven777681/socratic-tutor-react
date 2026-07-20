@@ -25,6 +25,7 @@ import {
 import { analyzeAssignmentFile } from "@/services/assignments-service";
 import type {
   ExtractedConcept,
+  ExtractedQuestion,
   GeneratedPracticeTask,
   ImportedAssignmentFile,
   ImportHistoryEntry,
@@ -208,6 +209,75 @@ function ExtractedTextPreview({
   );
 }
 
+function ExtractedQuestionsPanel({
+  questions,
+  onToggleQuestion,
+}: {
+  questions: ExtractedQuestion[];
+  onToggleQuestion: (questionId: string, selected: boolean) => void;
+}) {
+  return (
+    <section className="rounded-[20px] border border-[#E4E7F0] bg-white p-5 shadow-[0_16px_45px_rgba(78,91,130,0.08)] sm:p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-extrabold tracking-normal text-[#101426]">Extracted Questions</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">
+            {questions.length
+              ? `${questions.length} programming question${questions.length === 1 ? "" : "s"} detected`
+              : "No explicit programming questions detected."}
+          </p>
+        </div>
+      </div>
+
+      {questions.length ? (
+        <div className="mt-4 grid gap-3">
+          {questions.map((question) => (
+            <article key={question.id} className="rounded-2xl border border-indigo-100 bg-[#FBFCFF] p-4">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={question.selected !== false}
+                  onChange={(event) => onToggleQuestion(question.id, event.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-[#6255f6] accent-[#6255f6] focus:ring-4 focus:ring-[#6255f6]/10"
+                  aria-label={`Include Question ${question.questionNumber}`}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-extrabold text-[#101426]">
+                      Question {question.questionNumber}: {question.title}
+                    </h3>
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-slate-600">
+                      Confidence: {Math.round(question.confidence * 100)}%
+                    </span>
+                  </div>
+                  <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">
+                    {question.sourceSnippet}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-[#eceaff] px-3 py-1 text-xs font-bold text-[#6255f6]">
+                      Topic: {question.detectedTopic}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                      {question.thinkingDepth.replace("_", " ")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-[18px] border border-[#E4E7F0] bg-[#FBFCFF] px-4 py-8 text-center">
+          <p className="text-sm font-bold text-slate-500">No explicit programming questions detected.</p>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+            We will try to generate practice tasks from detected concepts instead.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function TaskCard({
   task,
   index,
@@ -232,6 +302,17 @@ function TaskCard({
       <p className="mt-3 truncate text-xs font-bold text-slate-500" title={task.sourceFileName}>
         Source File: <span className="text-slate-700">{task.sourceFileName}</span>
       </p>
+      {task.sourceQuestionLabel ? (
+        <div className="mt-3 rounded-[14px] border border-indigo-100 bg-indigo-50/40 p-3">
+          <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-[#6255f6]">Source question</p>
+          <p className="mt-1 text-sm font-bold text-[#101426]">{task.sourceQuestionLabel}</p>
+          {task.sourceQuestionSnippet ? (
+            <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500">
+              {task.sourceQuestionSnippet}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[#eceaff] px-3 py-1 text-xs font-bold text-[#6255f6]">
           <BookOpenIcon className="h-3.5 w-3.5" />
@@ -381,6 +462,7 @@ export function AssignmentImportPage() {
   const [status, setStatus] = useState<ImportPipelineStatus>("idle");
   const [error, setError] = useState("");
   const [concepts, setConcepts] = useState<ExtractedConcept[]>([]);
+  const [extractedQuestions, setExtractedQuestions] = useState<ExtractedQuestion[]>([]);
   const [tasks, setTasks] = useState<GeneratedPracticeTask[]>([]);
   const [editingTask, setEditingTask] = useState<GeneratedPracticeTask | null>(null);
   const [history, setHistory] = useState<ImportHistoryEntry[]>([]);
@@ -419,6 +501,7 @@ export function AssignmentImportPage() {
     setSuccessMessage("");
     setTasks([]);
     setConcepts([]);
+    setExtractedQuestions([]);
     setSelectedFile(file);
     setExtractedText("");
     setTextPreview("");
@@ -445,6 +528,7 @@ export function AssignmentImportPage() {
       setWarnings(analysis.warnings ?? []);
       setStatus("detecting_concepts");
       setConcepts(analysis.detectedConcepts);
+      setExtractedQuestions(analysis.extractedQuestions);
       setStatus("generating");
       setTasks(analysis.generatedTasks);
       setStatus("ready");
@@ -457,12 +541,20 @@ export function AssignmentImportPage() {
   };
 
   const addToTaskList = () => {
-    if (!fileMeta || !tasks.length) {
+    const selectedTasks = tasks.filter((task) => {
+      if (!task.sourceQuestionId) {
+        return true;
+      }
+
+      return extractedQuestions.find((question) => question.id === task.sourceQuestionId)?.selected !== false;
+    });
+
+    if (!fileMeta || !selectedTasks.length) {
       return;
     }
 
     const importedAt = new Date().toISOString();
-    const importedTasks = tasks.map((task, index) => ({
+    const importedTasks = selectedTasks.map((task, index) => ({
       ...task,
       id: `${fileMeta.id}-task-${String(index + 1).padStart(3, "0")}`,
       taskNumber: index + 1,
@@ -495,6 +587,20 @@ export function AssignmentImportPage() {
   const fileHint = fileMeta && (fileMeta.type === "pdf" || fileMeta.type === "docx" || fileMeta.type === "pptx")
     ? "This file will be sent to the local Next.js API route for server-side text extraction."
     : "TXT and Markdown files are read by the local Next.js API route and never leave this prototype.";
+  const toggleQuestion = (questionId: string, selected: boolean) => {
+    setExtractedQuestions((current) =>
+      current.map((question) =>
+        question.id === questionId ? { ...question, selected } : question,
+      ),
+    );
+  };
+  const visibleTasks = tasks.filter((task) => {
+    if (!task.sourceQuestionId) {
+      return true;
+    }
+
+    return extractedQuestions.find((question) => question.id === task.sourceQuestionId)?.selected !== false;
+  });
 
   return (
     <div className="space-y-7">
@@ -550,7 +656,7 @@ export function AssignmentImportPage() {
                     <p className="mt-1 font-semibold text-slate-500">{fileMeta.type.toUpperCase()} · {formatFileSize(fileMeta.size)}</p>
                     <p className="mt-1 font-semibold text-slate-500">Uploaded {new Date(fileMeta.uploadedAt).toLocaleString()}</p>
                   </div>
-                  <button type="button" onClick={() => { setSelectedFile(null); setFileMeta(null); setTasks([]); setConcepts([]); setWarnings([]); setExtractedText(""); setTextPreview(""); setKeywordCount(0); setStatus("idle"); }} className="rounded-lg border border-[#E4E7F0] px-3 py-2 text-xs font-bold text-slate-600 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15">
+                  <button type="button" onClick={() => { setSelectedFile(null); setFileMeta(null); setTasks([]); setConcepts([]); setExtractedQuestions([]); setWarnings([]); setExtractedText(""); setTextPreview(""); setKeywordCount(0); setStatus("idle"); }} className="rounded-lg border border-[#E4E7F0] px-3 py-2 text-xs font-bold text-slate-600 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15">
                     Remove File
                   </button>
                 </div>
@@ -572,6 +678,12 @@ export function AssignmentImportPage() {
               keywordCount={keywordCount}
             />
           ) : null}
+          {(status === "ready" || status === "imported" || extractedQuestions.length > 0 || extractedText) ? (
+            <ExtractedQuestionsPanel
+              questions={extractedQuestions}
+              onToggleQuestion={toggleQuestion}
+            />
+          ) : null}
           <ConceptsPanel concepts={concepts} />
         </div>
 
@@ -585,7 +697,7 @@ export function AssignmentImportPage() {
             </div>
           ) : hasReviewTasks ? (
             <div className="mt-5 grid gap-4 xl:grid-cols-2">
-              {tasks.map((task, index) => (
+              {visibleTasks.map((task, index) => (
                 <TaskCard
                   key={task.id}
                   task={task}

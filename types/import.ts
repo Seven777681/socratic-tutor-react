@@ -1,5 +1,7 @@
 import type { TaskDifficulty, TaskStatus, TaskTopic } from "@/types/task";
 
+export type ThinkingDepth = "foundational" | "intermediate" | "deep_dive";
+
 export type ImportedTaskSourceType =
   | "pdf"
   | "docx"
@@ -34,12 +36,37 @@ export interface ExtractedConcept {
   matchedKeywords: string[];
 }
 
+export interface ExtractedQuestion {
+  id: string;
+  questionNumber: number;
+  title: string;
+  rawText: string;
+  problemStatement: string;
+  inputDescription?: string;
+  outputDescription?: string;
+  examples: {
+    id: string;
+    input: string;
+    output: string;
+    explanation?: string;
+  }[];
+  requirements: string[];
+  detectedTopic: TaskTopic;
+  thinkingDepth: ThinkingDepth;
+  confidence: number;
+  sourceSnippet: string;
+  selected?: boolean;
+}
+
 export interface GeneratedPracticeTask {
   id: string;
   taskNumber: number;
   sourceFileId: string;
   sourceFileName: string;
   sourceFileType: ImportedTaskSourceType;
+  sourceQuestionId?: string;
+  sourceQuestionLabel?: string;
+  sourceQuestionSnippet?: string;
   title: string;
   topic: TaskTopic;
   difficulty: TaskDifficulty;
@@ -71,6 +98,7 @@ export interface AssignmentAnalysisResponse {
   extractedText: string;
   textPreview: string;
   detectedConcepts: ExtractedConcept[];
+  extractedQuestions: ExtractedQuestion[];
   generatedTasks: GeneratedPracticeTask[];
   warnings?: string[];
 }
