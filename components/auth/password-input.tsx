@@ -27,8 +27,10 @@ export function PasswordInput({
       <label htmlFor={id} className="block text-sm font-semibold text-slate-800">
         {label}
       </label>
-      <div className="relative mt-3">
-        <span className="pointer-events-none absolute left-4 top-1/2 flex -translate-y-1/2 text-slate-700">
+      <div className="relative mt-2.5">
+        <span className={`pointer-events-none absolute left-4 top-1/2 flex -translate-y-1/2 ${
+          error ? "text-red-500" : "text-slate-500"
+        }`}>
           <svg
             aria-hidden="true"
             viewBox="0 0 24 24"
@@ -68,8 +70,8 @@ export function PasswordInput({
           disabled={disabled}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? errorId : undefined}
-          className={`h-[52px] w-full rounded-[10px] border bg-white pl-12 pr-14 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#6255f6] focus:ring-4 focus:ring-[#6255f6]/10 disabled:cursor-not-allowed disabled:bg-slate-100 ${
-            error ? "border-red-500" : "border-slate-200"
+          className={`h-[52px] w-full rounded-[12px] border bg-[#FBFCFF] pl-12 pr-14 text-base font-semibold text-slate-950 outline-none transition placeholder:font-medium placeholder:text-slate-400 focus:border-[#6255f6] focus:bg-white focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+            error ? "border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-red-100" : "border-slate-200"
           }`}
         />
         <button
@@ -77,7 +79,7 @@ export function PasswordInput({
           onClick={() => setIsVisible((current) => !current)}
           disabled={disabled}
           aria-label={isVisible ? "Hide password" : "Show password"}
-          className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-[#6255f6] transition hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/10 disabled:cursor-not-allowed disabled:text-slate-400"
+          className="absolute right-2.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition hover:bg-indigo-50 hover:text-[#6255f6] focus:outline-none focus:ring-4 focus:ring-[#6255f6]/10 disabled:cursor-not-allowed disabled:text-slate-400"
         >
           {isVisible ? (
             <svg
@@ -132,7 +134,7 @@ export function PasswordInput({
         </button>
       </div>
       {error ? (
-        <p id={errorId} className="mt-2 text-sm font-medium text-red-600">
+        <p id={errorId} className="mt-2 text-sm font-semibold text-red-600">
           {error}
         </p>
       ) : null}
