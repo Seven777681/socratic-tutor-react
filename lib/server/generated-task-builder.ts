@@ -1,7 +1,9 @@
 import type {
   ExtractedConcept,
+  ExtractedQuestion,
   GeneratedPracticeTask,
   ImportedAssignmentFile,
+  ThinkingDepth,
 } from "@/types/import";
 import type { TaskDifficulty, TaskTopic } from "@/types/task";
 
@@ -58,6 +60,12 @@ const starterCodeByTopic: Record<TaskTopic, string> = {
   functions: "def solve():\n    # TODO: Write your function logic\n    pass\n\nsolve()\n",
   lists: 'values = input("Enter values separated by spaces: ").split()\n\n# TODO: Process the list values\n\nprint(values)\n',
   strings: 'text = input("Enter text: ")\n\n# TODO: Inspect or transform the text\n\nprint(text)\n',
+};
+
+const depthToDifficulty: Record<ThinkingDepth, TaskDifficulty> = {
+  foundational: "easy",
+  intermediate: "medium",
+  deep_dive: "hard",
 };
 
 function toTitleCase(value: string) {
@@ -130,6 +138,24 @@ function buildTitle(topic: TaskTopic, contextPhrase: string) {
   return `Use Variables for ${toTitleCase(concise)}`;
 }
 
+function buildQuestionTitle(question: ExtractedQuestion) {
+  const title = question.title.trim();
+
+  if (title && !/^Question\s+\d+$/i.test(title)) {
+    if (question.detectedTopic === "conditionals" && /\bpositive|negative|zero|classify|grade\b/i.test(title)) {
+      return `${title} with Conditional Logic`;
+    }
+
+    if (question.detectedTopic === "loops" && /\bsum|total|count|sales|range\b/i.test(title)) {
+      return `${title} with a Loop`;
+    }
+
+    return title;
+  }
+
+  return buildTitle(question.detectedTopic, question.problemStatement);
+}
+
 function difficultyForConcept(concept: ExtractedConcept, index: number): TaskDifficulty {
   if (concept.topic === "functions" || concept.topic === "lists" || index === 2) {
     return "medium";
@@ -176,7 +202,7 @@ function buildTask(
     status: "not_started",
     progress: 0,
     estimatedMinutes: estimatedMinutes(difficulty),
-    description: `Explore ${seed.contextPhrase} using the assignment context: “${contextPhrase.slice(0, 130)}”.`,
+    description: `Explore ${seed.contextPhrase} using the assignment context: "${contextPhrase.slice(0, 130)}".`,
     problemDescription: [
       `Create a Python program connected to this assignment idea: ${contextPhrase}`,
       "Use the starter code as a scaffold, then reason through each step before writing the full logic.",
@@ -211,6 +237,72 @@ function buildTask(
   };
 }
 
+function buildTaskFromQuestion(
+  file: ImportedAssignmentFile,
+  question: ExtractedQuestion,
+  index: number,
+): GeneratedPracticeTask {
+  const createdAt = new Date().toISOString();
+  const difficulty = depthToDifficulty[question.thinkingDepth];
+  const id = `${file.id}-draft-${String(index + 1).padStart(3, "0")}`;
+  const seed = topicDefaults[question.detectedTopic];
+
+  return {
+    id,
+    taskNumber: index + 1,
+    sourceFileId: file.id,
+    sourceFileName: file.name,
+    sourceFileType: file.type,
+    sourceQuestionId: question.id,
+    sourceQuestionLabel: `Question ${question.questionNumber}`,
+    sourceQuestionSnippet: question.sourceSnippet,
+    title: buildQuestionTitle(question),
+    topic: question.detectedTopic,
+    difficulty,
+    status: "not_started",
+    progress: 0,
+    estimatedMinutes: estimatedMinutes(difficulty),
+    description: `Turn the original Question ${question.questionNumber} into a guided Socratic coding task about ${seed.contextPhrase}.`,
+    problemDescription: [
+      question.problemStatement,
+      "Use the starter code as a scaffold. Think through the inputs, outputs, and required steps before coding.",
+    ],
+    learningObjectives: [
+      `Identify the main ${question.detectedTopic} idea in the original question.`,
+      "Translate the problem statement into input, processing, and output steps.",
+      "Explain your reasoning before completing the code.",
+    ],
+    inputDescription: question.inputDescription || seed.inputHint,
+    outputDescription: question.outputDescription || seed.outputHint,
+    examples: question.examples.length
+      ? question.examples.map((example, exampleIndex) => ({
+          id: `${id}-example-${exampleIndex + 1}`,
+          input: example.input,
+          output: example.output,
+        }))
+      : [{
+          id: `${id}-example-1`,
+          input: question.detectedTopic === "loops" ? "5" : "42",
+          output: question.detectedTopic === "loops" ? "15" : "Result",
+        }],
+    constraints: question.requirements.length
+      ? question.requirements
+      : [
+          "Do not hard-code the example output.",
+          "Follow the original question requirements.",
+          "Keep the solution explainable step by step.",
+        ],
+    helpfulReminder:
+      "Before writing code, ask: what is the input, what changes during the program, and what should be printed?",
+    starterCode: starterCodeByTopic[question.detectedTopic],
+    language: "python",
+    imported: true,
+    createdAt,
+    updatedAt: createdAt,
+    href: `/tasks/${id}`,
+  };
+}
+
 function fallbackConcept(): ExtractedConcept {
   return {
     id: "concept-general-variables",
@@ -233,4 +325,14 @@ export function generateTasksFromExtractedText(params: {
   return selectedConcepts.map((concept, index) =>
     buildTask(params.file, params.extractedText, concept, index),
   );
+}
+
+export function generateTasksFromExtractedQuestions(params: {
+  file: ImportedAssignmentFile;
+  extractedQuestions: ExtractedQuestion[];
+}): GeneratedPracticeTask[] {
+  return params.extractedQuestions
+    .filter((question) => question.selected !== false)
+    .slice(0, 5)
+    .map((question, index) => buildTaskFromQuestion(params.file, question, index));
 }

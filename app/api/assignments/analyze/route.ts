@@ -5,7 +5,11 @@ import {
   extractTextPreview,
 } from "@/lib/server/assignment-analyzer";
 import { extractTextFromAssignmentFile } from "@/lib/server/file-text-extractor";
-import { generateTasksFromExtractedText } from "@/lib/server/generated-task-builder";
+import {
+  generateTasksFromExtractedQuestions,
+  generateTasksFromExtractedText,
+} from "@/lib/server/generated-task-builder";
+import { extractProgrammingQuestions } from "@/lib/server/question-extractor";
 import type { AssignmentAnalysisResponse } from "@/types/import";
 
 export const runtime = "nodejs";
@@ -36,6 +40,7 @@ export async function POST(request: Request) {
     const extraction = await extractTextFromAssignmentFile(value);
     const warnings = [...extraction.warnings];
     const detectedConcepts = extractProgrammingConcepts(extraction.extractedText);
+    const extractedQuestions = extractProgrammingQuestions(extraction.extractedText);
 
     if (!extraction.extractedText) {
       warnings.push(
@@ -55,11 +60,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const generatedTasks = generateTasksFromExtractedText({
-      file: extraction.file,
-      extractedText: extraction.extractedText,
-      concepts: detectedConcepts,
-    });
+    if (!extractedQuestions.length && extraction.extractedText) {
+      warnings.push("No explicit programming questions were detected.");
+      warnings.push("Tasks were generated from concepts instead of exact questions.");
+    }
+
+    if (extraction.file.type === "pdf" && extraction.extractedText) {
+      warnings.push("This PDF may have lost formatting during text extraction.");
+    }
+
+    const generatedTasks = extractedQuestions.length
+      ? generateTasksFromExtractedQuestions({
+          file: extraction.file,
+          extractedQuestions,
+        })
+      : generateTasksFromExtractedText({
+          file: extraction.file,
+          extractedText: extraction.extractedText,
+          concepts: detectedConcepts,
+        });
 
     if (!generatedTasks.length) {
       return errorResponse(
@@ -76,6 +95,7 @@ export async function POST(request: Request) {
       extractedText: extraction.extractedText,
       textPreview: extractTextPreview(extraction.extractedText),
       detectedConcepts,
+      extractedQuestions,
       generatedTasks,
       warnings,
       extractedCharacterCount: extraction.extractedText.length,
