@@ -26,6 +26,8 @@ export function getDashboardStats(): DashboardStats {
 }
 
 function toDashboardStatCards(stats: DashboardStats): DashboardStat[] {
+  const streakUnit = stats.learningStreakDays === 1 ? "day" : "days";
+
   return [
     {
       id: "files-analysed",
@@ -44,7 +46,7 @@ function toDashboardStatCards(stats: DashboardStats): DashboardStat[] {
     {
       id: "learning-streak",
       title: "Learning Streak",
-      value: `${stats.learningStreakDays} days`,
+      value: `${stats.learningStreakDays} ${streakUnit}`,
       description: "Consistent practice",
       icon: "streak",
     },

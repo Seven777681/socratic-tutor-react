@@ -31,38 +31,47 @@ function RobotLogo() {
   );
 }
 
-export function BrandPanel() {
+export function BrandPanel({
+  title = "Think. Code. Grow.",
+  highlight = "With Guidance.",
+  description = "Your AI-powered Socratic tutor that helps you think deeper, code better, and learn smarter.",
+}: {
+  title?: string;
+  highlight?: string;
+  description?: string;
+}) {
   return (
-    <section className="text-slate-950">
-      <div className="mx-auto w-full max-w-[600px] lg:mx-0">
-        <div className="flex items-center gap-3">
+    <section className="flex min-h-[calc(100dvh-96px)] text-slate-950 md:py-2">
+      <div className="mx-auto flex w-full max-w-[660px] flex-col lg:mx-0">
+        <div className="flex items-center gap-3 self-start">
           <RobotLogo />
           <p className="text-lg font-bold tracking-normal text-slate-950 lg:text-xl">
             Socratic <span className="text-[#6255f6]">AI</span> Tutor
           </p>
         </div>
 
-        <h1 className="mt-14 max-w-[580px] text-[42px] font-extrabold leading-[1.08] tracking-normal text-slate-950 sm:text-[48px] lg:mt-16 lg:text-[54px] xl:text-[58px]">
-          Think. Code. Grow.
-          <span className="mt-1 block bg-[linear-gradient(90deg,#725cff,#4b78ff)] bg-clip-text text-transparent">
-            With Guidance.
-          </span>
-        </h1>
+        <div className="flex flex-1 flex-col justify-center py-8 md:-mt-4 md:py-10 lg:-mt-6">
+          <h1 className="max-w-[620px] text-[42px] font-extrabold leading-[1.08] tracking-normal text-slate-950 sm:text-[48px] lg:text-[56px] xl:text-[62px]">
+            {title}
+            <span className="mt-1 block bg-[linear-gradient(90deg,#725cff,#4b78ff)] bg-clip-text text-transparent">
+              {highlight}
+            </span>
+          </h1>
 
-        <p className="mt-6 max-w-[500px] text-[17px] leading-[1.6] text-slate-600 lg:text-lg">
-          Your AI-powered Socratic tutor that helps you think deeper, code
-          better, and learn smarter.
-        </p>
+          <p className="mt-5 max-w-[520px] text-[17px] leading-[1.65] text-slate-600 lg:text-lg">
+            {description}
+          </p>
 
-        <div className="mt-14 hidden w-full justify-center md:flex lg:justify-start">
-          <Image
-            src="/images/login-robot.png"
-            alt="AI robot programming illustration"
-            width={1200}
-            height={800}
-            priority
-            className="h-auto w-full max-w-[540px] object-contain drop-shadow-[0_26px_40px_rgba(95,102,245,0.14)]"
-          />
+          <div className="mt-8 hidden w-full justify-center md:flex lg:mt-9 lg:justify-center">
+            <Image
+              src="/images/login-robot.png"
+              alt="AI robot programming illustration"
+              width={1200}
+              height={800}
+              priority
+              className="h-auto w-full max-w-[700px] object-contain drop-shadow-[0_30px_48px_rgba(95,102,245,0.16)]"
+            />
+          </div>
         </div>
       </div>
     </section>

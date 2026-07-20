@@ -6,5 +6,5 @@ export const emptyDashboardStats: DashboardStats = {
   filesAnalysed: 0,
   questionsCompleted: 0,
   questionsTotal: 0,
-  learningStreakDays: 5,
+  learningStreakDays: 0,
 };
