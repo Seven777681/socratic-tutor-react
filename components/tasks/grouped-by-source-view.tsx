@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { MouseEvent } from "react";
 import Link from "next/link";
 import type { ProgrammingTaskSummary } from "@/types/task";
 import {
@@ -37,11 +38,18 @@ function getGroupAction(group: SourceGroup) {
   };
 }
 
-function SourceTaskRow({ task }: { task: ProgrammingTaskSummary }) {
+function SourceTaskRow({
+  task,
+  onContextMenu,
+}: {
+  task: ProgrammingTaskSummary;
+  onContextMenu?: (event: MouseEvent, task: ProgrammingTaskSummary) => void;
+}) {
   return (
     <Link
       href={task.href}
       className="grid gap-3 rounded-[14px] border border-[#E4E7F0] bg-white p-4 transition hover:border-indigo-200 hover:bg-indigo-50/40 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 md:grid-cols-[90px_minmax(0,1fr)_140px_130px_70px_160px] md:items-center"
+      onContextMenu={(event) => onContextMenu?.(event, task)}
     >
       <span className="text-sm font-extrabold text-[#6255f6]">
         Task {String(task.taskNumber).padStart(2, "0")}
@@ -71,7 +79,13 @@ function SourceTaskRow({ task }: { task: ProgrammingTaskSummary }) {
   );
 }
 
-function SourceFileGroup({ group }: { group: SourceGroup }) {
+function SourceFileGroup({
+  group,
+  onTaskContextMenu,
+}: {
+  group: SourceGroup;
+  onTaskContextMenu?: (event: MouseEvent, task: ProgrammingTaskSummary) => void;
+}) {
   const [isOpen, setIsOpen] = useState(true);
   const completedCount = group.tasks.filter(
     (task) => task.status === "completed",
@@ -146,7 +160,11 @@ function SourceFileGroup({ group }: { group: SourceGroup }) {
       {isOpen ? (
         <div className="mt-5 grid gap-3">
           {group.tasks.map((task) => (
-            <SourceTaskRow key={task.id} task={task} />
+            <SourceTaskRow
+              key={task.id}
+              task={task}
+              onContextMenu={onTaskContextMenu}
+            />
           ))}
         </div>
       ) : null}
@@ -156,8 +174,10 @@ function SourceFileGroup({ group }: { group: SourceGroup }) {
 
 export function GroupedBySourceView({
   tasks,
+  onTaskContextMenu,
 }: {
   tasks: ProgrammingTaskSummary[];
+  onTaskContextMenu?: (event: MouseEvent, task: ProgrammingTaskSummary) => void;
 }) {
   const groups = useMemo(
     () =>
@@ -181,7 +201,11 @@ export function GroupedBySourceView({
   return (
     <section className="grid gap-5" aria-label="Tasks grouped by source file">
       {groups.map((group) => (
-        <SourceFileGroup key={group.id} group={group} />
+        <SourceFileGroup
+          key={group.id}
+          group={group}
+          onTaskContextMenu={onTaskContextMenu}
+        />
       ))}
     </section>
   );

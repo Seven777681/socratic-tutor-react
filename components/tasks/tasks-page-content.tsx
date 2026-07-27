@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import type {
   ProgrammingTaskSummary,
@@ -18,7 +19,9 @@ import { TaskGrid } from "@/components/tasks/task-grid";
 import { TaskStats } from "@/components/tasks/task-stats";
 import { TasksEmptyState } from "@/components/tasks/tasks-empty-state";
 import { TasksPageHeader } from "@/components/tasks/tasks-page-header";
+import { TrashIcon } from "@/components/dashboard/dashboard-icons";
 import {
+  deleteImportedTask,
   getGeneratedTaskSummaries,
 } from "@/lib/imported-tasks-storage";
 
@@ -55,6 +58,12 @@ const defaultFilters: TaskFilters = {
   sort: "recommended",
   view: "cards",
 };
+
+interface TaskContextMenuState {
+  task: ProgrammingTaskSummary;
+  x: number;
+  y: number;
+}
 
 function readParam<Value extends string>(
   value: string | null,
@@ -168,10 +177,31 @@ export function TasksPageContent({
   const [filters, setFilters] = useState<TaskFilters>(() =>
     getInitialFilters(searchParams),
   );
+  const [contextMenu, setContextMenu] = useState<TaskContextMenuState | null>(null);
 
   useEffect(() => {
     setGeneratedTasks(getGeneratedTaskSummaries());
   }, []);
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return;
+    }
+
+    const closeContextMenu = () => setContextMenu(null);
+
+    window.addEventListener("click", closeContextMenu);
+    window.addEventListener("keydown", closeContextMenu);
+    window.addEventListener("resize", closeContextMenu);
+    window.addEventListener("scroll", closeContextMenu, true);
+
+    return () => {
+      window.removeEventListener("click", closeContextMenu);
+      window.removeEventListener("keydown", closeContextMenu);
+      window.removeEventListener("resize", closeContextMenu);
+      window.removeEventListener("scroll", closeContextMenu, true);
+    };
+  }, [contextMenu]);
 
   const allTasks = useMemo(
     () => generatedTasks,
@@ -225,6 +255,27 @@ export function TasksPageContent({
 
   const clearFilters = () => setFilters(defaultFilters);
   const hasTasks = allTasks.length > 0;
+  const openTaskContextMenu = (
+    event: ReactMouseEvent,
+    task: ProgrammingTaskSummary,
+  ) => {
+    event.preventDefault();
+    setContextMenu({
+      task,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+  const deleteTask = () => {
+    if (!contextMenu?.task.imported) {
+      setContextMenu(null);
+      return;
+    }
+
+    deleteImportedTask(contextMenu.task.id);
+    setGeneratedTasks(getGeneratedTaskSummaries());
+    setContextMenu(null);
+  };
 
   return (
     <div className="space-y-7">
@@ -269,9 +320,15 @@ export function TasksPageContent({
           />
         ) : filteredTasks.length > 0 ? (
           filters.view === "by-file" ? (
-            <GroupedBySourceView tasks={filteredTasks} />
+            <GroupedBySourceView
+              tasks={filteredTasks}
+              onTaskContextMenu={openTaskContextMenu}
+            />
           ) : (
-            <TaskGrid tasks={filteredTasks} />
+            <TaskGrid
+              tasks={filteredTasks}
+              onTaskContextMenu={openTaskContextMenu}
+            />
           )
         ) : (
           <TasksEmptyState
@@ -280,6 +337,31 @@ export function TasksPageContent({
           />
         )}
       </div>
+
+      {contextMenu ? (
+        <div
+          role="menu"
+          aria-label={`Task actions for ${contextMenu.task.title}`}
+          className="fixed z-50 min-w-[180px] rounded-lg border border-[#E4E7F0] bg-white p-1.5 shadow-[0_18px_45px_rgba(15,23,42,0.16)]"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            disabled={!contextMenu.task.imported}
+            onClick={deleteTask}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent"
+          >
+            <TrashIcon className="h-4 w-4" />
+            Delete Task
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

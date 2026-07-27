@@ -2,33 +2,42 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { FormField } from "@/components/auth/form-field";
 import { PasswordInput } from "@/components/auth/password-input";
-import type { RegisterFormErrors, RegisterFormValues } from "@/types/auth";
+import type {
+  AuthResponse,
+  RegisterFormErrors,
+  RegisterFormValues,
+  SendVerificationCodeResponse,
+} from "@/types/auth";
+import { isValidUsername } from "@/lib/auth/username-utils";
 
 const initialValues: RegisterFormValues = {
-  studentId: "",
-  name: "",
+  username: "",
+  verificationCode: "",
+  displayName: "",
   password: "",
   confirmPassword: "",
 };
 
-const knownStudentIds = ["student001", "student-001", "s001"];
-
-function normalizeStudentId(studentId: string) {
-  return studentId.trim().toLowerCase();
-}
-
 function validateRegister(values: RegisterFormValues): RegisterFormErrors {
   const errors: RegisterFormErrors = {};
 
-  if (!values.studentId.trim()) {
-    errors.studentId = "Please enter your student ID.";
+  if (!values.username.trim()) {
+    errors.username = "Please enter your username.";
+  } else if (!isValidUsername(values.username)) {
+    errors.username = "Username must be a valid email address or phone number.";
   }
 
-  if (!values.name.trim()) {
-    errors.name = "Please enter your name.";
+  if (!values.verificationCode.trim()) {
+    errors.verificationCode = "Please enter the verification code.";
+  }
+
+  if (!values.displayName.trim()) {
+    errors.displayName = "Please enter your display name.";
+  } else if (values.displayName.trim().length < 2) {
+    errors.displayName = "Display name must be at least 2 characters.";
   }
 
   if (!values.password) {
@@ -46,50 +55,47 @@ function validateRegister(values: RegisterFormValues): RegisterFormErrors {
   return errors;
 }
 
-function getStoredStudentIds() {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    return JSON.parse(window.sessionStorage.getItem("socratic-registered-student-ids") ?? "[]") as string[];
-  } catch {
-    return [];
-  }
-}
-
-function saveRegisteredUser(values: RegisterFormValues) {
-  const user = {
-    id: `user-${Date.now()}`,
-    studentId: values.studentId.trim(),
-    name: values.name.trim(),
-    role: "student",
-  };
-  const token = `local-register-token-${Date.now()}`;
-  const ids = Array.from(
-    new Set([...getStoredStudentIds(), normalizeStudentId(values.studentId)]),
-  );
-
-  window.sessionStorage.setItem("socratic-auth-user", JSON.stringify(user));
-  window.sessionStorage.setItem("socratic-auth-token", token);
-  window.sessionStorage.setItem("socratic-registered-student-ids", JSON.stringify(ids));
-}
-
 export function RegisterForm() {
   const router = useRouter();
   const [values, setValues] = useState<RegisterFormValues>(initialValues);
   const [errors, setErrors] = useState<RegisterFormErrors>({});
   const [formError, setFormError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
   const [isCreated, setIsCreated] = useState(false);
+  const [hasSentCode, setHasSentCode] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setResendSeconds((current) => Math.max(current - 1, 0));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [resendSeconds]);
+
+  const isUsernameValid = isValidUsername(values.username);
+  const canSendCode =
+    values.username.trim().length > 0 &&
+    isUsernameValid &&
+    !isSendingCode &&
+    resendSeconds === 0 &&
+    !isLoading;
 
   const isFormComplete = useMemo(
     () =>
-      values.studentId.trim().length > 0 &&
-      values.name.trim().length > 0 &&
+      values.username.trim().length > 0 &&
+      values.verificationCode.trim().length > 0 &&
+      values.displayName.trim().length >= 2 &&
       values.password.length >= 6 &&
-      values.confirmPassword === values.password,
-    [values],
+      values.confirmPassword === values.password &&
+      hasSentCode,
+    [hasSentCode, values],
   );
 
   const updateField = <Key extends keyof RegisterFormValues>(
@@ -104,43 +110,120 @@ export function RegisterForm() {
         next.confirmPassword = undefined;
       }
 
+      if (field === "username") {
+        next.verificationCode = undefined;
+        setHasSentCode(false);
+        setSuccessMessage("");
+        setResendSeconds(0);
+      }
+
       return next;
     });
     setFormError("");
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const sendCode = async () => {
+    if (!values.username.trim()) {
+      setErrors((current) => ({
+        ...current,
+        username: "Please enter your username.",
+      }));
+      return;
+    }
+
+    if (!isValidUsername(values.username)) {
+      setErrors((current) => ({
+        ...current,
+        username: "Username must be a valid email address or phone number.",
+      }));
+      return;
+    }
+
+    try {
+      setIsSendingCode(true);
+      setFormError("");
+      setSuccessMessage("");
+
+      const response = await fetch("/api/auth/send-verification-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username: values.username }),
+      });
+      const result = (await response.json()) as SendVerificationCodeResponse;
+
+      if (!response.ok || !result.success) {
+        setErrors((current) => ({ ...current, username: result.message }));
+        setFormError(result.message);
+        return;
+      }
+
+      setHasSentCode(true);
+      setResendSeconds(60);
+    } catch {
+      setFormError("Unable to send verification code right now.");
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const nextErrors = validateRegister(values);
     setErrors(nextErrors);
     setFormError("");
 
-    if (Object.keys(nextErrors).length > 0) {
+    if (!hasSentCode) {
+      setErrors((current) => ({
+        ...current,
+        verificationCode: "Please request a verification code first.",
+      }));
+      setFormError("Please request a verification code first.");
       return;
     }
 
-    const normalizedId = normalizeStudentId(values.studentId);
-
-    if ([...knownStudentIds, ...getStoredStudentIds()].includes(normalizedId)) {
-      setErrors((current) => ({
-        ...current,
-        studentId: "This student ID is already registered.",
-      }));
-      setFormError("This student ID is already registered.");
+    if (Object.keys(nextErrors).length > 0) {
       return;
     }
 
     try {
       setIsLoading(true);
+      setSuccessMessage("");
+
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      });
+      const result = (await response.json()) as AuthResponse;
+
+      if (!response.ok || !result.success || !result.user || !result.token) {
+        setFormError(result.message || "Unable to create account right now.");
+
+        if (result.message.includes("verification code")) {
+          setErrors((current) => ({
+            ...current,
+            verificationCode: result.message,
+          }));
+        } else if (result.message.includes("username")) {
+          setErrors((current) => ({ ...current, username: result.message }));
+        }
+
+        setIsLoading(false);
+        return;
+      }
+
+      window.sessionStorage.setItem("socratic-auth-user", JSON.stringify(result.user));
+      window.sessionStorage.setItem("socratic-auth-token", result.token);
+      setIsCreated(true);
+      setSuccessMessage("Account created. Redirecting to dashboard...");
 
       window.setTimeout(() => {
-        saveRegisteredUser(values);
-        setIsCreated(true);
-
-        window.setTimeout(() => {
-          router.push("/dashboard");
-        }, 450);
+        router.push("/dashboard");
       }, 450);
     } catch {
       setIsLoading(false);
@@ -149,7 +232,7 @@ export function RegisterForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
       {formError ? (
         <div
           role="alert"
@@ -165,41 +248,75 @@ export function RegisterForm() {
         </div>
       ) : null}
 
-      <FormField
-        id="register-student-id"
-        label="Student ID"
-        type="text"
-        value={values.studentId}
-        onChange={(event) => updateField("studentId", event.target.value)}
-        placeholder="Enter your student ID"
-        autoComplete="username"
-        disabled={isLoading}
-        error={errors.studentId}
-        icon={
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-            <rect x="4" y="5" width="16" height="14" rx="3" stroke="currentColor" strokeWidth="2" />
-            <circle cx="12" cy="10" r="2" stroke="currentColor" strokeWidth="2" />
-            <path d="M8 16a4 4 0 0 1 8 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-        }
-      />
+      <div>
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_128px] sm:items-end">
+          <FormField
+            id="register-username"
+            label="Username"
+            type="text"
+            value={values.username}
+            onChange={(event) => updateField("username", event.target.value)}
+            placeholder="Enter your email or phone number"
+            autoComplete="username"
+            disabled={isLoading || isSendingCode}
+            error={errors.username}
+            icon={
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+                <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2" />
+                <path d="M5 21a7 7 0 0 1 14 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            }
+          />
+          <button
+            type="button"
+            onClick={() => void sendCode()}
+            disabled={!canSendCode}
+            className="h-[52px] rounded-xl border border-[#b9b2ff] bg-white px-3 text-sm font-extrabold text-[#6255f6] transition hover:border-[#6255f6] hover:bg-indigo-50/60 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-[#f0efff] disabled:text-[#8c87a6]"
+          >
+            {isSendingCode
+              ? "Sending..."
+              : resendSeconds > 0
+                ? `Resend in ${resendSeconds}s`
+                : hasSentCode
+                  ? "Resend Code"
+                  : "Send Code"}
+          </button>
+        </div>
+        <p className="mt-1.5 text-[11px] font-semibold leading-5 text-slate-500">
+          Use your email or phone number as your username.
+        </p>
+      </div>
+
+      <div>
+        <FormField
+          id="register-verification-code"
+          label="Verification Code"
+          type="text"
+          inputMode="numeric"
+          value={values.verificationCode}
+          onChange={(event) => updateField("verificationCode", event.target.value)}
+          placeholder="Enter the 6-digit code"
+          autoComplete="one-time-code"
+          disabled={isLoading || !hasSentCode}
+          error={errors.verificationCode}
+        />
+        <p className="mt-1.5 text-[11px] font-semibold leading-5 text-slate-500">
+          {hasSentCode
+            ? "Verification code sent. Use 123456 in this prototype."
+            : "Send a code to your username first."}
+        </p>
+      </div>
 
       <FormField
-        id="register-name"
-        label="Name"
+        id="register-display-name"
+        label="Display Name"
         type="text"
-        value={values.name}
-        onChange={(event) => updateField("name", event.target.value)}
-        placeholder="Enter your name"
+        value={values.displayName}
+        onChange={(event) => updateField("displayName", event.target.value)}
+        placeholder="Enter your display name"
         autoComplete="name"
         disabled={isLoading}
-        error={errors.name}
-        icon={
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-            <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2" />
-            <path d="M5 21a7 7 0 0 1 14 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-        }
+        error={errors.displayName}
       />
 
       <PasswordInput
@@ -207,6 +324,7 @@ export function RegisterForm() {
         label="Password"
         value={values.password}
         onChange={(event) => updateField("password", event.target.value)}
+        placeholder="Create a password"
         disabled={isLoading}
         error={errors.password}
       />
@@ -216,9 +334,20 @@ export function RegisterForm() {
         label="Confirm Password"
         value={values.confirmPassword}
         onChange={(event) => updateField("confirmPassword", event.target.value)}
+        placeholder="Confirm your password"
         disabled={isLoading}
         error={errors.confirmPassword}
       />
+
+      {successMessage ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-[14px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
+        >
+          {successMessage}
+        </p>
+      ) : null}
 
       <button
         type="submit"
@@ -239,7 +368,7 @@ export function RegisterForm() {
         )}
       </button>
 
-      <p className="pt-0.5 text-center text-sm font-semibold leading-6 text-slate-500">
+      <p className="pt-1 text-center text-sm font-semibold leading-6 text-slate-500">
         Already have an account?{" "}
         <Link
           href="/login"
@@ -249,27 +378,6 @@ export function RegisterForm() {
         </Link>
       </p>
 
-      <div className="flex items-center gap-5 py-0.5 text-sm text-slate-500">
-        <span className="h-px flex-1 bg-slate-200" />
-        <span>or</span>
-        <span className="h-px flex-1 bg-slate-200" />
-      </div>
-
-      <button
-        type="button"
-        onClick={() => router.push("/dashboard")}
-        disabled={isLoading}
-        className="flex h-[50px] w-full items-center justify-center gap-3 rounded-xl border border-[#b9b2ff] bg-white px-5 text-base font-bold text-slate-700 transition hover:border-[#6255f6] hover:bg-indigo-50/60 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-      >
-        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-          <path d="M22 10 12 5 2 10l10 5 10-5Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-          <path d="M6 12v5c3.5 2 8.5 2 12 0v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Try as Guest
-      </button>
-      <p className="-mt-1.5 text-center text-xs font-semibold leading-5 text-slate-500">
-        Try a demo task with sample code and AI guidance.
-      </p>
     </form>
   );
 }

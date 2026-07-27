@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { MouseEvent } from "react";
 import type { ProgrammingTaskSummary, TaskDifficulty } from "@/types/task";
 import {
   ArrowRightIcon,
@@ -115,12 +116,19 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
   );
 }
 
-export function TaskCard({ task }: { task: ProgrammingTaskSummary }) {
+export function TaskCard({
+  task,
+  onContextMenu,
+}: {
+  task: ProgrammingTaskSummary;
+  onContextMenu?: (event: MouseEvent, task: ProgrammingTaskSummary) => void;
+}) {
   return (
     <Link
       href={task.href}
       className="group block rounded-[20px] focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15"
       aria-label={`${actionLabel(task)}: ${task.title}`}
+      onContextMenu={(event) => onContextMenu?.(event, task)}
     >
       <CardContent task={task} />
     </Link>

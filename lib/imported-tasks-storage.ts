@@ -78,6 +78,26 @@ export function addGeneratedTasks(tasks: GeneratedPracticeTask[]) {
   return appendImportedTasks(tasks);
 }
 
+export function deleteImportedTask(taskId: string) {
+  const nextTasks = loadImportedTasks().filter((task) => task.id !== taskId);
+  saveImportedTasks(nextTasks);
+
+  const nextHistory = loadImportHistory()
+    .map((entry) => {
+      const taskIds = entry.taskIds.filter((id) => id !== taskId);
+
+      return {
+        ...entry,
+        taskIds,
+        taskCount: taskIds.length,
+      };
+    })
+    .filter((entry) => entry.taskIds.length > 0);
+
+  saveImportHistory(nextHistory);
+  return nextTasks;
+}
+
 export function loadImportHistory() {
   return readJsonArray<ImportHistoryEntry>(importHistoryStorageKey);
 }

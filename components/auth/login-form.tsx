@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { FormField } from "@/components/auth/form-field";
 import { PasswordInput } from "@/components/auth/password-input";
-import type { LoginFormErrors, LoginFormValues } from "@/types/auth";
+import type { AuthResponse, LoginFormErrors, LoginFormValues } from "@/types/auth";
+import { isValidUsername } from "@/lib/auth/username-utils";
 
 const initialValues: LoginFormValues = {
-  studentId: "",
+  username: "",
   password: "",
   rememberMe: false,
 };
@@ -16,8 +17,10 @@ const initialValues: LoginFormValues = {
 function validateLogin(values: LoginFormValues): LoginFormErrors {
   const errors: LoginFormErrors = {};
 
-  if (!values.studentId.trim()) {
-    errors.studentId = "Please enter your student ID.";
+  if (!values.username.trim()) {
+    errors.username = "Please enter your username.";
+  } else if (!isValidUsername(values.username)) {
+    errors.username = "Username must be a valid email address or phone number.";
   }
 
   if (!values.password) {
@@ -38,7 +41,7 @@ export function LoginForm() {
   const [successMessage, setSuccessMessage] = useState("");
   const [formError, setFormError] = useState("");
   const isFormComplete =
-    values.studentId.trim().length > 0 && values.password.length >= 6;
+    values.username.trim().length > 0 && values.password.length >= 6;
 
   const updateField = <Key extends keyof LoginFormValues>(
     field: Key,
@@ -50,7 +53,7 @@ export function LoginForm() {
     setFormError("");
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const nextErrors = validateLogin(values);
@@ -65,14 +68,31 @@ export function LoginForm() {
       setIsLoading(true);
       setSuccessMessage("");
 
-      window.setTimeout(() => {
-        setIsSignedIn(true);
-        setSuccessMessage("Signed in. Redirecting to dashboard...");
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      });
+      const result = (await response.json()) as AuthResponse;
 
-        window.setTimeout(() => {
-          router.push("/dashboard");
-        }, 450);
-      }, 300);
+      if (!response.ok || !result.success || !result.user || !result.token) {
+        setFormError(
+          result.message || "Incorrect username or password. Please try again.",
+        );
+        setIsLoading(false);
+        return;
+      }
+
+      window.sessionStorage.setItem("socratic-auth-user", JSON.stringify(result.user));
+      window.sessionStorage.setItem("socratic-auth-token", result.token);
+      setIsSignedIn(true);
+      setSuccessMessage("Signed in. Redirecting to dashboard...");
+
+      window.setTimeout(() => {
+        router.push("/dashboard");
+      }, 450);
     } catch {
       setIsLoading(false);
       setFormError("Unable to sign in right now. Please try again later.");
@@ -97,15 +117,15 @@ export function LoginForm() {
       ) : null}
 
       <FormField
-        id="studentId"
-        label="Student ID"
+        id="username"
+        label="Username"
         type="text"
-        value={values.studentId}
-        onChange={(event) => updateField("studentId", event.target.value)}
-        placeholder="Enter your student ID"
+        value={values.username}
+        onChange={(event) => updateField("username", event.target.value)}
+        placeholder="Enter your email or phone number"
         autoComplete="username"
         disabled={isLoading}
-        error={errors.studentId}
+        error={errors.username}
         icon={
           <svg
             aria-hidden="true"
@@ -144,14 +164,12 @@ export function LoginForm() {
           />
           Remember me
         </label>
-        <a
-          href="#"
-          onClick={(event) => event.preventDefault()}
-          title="Password recovery is coming soon."
+        <Link
+          href="/forgot-password"
           className="text-sm font-bold text-[#6255f6] transition hover:text-[#4b78ff] hover:underline focus:outline-none focus:ring-4 focus:ring-[#6255f6]/10"
         >
           Forgot password?
-        </a>
+        </Link>
       </div>
 
       {successMessage ? (
@@ -180,8 +198,8 @@ export function LoginForm() {
           </>
         ) : (
           <>
-            <span className="hidden sm:inline">Sign in to continue thinking</span>
-            <span className="sm:hidden">Sign In</span>
+            <span className="hidden sm:inline">Sign in to start coding</span>
+            <span className="sm:hidden">Sign in</span>
           </>
         )}
         {!isLoading ? (
@@ -202,7 +220,7 @@ export function LoginForm() {
         ) : null}
       </button>
 
-      <div className="flex items-center gap-5 py-0.5 text-sm text-slate-500">
+      <div className="flex items-center gap-5 pt-1 text-sm text-slate-500">
         <span className="h-px flex-1 bg-slate-200" />
         <span>or</span>
         <span className="h-px flex-1 bg-slate-200" />
@@ -212,7 +230,7 @@ export function LoginForm() {
         type="button"
         onClick={() => router.push("/dashboard")}
         disabled={isLoading}
-        className="flex h-[50px] w-full items-center justify-center gap-3 rounded-xl border border-[#b9b2ff] bg-white px-5 text-base font-bold text-slate-700 transition hover:border-[#6255f6] hover:bg-indigo-50/60 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-[#c7c1ff] bg-white/80 px-5 text-sm font-extrabold text-slate-700 transition hover:border-[#6255f6] hover:bg-indigo-50/60 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
       >
         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
           <path
@@ -231,12 +249,12 @@ export function LoginForm() {
         </svg>
         Try as Guest
       </button>
-      <p className="-mt-1.5 text-center text-xs font-semibold leading-5 text-slate-500">
-        Try a demo task with sample code and AI guidance.
+      <p className="-mt-2.5 text-center text-[11px] font-semibold leading-5 text-slate-400">
+        Demo task with sample code and AI guidance.
       </p>
 
-      <p className="pt-0.5 text-center text-sm font-semibold leading-6 text-slate-500">
-        Don&apos;t have an account?{" "}
+      <p className="pt-3 text-center text-sm font-bold leading-6 text-slate-600">
+        New to Socratic AI Tutor?{" "}
         <Link
           href="/register"
           className="rounded-md font-extrabold text-[#6255f6] underline-offset-4 transition hover:text-[#4b78ff] hover:underline focus:outline-none focus:ring-4 focus:ring-[#6255f6]/10"

@@ -9,6 +9,7 @@ type PasswordInputProps = {
   onChange: ChangeEventHandler<HTMLInputElement>;
   error?: string;
   disabled?: boolean;
+  placeholder?: string;
 };
 
 export function PasswordInput({
@@ -18,6 +19,7 @@ export function PasswordInput({
   onChange,
   error,
   disabled,
+  placeholder = "Enter your password",
 }: PasswordInputProps) {
   const [isVisible, setIsVisible] = useState(false);
   const errorId = `${id}-error`;
@@ -65,7 +67,7 @@ export function PasswordInput({
           type={isVisible ? "text" : "password"}
           value={value}
           onChange={onChange}
-          placeholder="Enter your password"
+          placeholder={placeholder}
           autoComplete="current-password"
           disabled={disabled}
           aria-invalid={Boolean(error)}
