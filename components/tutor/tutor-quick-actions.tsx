@@ -1,6 +1,6 @@
 "use client";
 
-import type { GuidanceStage, TutorActionType, TutorStatus } from "@/types/tutor";
+import type { TutorActionType, TutorStatus } from "@/types/tutor";
 import {
   BrainIcon,
   LightbulbIcon,
@@ -8,61 +8,49 @@ import {
 } from "@/components/dashboard/dashboard-icons";
 
 export function TutorQuickActions({
-  stage,
   status,
   onAction,
 }: {
-  stage: GuidanceStage;
   status: TutorStatus;
   onAction: (action: Exclude<TutorActionType, "message">) => void;
 }) {
-  const isReflect = stage === "reflect";
   const actions: {
     label: string;
     ariaLabel: string;
     action: Exclude<TutorActionType, "message">;
     icon: "rephrase" | "hint" | "brain";
-  }[] = isReflect
-    ? [
-        {
-          label: "Help Me Explain",
-          ariaLabel: "Help me explain my solution",
-          action: "rephrase",
-          icon: "rephrase",
-        },
-        {
-          label: "Transfer Question",
-          ariaLabel: "Ask a transfer question",
-          action: "smaller_hint",
-          icon: "hint",
-        },
-        {
-          label: "Review Reasoning",
-          ariaLabel: "Review my reasoning",
-          action: "check_reasoning",
-          icon: "brain",
-        },
-      ]
-    : [
-        {
-          label: "Rephrase",
-          ariaLabel: "Rephrase the guiding question",
-          action: "rephrase",
-          icon: "rephrase",
-        },
-        {
-          label: "Smaller Hint",
-          ariaLabel: "Give me a smaller hint",
-          action: "smaller_hint",
-          icon: "hint",
-        },
-        {
-          label: "Check My Reasoning",
-          ariaLabel: "Check my reasoning",
-          action: "check_reasoning",
-          icon: "brain",
-        },
-      ];
+  }[] = [
+    {
+      label: "Help me understand",
+      ariaLabel: "Help me understand",
+      action: "rephrase",
+      icon: "rephrase",
+    },
+    {
+      label: "Give me a smaller hint",
+      ariaLabel: "Give me a smaller hint",
+      action: "smaller_hint",
+      icon: "hint",
+    },
+    {
+      label: "Help me debug",
+      ariaLabel: "Help me debug",
+      action: "debug",
+      icon: "brain",
+    },
+    {
+      label: "Check edge cases",
+      ariaLabel: "Check edge cases",
+      action: "check_edge_cases",
+      icon: "hint",
+    },
+    {
+      label: "Reflect on my solution",
+      ariaLabel: "Reflect on my solution",
+      action: "reflect_solution",
+      icon: "brain",
+    },
+  ];
 
   return (
     <div className="border-t border-[#E4E7F0] px-4 py-3">

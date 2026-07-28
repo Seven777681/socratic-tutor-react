@@ -13,12 +13,13 @@ function toContinueTask(task: ProgrammingTaskSummary): ContinueTask {
     topic: topicLabels[task.topic],
     difficulty: task.difficulty,
     progress: task.progress,
-    lastStudied: "Imported",
+    lastStudied: task.sourceType === "question_bank" ? "Question Bank" : "Custom Import",
     description: task.description,
     href: task.href,
     sourceFileName: task.sourceFileName,
     sourceFileId: task.sourceFileId,
-    sourceType: "imported",
+    sourceType: task.sourceType,
+    concept: topicLabels[task.concept],
   };
 }
 

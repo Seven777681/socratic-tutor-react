@@ -1,16 +1,16 @@
 import type { TaskViewMode } from "@/types/task";
 import {
-  FileCodeIcon,
+  BookOpenIcon,
   ListChecksIcon,
 } from "@/components/dashboard/dashboard-icons";
 
 const viewModes: Array<{
   value: TaskViewMode;
   label: string;
-  icon: "cards" | "file";
+  icon: "path" | "questions";
 }> = [
-  { value: "cards", label: "Cards", icon: "cards" },
-  { value: "by-file", label: "By File", icon: "file" },
+  { value: "learning_path", label: "Learning Path", icon: "path" },
+  { value: "all_questions", label: "All Questions", icon: "questions" },
 ];
 
 export function TaskViewToggle({
@@ -28,7 +28,7 @@ export function TaskViewToggle({
     >
       {viewModes.map((mode) => {
         const isActive = value === mode.value;
-        const Icon = mode.icon === "cards" ? ListChecksIcon : FileCodeIcon;
+        const Icon = mode.icon === "path" ? BookOpenIcon : ListChecksIcon;
 
         return (
           <button

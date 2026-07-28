@@ -3,22 +3,28 @@
 import { useEffect, useMemo, useState } from "react";
 import { emptyDashboardStats } from "@/data/dashboard";
 import {
-  loadImportHistory,
-  getGeneratedTasks,
+  getGeneratedTaskSummaries,
 } from "@/lib/imported-tasks-storage";
 import type { DashboardStat, DashboardStats } from "@/types/dashboard";
 
 export function getDashboardStats(): DashboardStats {
-  const importHistory = loadImportHistory();
-  const importedTasks = getGeneratedTasks();
+  const tasks = getGeneratedTaskSummaries();
+  const questionBankTasks = tasks.filter((task) => task.sourceType === "question_bank");
 
-  const questionsTotal = importedTasks.length;
-  const questionsCompleted = importedTasks.filter(
+  const questionsTotal = questionBankTasks.length;
+  const questionsCompleted = questionBankTasks.filter(
     (task) => task.status === "completed",
   ).length;
+  const concepts = new Set(questionBankTasks.map((task) => task.concept));
+  const practicedConcepts = new Set(
+    questionBankTasks
+      .filter((task) => task.status !== "not_started" || task.progress > 0)
+      .map((task) => task.concept),
+  );
 
   return {
-    filesAnalysed: importHistory.length,
+    conceptsPracticed: practicedConcepts.size,
+    conceptsTotal: concepts.size,
     questionsCompleted,
     questionsTotal,
     learningStreakDays: emptyDashboardStats.learningStreakDays,
@@ -30,17 +36,17 @@ function toDashboardStatCards(stats: DashboardStats): DashboardStat[] {
 
   return [
     {
-      id: "files-analysed",
-      title: "Files Analysed",
-      value: String(stats.filesAnalysed),
-      description: "Class files processed",
-      icon: "files",
+      id: "completed-tasks",
+      title: "Completed Tasks",
+      value: `${stats.questionsCompleted} / ${stats.questionsTotal}`,
+      description: "Question bank progress",
+      icon: "completed",
     },
     {
-      id: "questions-explored",
-      title: "Questions Explored",
-      value: `${stats.questionsCompleted} / ${stats.questionsTotal}`,
-      description: "Generated questions completed",
+      id: "concepts-practiced",
+      title: "Concepts Practiced",
+      value: `${stats.conceptsPracticed} / ${stats.conceptsTotal}`,
+      description: "Python concepts explored",
       icon: "questions",
     },
     {

@@ -57,6 +57,46 @@ function getTutorContent({
     };
   }
 
+  if (action === "review_plan") {
+    return {
+      content:
+        "You identified part of the plan. Before coding, what information should the program read, and where should each input appear in the final message?",
+      questionType: "decomposition" as const,
+    };
+  }
+
+  if (action === "generate_reflection_summary") {
+    return {
+      content:
+        "You practiced connecting input values to a clear formatted output. You strengthened the habit of planning the goal, predicting the result, and checking whether the program used each piece of input.",
+      questionType: "reflection" as const,
+    };
+  }
+
+  if (action === "debug") {
+    return {
+      content:
+        "Your output is close, but it may not include both pieces of information. Which values from the input should appear in the final message?",
+      questionType: "debugging" as const,
+    };
+  }
+
+  if (action === "check_edge_cases") {
+    return {
+      content:
+        "Try a different name and age in your head. Which part of your code makes the same sentence pattern work for both cases?",
+      questionType: "debugging" as const,
+    };
+  }
+
+  if (action === "reflect_solution") {
+    return {
+      content:
+        "What changed in your thinking from reading the task to checking the run result?",
+      questionType: "reflection" as const,
+    };
+  }
+
   if (action === "smaller_hint") {
     return {
       content:

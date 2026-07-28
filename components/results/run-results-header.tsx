@@ -39,7 +39,7 @@ export function RunResultsHeader({
       >
         <TerminalIcon className="h-5 w-5 shrink-0 text-[#6255f6]" />
         <span className="truncate text-sm font-extrabold text-[#101426]">
-          Run Results
+          {isOpen ? "Run Results" : "Show Run Results"}
         </span>
         <ChevronDownIcon
           className={`h-4 w-4 shrink-0 text-slate-500 transition duration-200 motion-reduce:transition-none ${

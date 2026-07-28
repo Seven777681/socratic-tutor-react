@@ -13,9 +13,9 @@ export function QuickUploadCard() {
         </span>
 
         <div className="mt-5">
-          <p className="text-sm font-semibold text-[#6255f6]">Quick Upload</p>
+          <p className="text-sm font-semibold text-[#6255f6]">Optional Custom Import</p>
           <h2 className="mt-3 text-2xl font-extrabold tracking-normal text-[#101426]">
-            Upload a class file and generate practice tasks.
+            Have your own assignment?
           </h2>
         </div>
 
@@ -31,14 +31,14 @@ export function QuickUploadCard() {
         </div>
 
         <p className="mt-5 text-sm font-semibold leading-6 text-slate-500">
-          Files stay in your browser in this prototype.
+          Import a class file to create extra custom practice tasks.
         </p>
 
         <Link
           href="/assignment-import"
           className="group mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[linear-gradient(90deg,#6657f5,#4678ff)] px-4 text-sm font-bold text-white shadow-lg shadow-indigo-200/80 transition hover:shadow-xl hover:shadow-indigo-200 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 active:scale-[0.99] sm:w-auto lg:mt-auto"
         >
-          Import Assignment
+          Import Custom Assignment
           <ArrowRightIcon className="h-4 w-4 transition group-hover:translate-x-0.5" />
         </Link>
       </div>

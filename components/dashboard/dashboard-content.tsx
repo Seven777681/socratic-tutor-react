@@ -2,17 +2,16 @@
 
 import { ContinueLearningCard } from "@/components/dashboard/continue-learning-card";
 import { DashboardFooter } from "@/components/dashboard/dashboard-footer";
+import { LearningPath } from "@/components/dashboard/learning-path";
+import { MultiAgentPreview } from "@/components/dashboard/multi-agent-preview";
 import { QuickUploadCard } from "@/components/dashboard/quick-upload-card";
-import { RecentUploads } from "@/components/dashboard/recent-uploads";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { WelcomeSection } from "@/components/dashboard/welcome-section";
 import { useDashboardStats } from "@/hooks/use-dashboard-stats";
-import { useDashboardUploads } from "@/hooks/use-dashboard-uploads";
 import { useDashboardLearning } from "@/hooks/use-dashboard-learning";
 
 export function DashboardContent() {
   const dashboardStats = useDashboardStats();
-  const { uploads } = useDashboardUploads();
   const { task } = useDashboardLearning();
 
   return (
@@ -30,10 +29,12 @@ export function DashboardContent() {
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,65fr)_minmax(320px,35fr)]">
         <ContinueLearningCard task={task} />
-        <QuickUploadCard />
+        <MultiAgentPreview />
       </section>
 
-      <RecentUploads uploads={uploads} />
+      <LearningPath />
+
+      <QuickUploadCard />
 
       <DashboardFooter />
     </div>

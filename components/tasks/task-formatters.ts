@@ -1,5 +1,6 @@
 import type {
   TaskDifficulty,
+  TaskSourceType,
   TaskStatus,
   TaskTopic,
 } from "@/types/task";
@@ -20,6 +21,11 @@ export const difficultyLabels: Record<TaskDifficulty, string> = {
 };
 
 export const thinkingDepthLabels = difficultyLabels;
+
+export const sourceTypeLabels: Record<TaskSourceType, string> = {
+  question_bank: "Question Bank",
+  custom_imported: "Custom Imported",
+};
 
 export const statusLabels: Record<TaskStatus, string> = {
   not_started: "Not Started",

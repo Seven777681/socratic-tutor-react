@@ -73,7 +73,7 @@ export function TutorHeader({
             Socratic AI Tutor
           </h2>
           <p className="hidden truncate text-xs font-semibold text-slate-500 2xl:block">
-            Guided questions, not direct answers
+            Multi-agent guidance for planning, debugging, testing, and reflection.
           </p>
         </div>
       </div>

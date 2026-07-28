@@ -607,9 +607,9 @@ export function AssignmentImportPage() {
       <section className="rounded-[24px] border border-[#E4E7F0] bg-[linear-gradient(135deg,#ffffff_0%,#f2f5ff_100%)] px-6 py-7 shadow-[0_22px_70px_rgba(78,91,130,0.10)] sm:px-8">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
           <div>
-            <h1 className="text-[34px] font-extrabold leading-tight tracking-normal text-[#101426] sm:text-[40px]">Assignment Import</h1>
+            <h1 className="text-[34px] font-extrabold leading-tight tracking-normal text-[#101426] sm:text-[40px]">Import Custom Assignment</h1>
             <p className="mt-3 max-w-[780px] text-base leading-7 text-slate-600">
-              Upload class assignments or lecture files and generate coding practice tasks from the same programming concepts.
+              Optional: turn your own class file into extra practice tasks.
             </p>
             <p className="mt-4 rounded-2xl border border-indigo-100 bg-white/70 px-4 py-3 text-sm font-semibold leading-6 text-slate-600">
               In this prototype, files stay in your browser. Backend extraction can be connected later.

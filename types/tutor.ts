@@ -19,7 +19,12 @@ export type TutorActionType =
   | "message"
   | "rephrase"
   | "smaller_hint"
-  | "check_reasoning";
+  | "check_reasoning"
+  | "debug"
+  | "check_edge_cases"
+  | "reflect_solution"
+  | "review_plan"
+  | "generate_reflection_summary";
 
 export type TutorStatus = "ready" | "thinking" | "offline";
 

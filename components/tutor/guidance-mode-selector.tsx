@@ -59,7 +59,7 @@ export function GuidanceModeSelector({
   return (
     <section className="border-b border-[#E4E7F0] bg-[#FBFCFF] px-4 py-3">
       <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500">
-        Guidance Mode
+        Tutor Focus
       </p>
       <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Guidance mode">
         {modes.map((item) => {
@@ -87,7 +87,7 @@ export function GuidanceModeSelector({
         })}
       </div>
       <p className="mt-2 text-[12px] leading-5 text-slate-500" aria-live="polite">
-        {selected.description}
+        {selected.description} The tutor blends multi-agent reasoning behind the scenes.
       </p>
     </section>
   );

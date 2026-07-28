@@ -3,7 +3,8 @@ import type {
 } from "@/types/dashboard";
 
 export const emptyDashboardStats: DashboardStats = {
-  filesAnalysed: 0,
+  conceptsPracticed: 0,
+  conceptsTotal: 0,
   questionsCompleted: 0,
   questionsTotal: 0,
   learningStreakDays: 0,

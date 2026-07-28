@@ -23,6 +23,21 @@ function runObservation(latestRunResult?: CodeRunResult) {
 }
 
 function actionResponse(action: TutorActionType, mode: TutorMode, hasReasoning: boolean, run?: CodeRunResult) {
+  if (action === "review_plan") {
+    return "You identified part of the plan. What information should the program read before producing the greeting?";
+  }
+  if (action === "generate_reflection_summary") {
+    return "You practiced using input values and formatting output. You strengthened your ability to connect user input with a clear printed message.";
+  }
+  if (action === "debug") {
+    return "Your output is close, but it may not include both pieces of information. Which values from the input should appear in the final message?";
+  }
+  if (action === "check_edge_cases") {
+    return "Try another name and age. What should stay the same about the sentence format?";
+  }
+  if (action === "reflect_solution") {
+    return "What strategy helped you connect the input values to the final printed message?";
+  }
   if (action === "rephrase") {
     if (mode === "explore_strategies") return "Let’s compare the choices another way: which approach best helps you practice updating a value inside a loop?";
     if (mode === "run_and_reflect") return "Look again at the latest output. What did you expect to change before the result was printed?";

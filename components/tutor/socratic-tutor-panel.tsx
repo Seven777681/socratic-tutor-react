@@ -108,7 +108,6 @@ export function SocraticTutorPanel({
         </div>
       ) : null}
       <TutorQuickActions
-        stage={conversation.stage}
         status={status}
         onAction={triggerAction}
       />

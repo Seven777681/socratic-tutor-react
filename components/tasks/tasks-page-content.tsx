@@ -5,6 +5,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import type {
   ProgrammingTaskSummary,
+  QuestionBankModuleId,
   TaskDifficulty,
   TaskFilters,
   TaskSort,
@@ -12,13 +13,15 @@ import type {
   TaskTopic,
   TaskViewMode,
 } from "@/types/task";
+import { questionModules } from "@/data/question-modules";
 import { difficultyRank, topicLabels } from "@/components/tasks/task-formatters";
-import { GroupedBySourceView } from "@/components/tasks/grouped-by-source-view";
+import { LearningPathTasksView } from "@/components/tasks/learning-path-tasks-view";
 import { TaskFilterBar } from "@/components/tasks/task-filter-bar";
 import { TaskGrid } from "@/components/tasks/task-grid";
 import { TaskStats } from "@/components/tasks/task-stats";
 import { TasksEmptyState } from "@/components/tasks/tasks-empty-state";
 import { TasksPageHeader } from "@/components/tasks/tasks-page-header";
+import { TaskViewToggle } from "@/components/tasks/task-view-toggle";
 import { TrashIcon } from "@/components/dashboard/dashboard-icons";
 import {
   deleteImportedTask,
@@ -43,21 +46,51 @@ const statusValues: TaskStatus[] = [
 const sortValues: TaskSort[] = [
   "recommended",
   "newest",
-  "source_file",
+  "concept",
   "thinking_progress",
   "recently_updated",
 ];
-const viewValues: TaskViewMode[] = ["cards", "by-file"];
+const moduleOrder = [
+  "syntax_basics",
+  "simple_logic",
+  "data_structures",
+  "function_design",
+  "integrated_challenges",
+];
+const viewValues: TaskViewMode[] = ["learning_path", "all_questions"];
 
 const defaultFilters: TaskFilters = {
   query: "",
   source: "all",
+  taskSource: "all",
+  module: "all",
   topic: "all",
   depth: "all",
   status: "all",
   sort: "recommended",
-  view: "cards",
+  view: "learning_path",
 };
+
+function getRecommendedModuleId(tasks: ProgrammingTaskSummary[]): QuestionBankModuleId {
+  const inProgressTask = tasks.find(
+    (task) => task.status === "in_progress" && task.moduleId,
+  );
+
+  if (inProgressTask?.moduleId) {
+    return inProgressTask.moduleId;
+  }
+
+  const nextIncompleteModule = questionModules.find((module) => {
+    const moduleTasks = tasks.filter((task) => task.moduleId === module.id);
+
+    return (
+      moduleTasks.length > 0 &&
+      moduleTasks.some((task) => task.status !== "completed")
+    );
+  });
+
+  return nextIncompleteModule?.id ?? questionModules[0].id;
+}
 
 interface TaskContextMenuState {
   task: ProgrammingTaskSummary;
@@ -80,6 +113,17 @@ function getInitialFilters(searchParams: URLSearchParams): TaskFilters {
   return {
     ...defaultFilters,
     source: searchParams.get("source") || "all",
+    taskSource: readParam(searchParams.get("taskSource"), [
+      "question_bank",
+      "custom_imported",
+    ]),
+    module: readParam(searchParams.get("module"), [
+      "syntax_basics",
+      "simple_logic",
+      "data_structures",
+      "function_design",
+      "integrated_challenges",
+    ]),
     topic: readParam(searchParams.get("topic"), topicValues),
     depth: readParam(searchParams.get("depth"), difficultyValues),
     status: readParam(searchParams.get("status"), statusValues),
@@ -87,7 +131,7 @@ function getInitialFilters(searchParams: URLSearchParams): TaskFilters {
       ? "recommended"
       : (readParam(searchParams.get("sort"), sortValues) as TaskSort),
     view: readParam(searchParams.get("view"), viewValues) === "all"
-      ? "cards"
+      ? "learning_path"
       : (readParam(searchParams.get("view"), viewValues) as TaskViewMode),
   };
 }
@@ -96,11 +140,12 @@ function hasFilters(filters: TaskFilters) {
   return (
     filters.query.trim() !== "" ||
     filters.source !== "all" ||
+    filters.taskSource !== "all" ||
+    filters.module !== "all" ||
     filters.topic !== "all" ||
     filters.depth !== "all" ||
     filters.status !== "all" ||
-    filters.sort !== "recommended" ||
-    filters.view !== "cards"
+    filters.sort !== "recommended"
   );
 }
 
@@ -113,19 +158,30 @@ function filterTasks(tasks: ProgrammingTaskSummary[], filters: TaskFilters) {
       task.title.toLowerCase().includes(query) ||
       task.description.toLowerCase().includes(query) ||
       topicLabels[task.topic].toLowerCase().includes(query) ||
+      task.questionSetTitle?.toLowerCase().includes(query) ||
       task.sourceFileName.toLowerCase().includes(query);
 
+    const matchesTaskSource =
+      filters.taskSource === "all" || task.sourceType === filters.taskSource;
+    const matchesModule =
+      filters.module === "all" || task.moduleId === filters.module;
     const matchesSource =
       filters.source === "all" || task.sourceFileId === filters.source;
     const matchesTopic =
-      filters.topic === "all" || task.topic === filters.topic;
+      filters.topic === "all" || task.concept === filters.topic;
     const matchesDepth =
-      filters.depth === "all" || task.difficulty === filters.depth;
+      filters.depth === "all" || task.thinkingDepth === filters.depth;
     const matchesStatus =
       filters.status === "all" || task.status === filters.status;
 
     return (
-      matchesQuery && matchesSource && matchesTopic && matchesDepth && matchesStatus
+      matchesQuery &&
+      matchesTaskSource &&
+      matchesModule &&
+      matchesSource &&
+      matchesTopic &&
+      matchesDepth &&
+      matchesStatus
     );
   });
 }
@@ -140,10 +196,10 @@ function sortTasks(tasks: ProgrammingTaskSummary[], sort: TaskSort) {
     );
   }
 
-  if (sort === "source_file") {
+  if (sort === "concept") {
     return sortedTasks.sort(
       (first, second) =>
-        first.sourceFileName.localeCompare(second.sourceFileName) ||
+        first.concept.localeCompare(second.concept) ||
         first.taskNumber - second.taskNumber,
     );
   }
@@ -162,6 +218,9 @@ function sortTasks(tasks: ProgrammingTaskSummary[], sort: TaskSort) {
 
   return sortedTasks.sort(
     (first, second) =>
+      moduleOrder.indexOf(first.moduleId ?? "integrated_challenges") -
+        moduleOrder.indexOf(second.moduleId ?? "integrated_challenges") ||
+      (first.order ?? first.taskNumber) - (second.order ?? second.taskNumber) ||
       difficultyRank[first.difficulty] - difficultyRank[second.difficulty] ||
       first.taskNumber - second.taskNumber,
   );
@@ -177,10 +236,14 @@ export function TasksPageContent({
   const [filters, setFilters] = useState<TaskFilters>(() =>
     getInitialFilters(searchParams),
   );
+  const [selectedModuleId, setSelectedModuleId] =
+    useState<QuestionBankModuleId>("syntax_basics");
   const [contextMenu, setContextMenu] = useState<TaskContextMenuState | null>(null);
 
   useEffect(() => {
-    setGeneratedTasks(getGeneratedTaskSummaries());
+    const storedTasks = getGeneratedTaskSummaries();
+    setGeneratedTasks(storedTasks);
+    setSelectedModuleId(getRecommendedModuleId(storedTasks));
   }, []);
 
   useEffect(() => {
@@ -213,6 +276,10 @@ export function TasksPageContent({
     [allTasks],
   );
 
+  const currentModuleTitle =
+    questionModules.find((module) => module.id === selectedModuleId)?.title ??
+    questionModules[0].title;
+
   const counts = useMemo(
     () => ({
       all: allTasks.length,
@@ -221,22 +288,6 @@ export function TasksPageContent({
       not_started: allTasks.filter((task) => task.status === "not_started").length,
     }),
     [allTasks, completedTasks],
-  );
-
-  const sourceFiles = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          allTasks.map((task) => [
-            task.sourceFileId,
-            {
-              id: task.sourceFileId,
-              name: task.sourceFileName,
-            },
-          ]),
-        ).values(),
-      ),
-    [allTasks],
   );
 
   const filteredTasks = useMemo(
@@ -253,7 +304,11 @@ export function TasksPageContent({
 
   const hasActiveFilters = hasFilters(filters);
 
-  const clearFilters = () => setFilters(defaultFilters);
+  const clearFilters = () =>
+    setFilters((current) => ({
+      ...defaultFilters,
+      view: current.view,
+    }));
   const hasTasks = allTasks.length > 0;
   const openTaskContextMenu = (
     event: ReactMouseEvent,
@@ -282,31 +337,56 @@ export function TasksPageContent({
       <TasksPageHeader
         completedTasks={completedTasks}
         totalTasks={allTasks.length}
+        currentModuleTitle={currentModuleTitle}
       />
 
       {hasTasks ? (
         <>
-          <TaskStats
-            counts={counts}
-            activeStatus={activeStatus}
-            onStatusChange={(status) =>
-              setFilters((current) => ({ ...current, status }))
-            }
-          />
+          <div className="flex flex-col gap-4 rounded-[20px] border border-[#E4E7F0] bg-white p-4 shadow-[0_16px_45px_rgba(78,91,130,0.08)] sm:flex-row sm:items-center sm:justify-between">
+            <TaskViewToggle
+              value={filters.view}
+              onChange={(view) => setFilters((current) => ({ ...current, view }))}
+            />
+            <p className="text-sm font-semibold text-slate-500">
+              {filters.view === "learning_path"
+                ? "Focus on one module at a time."
+                : "Browse and filter the complete question bank."}
+            </p>
+          </div>
 
-          <TaskFilterBar
-            filters={filters}
-            sourceFiles={sourceFiles}
-            hasActiveFilters={hasActiveFilters}
-            onFiltersChange={setFilters}
-            onClearFilters={clearFilters}
-          />
+          {filters.view === "all_questions" ? (
+            <>
+              <TaskStats
+                counts={counts}
+                activeStatus={activeStatus}
+                onStatusChange={(status) =>
+                  setFilters((current) => ({ ...current, status }))
+                }
+              />
+
+              <TaskFilterBar
+                filters={filters}
+                hasActiveFilters={hasActiveFilters}
+                onFiltersChange={setFilters}
+                onClearFilters={clearFilters}
+              />
+            </>
+          ) : null}
 
           <div className="flex items-center justify-between gap-4">
             <p className="text-sm font-semibold text-slate-500">
-              Showing{" "}
-              <span className="text-[#101426]">{filteredTasks.length}</span> of{" "}
-              <span className="text-[#101426]">{allTasks.length}</span> thinking tasks
+              {filters.view === "learning_path" ? (
+                <>
+                  Showing{" "}
+                  <span className="text-[#101426]">{currentModuleTitle}</span> tasks
+                </>
+              ) : (
+                <>
+                  Showing{" "}
+                  <span className="text-[#101426]">{filteredTasks.length}</span> of{" "}
+                  <span className="text-[#101426]">{allTasks.length}</span> thinking tasks
+                </>
+              )}
             </p>
           </div>
         </>
@@ -318,18 +398,18 @@ export function TasksPageContent({
             hasActiveFilters={false}
             onClearFilters={clearFilters}
           />
-        ) : filteredTasks.length > 0 ? (
-          filters.view === "by-file" ? (
-            <GroupedBySourceView
-              tasks={filteredTasks}
+        ) : filters.view === "learning_path" ? (
+            <LearningPathTasksView
+              tasks={sortTasks(allTasks, "recommended")}
+              selectedModuleId={selectedModuleId}
+              onSelectedModuleChange={setSelectedModuleId}
               onTaskContextMenu={openTaskContextMenu}
             />
-          ) : (
+        ) : filteredTasks.length > 0 ? (
             <TaskGrid
               tasks={filteredTasks}
               onTaskContextMenu={openTaskContextMenu}
             />
-          )
         ) : (
           <TasksEmptyState
             hasActiveFilters={hasActiveFilters}

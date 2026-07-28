@@ -5,6 +5,30 @@ export type TaskStatus =
 
 export type TaskDifficulty = "easy" | "medium" | "hard";
 
+export type AgentType =
+  | "socratic_guide"
+  | "strategy_coach"
+  | "debug_coach"
+  | "test_coach"
+  | "reflection_coach";
+
+export type TaskConcept =
+  | "variables"
+  | "conditionals"
+  | "loops"
+  | "functions"
+  | "lists"
+  | "strings";
+
+export type TaskSourceType = "question_bank" | "custom_imported";
+
+export type QuestionBankModuleId =
+  | "syntax_basics"
+  | "simple_logic"
+  | "data_structures"
+  | "function_design"
+  | "integrated_challenges";
+
 export type TaskTopic =
   | "variables"
   | "conditionals"
@@ -16,11 +40,11 @@ export type TaskTopic =
 export type TaskSort =
   | "recommended"
   | "newest"
-  | "source_file"
+  | "concept"
   | "thinking_progress"
   | "recently_updated";
 
-export type TaskViewMode = "cards" | "by-file";
+export type TaskViewMode = "learning_path" | "all_questions";
 
 export interface ProgrammingTaskSummary {
   id: string;
@@ -36,6 +60,15 @@ export interface ProgrammingTaskSummary {
   status: TaskStatus;
   progress: number;
   estimatedMinutes: number;
+  sourceType: TaskSourceType;
+  moduleId?: QuestionBankModuleId;
+  moduleTitle?: string;
+  order?: number;
+  recommendedAgent: AgentType;
+  concept: TaskConcept;
+  thinkingDepth: TaskDifficulty;
+  questionSetId?: string;
+  questionSetTitle?: string;
   createdAt: string;
   updatedAt: string;
   href: string;
@@ -45,6 +78,8 @@ export interface ProgrammingTaskSummary {
 export interface TaskFilters {
   query: string;
   source: string | "all";
+  taskSource: TaskSourceType | "all";
+  module: QuestionBankModuleId | "all";
   topic: TaskTopic | "all";
   depth: TaskDifficulty | "all";
   status: TaskStatus | "all";
@@ -62,11 +97,23 @@ export interface ProgrammingTaskDetail {
   id: string;
   taskNumber: number;
   title: string;
+  sourceFileId: string;
+  sourceFileName: string;
+  sourceFileType?: "pdf" | "docx" | "pptx" | "txt" | "markdown";
   description: string[];
   topic: TaskTopic;
   difficulty: TaskDifficulty;
   status: TaskStatus;
   estimatedMinutes: number;
+  sourceType: TaskSourceType;
+  moduleId?: QuestionBankModuleId;
+  moduleTitle?: string;
+  order?: number;
+  recommendedAgent: AgentType;
+  concept: TaskConcept;
+  thinkingDepth: TaskDifficulty;
+  questionSetId?: string;
+  questionSetTitle?: string;
   progress: number;
   language: "python";
   learningObjectives: string[];
@@ -79,6 +126,9 @@ export interface ProgrammingTaskDetail {
   codeRuns: number;
   tutorInteractions: number;
   lastSaved: string;
+  href: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type SaveStatus = "saved" | "saving" | "unsaved";
@@ -97,6 +147,7 @@ export interface EditorPreferences {
 }
 
 export interface CodeEditorPanelProps {
+  task: ProgrammingTaskDetail;
   taskId: string;
   starterCode: string;
   language: "python";

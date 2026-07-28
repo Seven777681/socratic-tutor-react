@@ -1,21 +1,38 @@
 import type {
+  QuestionBankModuleId,
   TaskDifficulty,
   TaskFilters,
   TaskSort,
+  TaskSourceType,
   TaskStatus,
   TaskTopic,
 } from "@/types/task";
 import { TaskFilterSelect } from "@/components/tasks/task-filter-select";
 import { TaskSearchInput } from "@/components/tasks/task-search-input";
-import { TaskViewToggle } from "@/components/tasks/task-view-toggle";
 
 const topicOptions: Array<{ value: TaskTopic | "all"; label: string }> = [
-  { value: "all", label: "All Topics" },
+  { value: "all", label: "All Concepts" },
   { value: "variables", label: "Variables" },
   { value: "conditionals", label: "Conditionals" },
   { value: "loops", label: "Loops" },
   { value: "functions", label: "Functions" },
   { value: "lists", label: "Lists" },
+  { value: "strings", label: "Strings" },
+];
+
+const sourceOptions: Array<{ value: TaskSourceType | "all"; label: string }> = [
+  { value: "all", label: "All Sources" },
+  { value: "question_bank", label: "Question Bank" },
+  { value: "custom_imported", label: "Custom Imported" },
+];
+
+const moduleOptions: Array<{ value: QuestionBankModuleId | "all"; label: string }> = [
+  { value: "all", label: "All Modules" },
+  { value: "syntax_basics", label: "Syntax Basics" },
+  { value: "simple_logic", label: "Simple Logic" },
+  { value: "data_structures", label: "Data Structures" },
+  { value: "function_design", label: "Function Design" },
+  { value: "integrated_challenges", label: "Integrated Challenges" },
 ];
 
 const difficultyOptions: Array<{
@@ -38,45 +55,43 @@ const statusOptions: Array<{ value: TaskStatus | "all"; label: string }> = [
 const sortOptions: Array<{ value: TaskSort; label: string }> = [
   { value: "recommended", label: "Recommended" },
   { value: "newest", label: "Newest First" },
-  { value: "source_file", label: "By Source File" },
+  { value: "concept", label: "By Concept" },
   { value: "thinking_progress", label: "Thinking Progress" },
   { value: "recently_updated", label: "Recently Updated" },
 ];
 
 export function TaskFilterBar({
   filters,
-  sourceFiles,
   hasActiveFilters,
   onFiltersChange,
   onClearFilters,
 }: {
   filters: TaskFilters;
-  sourceFiles: Array<{ id: string; name: string }>;
   hasActiveFilters: boolean;
   onFiltersChange: (filters: TaskFilters) => void;
   onClearFilters: () => void;
 }) {
   return (
     <section className="rounded-[20px] border border-[#E4E7F0] bg-white p-4 shadow-[0_16px_45px_rgba(78,91,130,0.08)] sm:p-5">
-      <div className="grid gap-3 xl:grid-cols-[minmax(240px,1fr)_210px_170px_190px_170px_190px_150px]">
+      <div className="grid gap-3 xl:grid-cols-[minmax(240px,1fr)_170px_180px_170px_170px_190px]">
         <TaskSearchInput
           value={filters.query}
           onChange={(query) => onFiltersChange({ ...filters, query })}
         />
         <TaskFilterSelect
-          label="Filter by source file"
-          value={filters.source}
-          options={[
-            { value: "all", label: "All Source Files" },
-            ...sourceFiles.map((source) => ({
-              value: source.id,
-              label: source.name,
-            })),
-          ]}
-          onChange={(source) => onFiltersChange({ ...filters, source })}
+          label="Filter by task source"
+          value={filters.taskSource}
+          options={sourceOptions}
+          onChange={(taskSource) => onFiltersChange({ ...filters, taskSource })}
         />
         <TaskFilterSelect
-          label="Filter by topic"
+          label="Filter by module"
+          value={filters.module}
+          options={moduleOptions}
+          onChange={(module) => onFiltersChange({ ...filters, module })}
+        />
+        <TaskFilterSelect
+          label="Filter by concept"
           value={filters.topic}
           options={topicOptions}
           onChange={(topic) => onFiltersChange({ ...filters, topic })}
@@ -100,10 +115,6 @@ export function TaskFilterBar({
           value={filters.sort}
           options={sortOptions}
           onChange={(sort) => onFiltersChange({ ...filters, sort })}
-        />
-        <TaskViewToggle
-          value={filters.view}
-          onChange={(view) => onFiltersChange({ ...filters, view })}
         />
       </div>
 

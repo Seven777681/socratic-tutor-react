@@ -4,12 +4,22 @@ import type {
   ImportedAssignmentFile,
 } from "@/types/import";
 import type { ProgrammingTaskDetail, ProgrammingTaskSummary } from "@/types/task";
-import { devDemoTasks } from "@/data/dev-demo-tasks";
+import {
+  getQuestionBankSummaries,
+  getQuestionBankTaskById,
+} from "@/data/question-bank";
 
 export const importedTasksStorageKey = "socratic-imported-tasks";
 export const importHistoryStorageKey = "socratic-import-history";
 export const generatedTasksStorageKey = "socratic-generated-import-tasks";
 const importedFilesStorageKey = "socratic-imported-files";
+const moduleOrder = [
+  "syntax_basics",
+  "simple_logic",
+  "data_structures",
+  "function_design",
+  "integrated_challenges",
+];
 
 export function isDemoTasksEnabled() {
   return process.env.NEXT_PUBLIC_ENABLE_DEMO_TASKS === "true";
@@ -147,10 +157,14 @@ export function toTaskSummary(
     sourceFileType: sourceFile?.type,
     language: "Python",
     topic: task.topic,
+    concept: task.topic,
     difficulty: task.difficulty,
+    thinkingDepth: task.difficulty,
     status: task.status,
     progress: task.progress,
     estimatedMinutes: task.estimatedMinutes,
+    sourceType: "custom_imported",
+    recommendedAgent: "socratic_guide",
     createdAt: task.createdAt,
     updatedAt: task.createdAt,
     href: `/tasks/${task.id}`,
@@ -178,25 +192,35 @@ export function toTaskDetail(
     codeRuns: 0,
     tutorInteractions: 0,
     lastSaved: "Imported",
+    href: `/tasks/${task.id}`,
+    createdAt: task.createdAt,
+    updatedAt: task.createdAt,
   };
 }
 
 export function getGeneratedTaskSummaries() {
+  const questionBankTasks = getQuestionBankSummaries();
   const generated = getGeneratedTasks().map((task, index) =>
-    toTaskSummary(task, index + 1),
+    toTaskSummary(task, questionBankTasks.length + index + 1),
   );
 
-  if (!isDemoTasksEnabled()) {
-    return generated;
-  }
-
-  return [...devDemoTasks, ...generated.map((task, index) => ({
-    ...task,
-    taskNumber: devDemoTasks.length + index + 1,
-  }))];
+  return [...questionBankTasks, ...generated].sort(
+    (first, second) =>
+      (first.sourceType === "question_bank" ? 0 : 1) -
+        (second.sourceType === "question_bank" ? 0 : 1) ||
+      moduleOrder.indexOf(first.moduleId ?? "integrated_challenges") -
+        moduleOrder.indexOf(second.moduleId ?? "integrated_challenges") ||
+      (first.order ?? first.taskNumber) - (second.order ?? second.taskNumber),
+  );
 }
 
 export function getGeneratedTaskById(taskId: string) {
+  const questionBankTask = getQuestionBankTaskById(taskId);
+
+  if (questionBankTask) {
+    return questionBankTask;
+  }
+
   const generatedTasks = getGeneratedTasks();
   const importedTask = generatedTasks.find((task) => task.id === taskId);
 

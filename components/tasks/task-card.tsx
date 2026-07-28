@@ -5,11 +5,11 @@ import {
   ArrowRightIcon,
   BookOpenIcon,
   ClockIcon,
-  FileCodeIcon,
   GaugeIcon,
 } from "@/components/dashboard/dashboard-icons";
 import {
   difficultyLabels,
+  sourceTypeLabels,
   statusLabels,
   topicLabels,
 } from "@/components/tasks/task-formatters";
@@ -42,7 +42,7 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
     task.status === "not_started" || task.status === "in_progress";
 
   return (
-    <div className="flex h-full min-h-[360px] flex-col rounded-[20px] border border-[#E4E7F0] bg-white p-5 shadow-[0_14px_40px_rgba(78,91,130,0.07)] transition duration-300 group-hover:border-indigo-200 group-hover:shadow-[0_18px_48px_rgba(78,91,130,0.12)] motion-safe:group-hover:-translate-y-0.5">
+    <div className="flex h-full min-h-[300px] flex-col rounded-[18px] border border-[#E4E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(78,91,130,0.07)] transition duration-300 group-hover:border-indigo-200 group-hover:shadow-[0_16px_42px_rgba(78,91,130,0.11)] motion-safe:group-hover:-translate-y-0.5">
       <div className="flex items-start justify-between gap-4">
         <p className="text-sm font-extrabold text-[#6255f6]">
           Task {String(task.taskNumber).padStart(2, "0")}
@@ -50,25 +50,19 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
         <div className="flex flex-wrap justify-end gap-2">
           {task.imported ? (
             <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-              Imported
+              {sourceTypeLabels[task.sourceType]}
             </span>
-          ) : null}
+          ) : (
+            <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-[#6255f6]">
+              {sourceTypeLabels[task.sourceType]}
+            </span>
+          )}
           <TaskStatusBadge status={task.status} />
         </div>
       </div>
 
       <div className="mt-4 min-w-0">
-        <p
-          className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-500"
-          title={task.sourceFileName}
-        >
-          <FileCodeIcon className="h-3.5 w-3.5 shrink-0 text-[#6255f6]" />
-          <span className="shrink-0">Generated from:</span>
-          <span className="truncate font-bold text-slate-600">
-            {task.sourceFileName}
-          </span>
-        </p>
-        <h2 className="text-xl font-extrabold tracking-normal text-[#101426]">
+        <h2 className="text-lg font-extrabold tracking-normal text-[#101426]">
           {task.title}
         </h2>
         <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">
@@ -76,16 +70,16 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
         </p>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[#eceaff] px-3 py-1 text-xs font-bold text-[#6255f6]">
           <BookOpenIcon className="h-3.5 w-3.5" />
-          {topicLabels[task.topic]}
+          {topicLabels[task.concept]}
         </span>
         <span
           className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${difficultyClasses[task.difficulty]}`}
         >
           <GaugeIcon className="h-3.5 w-3.5" />
-          {difficultyLabels[task.difficulty]}
+          {difficultyLabels[task.thinkingDepth]}
         </span>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
           <ClockIcon className="h-3.5 w-3.5" />
@@ -93,7 +87,7 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
         </span>
       </div>
 
-      <div className="mt-auto pt-6">
+      <div className="mt-auto pt-5">
         {task.status === "in_progress" ? (
           <TaskProgress progress={task.progress} label="Thinking progress" />
         ) : (
@@ -101,7 +95,7 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
         )}
 
         <span
-          className={`mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${
+          className={`mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition ${
             isPrimaryAction
                 ? "bg-[linear-gradient(90deg,#6657f5,#4678ff)] text-white shadow-lg shadow-indigo-200/80 group-hover:shadow-xl group-hover:shadow-indigo-200"
                 : "border border-[#b9b2ff] bg-white text-[#6255f6] group-hover:border-[#6255f6] group-hover:bg-indigo-50/70"

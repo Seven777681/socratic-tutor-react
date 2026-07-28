@@ -9,8 +9,8 @@ import {
 function StatIcon({ icon }: { icon: DashboardStat["icon"] }) {
   const className = "h-5 w-5";
 
-  if (icon === "files") {
-    return <FileCodeIcon className={className} />;
+  if (icon === "completed") {
+    return <CheckCircleIcon className={className} />;
   }
 
   if (icon === "questions") {

@@ -18,7 +18,8 @@ export interface ContinueTask {
   href: string;
   sourceFileName?: string;
   sourceFileId?: string;
-  sourceType?: "manual" | "imported";
+  sourceType?: "question_bank" | "custom_imported";
+  concept?: string;
 }
 
 export interface DashboardStat {
@@ -26,11 +27,12 @@ export interface DashboardStat {
   title: string;
   value: string;
   description: string;
-  icon: "files" | "questions" | "streak";
+  icon: "completed" | "questions" | "streak";
 }
 
 export interface DashboardStats {
-  filesAnalysed: number;
+  conceptsPracticed: number;
+  conceptsTotal: number;
   questionsCompleted: number;
   questionsTotal: number;
   learningStreakDays: number;

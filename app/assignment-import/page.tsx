@@ -16,5 +16,5 @@ export default function AssignmentImportRoutePage() {
 }
 
 export const metadata = {
-  title: "Assignment Import - Socratic AI Tutor",
+  title: "Import Custom Assignment - Socratic AI Tutor",
 };
