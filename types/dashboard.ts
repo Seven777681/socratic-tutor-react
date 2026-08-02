@@ -31,8 +31,8 @@ export interface DashboardStat {
 }
 
 export interface DashboardStats {
-  conceptsPracticed: number;
-  conceptsTotal: number;
+  currentModulePosition: number;
+  totalModules: number;
   questionsCompleted: number;
   questionsTotal: number;
   learningStreakDays: number;

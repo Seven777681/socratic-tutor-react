@@ -2,29 +2,70 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { emptyDashboardStats } from "@/data/dashboard";
+import { questionModules } from "@/data/question-modules";
 import {
   getGeneratedTaskSummaries,
 } from "@/lib/imported-tasks-storage";
+import { loadTaskLearningState } from "@/hooks/use-task-learning-state";
 import type { DashboardStat, DashboardStats } from "@/types/dashboard";
+import type { ProgrammingTaskSummary } from "@/types/task";
+
+function isQuestionBankTaskCompleted(task: ProgrammingTaskSummary) {
+  try {
+    const learningState = loadTaskLearningState(task.id);
+
+    return (
+      task.status === "completed" ||
+      task.progress >= 100 ||
+      learningState.progress >= 100 ||
+      learningState.latestRunResult?.status === "success"
+    );
+  } catch {
+    return task.status === "completed" || task.progress >= 100;
+  }
+}
+
+function getCurrentModulePosition(questionBankTasks: ProgrammingTaskSummary[]) {
+  const modules = [...questionModules].sort((first, second) => first.order - second.order);
+  const totalModules = modules.length;
+
+  if (totalModules === 0) {
+    return { currentModulePosition: 0, totalModules };
+  }
+
+  try {
+    const modulePosition = modules.findIndex((module) => {
+      const moduleTasks = questionBankTasks.filter(
+        (task) => task.moduleId === module.id,
+      );
+
+      return moduleTasks.some((task) => !isQuestionBankTaskCompleted(task));
+    });
+
+    return {
+      currentModulePosition:
+        modulePosition === -1 ? totalModules : modulePosition + 1,
+      totalModules,
+    };
+  } catch {
+    return { currentModulePosition: 1, totalModules };
+  }
+}
 
 export function getDashboardStats(): DashboardStats {
   const tasks = getGeneratedTaskSummaries();
   const questionBankTasks = tasks.filter((task) => task.sourceType === "question_bank");
+  const { currentModulePosition, totalModules } =
+    getCurrentModulePosition(questionBankTasks);
 
   const questionsTotal = questionBankTasks.length;
   const questionsCompleted = questionBankTasks.filter(
     (task) => task.status === "completed",
   ).length;
-  const concepts = new Set(questionBankTasks.map((task) => task.concept));
-  const practicedConcepts = new Set(
-    questionBankTasks
-      .filter((task) => task.status !== "not_started" || task.progress > 0)
-      .map((task) => task.concept),
-  );
 
   return {
-    conceptsPracticed: practicedConcepts.size,
-    conceptsTotal: concepts.size,
+    currentModulePosition,
+    totalModules,
     questionsCompleted,
     questionsTotal,
     learningStreakDays: emptyDashboardStats.learningStreakDays,
@@ -43,10 +84,10 @@ function toDashboardStatCards(stats: DashboardStats): DashboardStat[] {
       icon: "completed",
     },
     {
-      id: "concepts-practiced",
-      title: "Concepts Practiced",
-      value: `${stats.conceptsPracticed} / ${stats.conceptsTotal}`,
-      description: "Python concepts explored",
+      id: "path-progress",
+      title: "Path Progress",
+      value: `${stats.currentModulePosition} / ${stats.totalModules}`,
+      description: "Current module in your learning path",
       icon: "questions",
     },
     {
