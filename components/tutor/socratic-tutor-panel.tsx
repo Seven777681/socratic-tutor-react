@@ -2,10 +2,8 @@
 
 import { useMemo, useState } from "react";
 import type { CodeRunResult } from "@/types/code-run";
-import type { GuidanceStage, TutorContextSnapshot } from "@/types/tutor";
+import type { GuidanceStage, TutorContextSnapshot, TutorLearningContext } from "@/types/tutor";
 import type { ProgrammingTaskDetail } from "@/types/task";
-import { GuidanceStageView } from "@/components/tutor/guidance-stage";
-import { GuidanceModeSelector } from "@/components/tutor/guidance-mode-selector";
 import { TutorClearDialog } from "@/components/tutor/tutor-clear-dialog";
 import { TutorComposer } from "@/components/tutor/tutor-composer";
 import { TutorContextSummary } from "@/components/tutor/tutor-context-summary";
@@ -43,10 +41,12 @@ export function SocraticTutorPanel({
   task,
   currentCode,
   latestRunResult,
+  learningContext,
 }: {
   task: ProgrammingTaskDetail;
   currentCode: string;
   latestRunResult?: CodeRunResult;
+  learningContext: TutorLearningContext;
 }) {
   const [isGuidelinesOpen, setIsGuidelinesOpen] = useState(false);
   const [isClearOpen, setIsClearOpen] = useState(false);
@@ -57,8 +57,6 @@ export function SocraticTutorPanel({
   });
   const {
     conversation,
-    tutorMode,
-    changeTutorMode,
     status,
     errorMessage,
     sendMessage,
@@ -68,8 +66,11 @@ export function SocraticTutorPanel({
     beginWithQuestion,
   } = useTutorConversation({
     taskId: task.id,
+    taskTitle: task.title,
+    taskDescription: task.description.join("\n"),
     currentCode,
     latestRunResult,
+    learningContext,
     stage,
   });
 
@@ -77,25 +78,48 @@ export function SocraticTutorPanel({
     () => ({
       taskId: task.id,
       taskTitle: task.title,
+      taskDescription: task.description[0] ?? "",
       topic: task.topic,
       stage,
+      planningStatus: learningContext.planningStatus,
+      latestPrediction: learningContext.latestPrediction,
       currentCodeLineCount: Math.max(1, currentCode.split("\n").length),
       latestRunResult,
+      latestError: latestRunResult?.error?.message,
+      hintLevel: learningContext.hintLevel,
       lastActivity: latestRunResult ? "Code run" : "Code edited",
     }),
-    [currentCode, latestRunResult, stage, task.id, task.title, task.topic],
+    [
+      currentCode,
+      latestRunResult,
+      learningContext.hintLevel,
+      learningContext.latestPrediction,
+      learningContext.planningStatus,
+      stage,
+      task.description,
+      task.id,
+      task.title,
+      task.topic,
+    ],
   );
+  const hasEditedCode = currentCode.trim() !== task.starterCode.trim();
+  const composerPlaceholder =
+    stage === "plan"
+      ? "Describe the part of the plan you are unsure about..."
+      : stage === "debug"
+        ? "Explain what you expected your code to do..."
+        : stage === "reflect"
+          ? "Describe what you learned from this solution..."
+          : "Ask about the task, your code, or the next small step...";
 
   return (
-    <section className="flex h-full min-h-[620px] flex-col overflow-hidden rounded-[18px] border border-[#E4E7F0] bg-white shadow-[0_14px_40px_rgba(78,91,130,0.07)]">
+    <section className="flex min-h-[620px] w-full flex-col overflow-hidden rounded-[18px] border border-[#E4E7F0] bg-white shadow-[0_14px_40px_rgba(78,91,130,0.07)] lg:h-full lg:min-h-0">
       <TutorHeader
         status={status}
         onStartNew={startNewConversation}
         onClear={() => setIsClearOpen(true)}
         onGuidelines={() => setIsGuidelinesOpen(true)}
       />
-      <GuidanceStageView stage={conversation.stage} />
-      <GuidanceModeSelector mode={tutorMode} onChange={changeTutorMode} />
       <TutorContextSummary context={context} />
       <TutorConversation
         messages={conversation.messages}
@@ -109,9 +133,16 @@ export function SocraticTutorPanel({
       ) : null}
       <TutorQuickActions
         status={status}
+        stage={stage}
+        hasEditedCode={hasEditedCode}
+        latestRunStatus={latestRunResult?.status}
         onAction={triggerAction}
       />
-      <TutorComposer status={status} onSend={sendMessage} />
+      <TutorComposer
+        status={status}
+        placeholder={composerPlaceholder}
+        onSend={sendMessage}
+      />
 
       {isGuidelinesOpen ? (
         <TutorGuidelinesDialog onClose={() => setIsGuidelinesOpen(false)} />

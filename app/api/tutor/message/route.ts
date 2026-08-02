@@ -44,23 +44,31 @@ function getTutorContent({
   latestRunResult,
   action,
   conversation,
+  taskTitle,
+  planningData,
+  latestPrediction,
 }: TutorRequest) {
   const hasStudentReasoning = conversation.some(
     (message) => message.role === "student",
   );
+  const problemName = taskTitle ? `"${taskTitle}"` : "this problem";
+  const hasPlan =
+    Boolean(planningData?.approach.trim()) ||
+    Boolean(planningData?.steps.some((step) => step.trim()));
+  const codeLineCount = Math.max(1, currentCode.split("\n").length);
 
   if (action === "rephrase") {
     return {
-      content:
-        "Let me ask it another way: what should change after each step of your program, and what should stay the same?",
+      content: `Let's look at ${problemName} another way: what information does the program need to keep track of, and what should it produce at the end?`,
       questionType: "decomposition" as const,
     };
   }
 
   if (action === "review_plan") {
     return {
-      content:
-        "You identified part of the plan. Before coding, what information should the program read, and where should each input appear in the final message?",
+      content: hasPlan
+        ? "Your plan has a starting shape. Which step connects the input or initial data to the final output?"
+        : "Before coding, what is the first small action your program needs to take for this problem?",
       questionType: "decomposition" as const,
     };
   }
@@ -68,15 +76,24 @@ function getTutorContent({
   if (action === "generate_reflection_summary") {
     return {
       content:
-        "You practiced connecting input values to a clear formatted output. You strengthened the habit of planning the goal, predicting the result, and checking whether the program used each piece of input.",
+        "You practiced connecting a plan, a prediction, code, and run feedback. You strengthened the habit of checking whether each part of the task is supported by your solution.",
+      questionType: "reflection" as const,
+    };
+  }
+
+  if (action === "explain_success") {
+    return {
+      content:
+        "Which part of your code makes the successful result happen for more than just the sample input?",
       questionType: "reflection" as const,
     };
   }
 
   if (action === "debug") {
     return {
-      content:
-        "Your output is close, but it may not include both pieces of information. Which values from the input should appear in the final message?",
+      content: latestRunResult?.error
+        ? `The latest run points to: ${latestRunResult.error.title}. Which line or value should you inspect first?`
+        : "Compare your expected result with the latest output. Where does the behavior first differ from your plan?",
       questionType: "debugging" as const,
     };
   }
@@ -84,15 +101,17 @@ function getTutorContent({
   if (action === "check_edge_cases") {
     return {
       content:
-        "Try a different name and age in your head. Which part of your code makes the same sentence pattern work for both cases?",
-      questionType: "debugging" as const,
+        "Try a smallest input, a typical input, and a boundary input in your head. What should stay true for all three?",
+      questionType: "transfer" as const,
     };
   }
 
   if (action === "reflect_solution") {
     return {
       content:
-        "What changed in your thinking from reading the task to checking the run result?",
+        latestRunResult?.status === "success"
+          ? "What did you learn about why this solution works, and what would you check before trusting it on new inputs?"
+          : "What changed in your thinking from reading the task to checking the current result?",
       questionType: "reflection" as const,
     };
   }
@@ -100,22 +119,22 @@ function getTutorContent({
   if (action === "smaller_hint") {
     return {
       content:
-        "Try one tiny trace. If the input is 3, what should the running total be after adding 1?",
+        latestRunResult?.error?.hint ??
+        "Trace one tiny example by hand. After the first meaningful step, what should be true?",
       questionType: "decomposition" as const,
     };
   }
 
   if (action === "check_reasoning" && !hasStudentReasoning) {
     return {
-      content: "Share your reasoning first, and I’ll help you test it.",
+      content: "Share your reasoning first, and I'll help you test it.",
       questionType: "reflection" as const,
     };
   }
 
   if (action === "check_reasoning") {
     return {
-      content:
-        "Which line in your code proves that the value you described will actually be updated?",
+      content: `You have about ${codeLineCount} lines of code. Which line proves that the value you described actually changes or gets used?`,
       questionType: "reflection" as const,
     };
   }
@@ -123,7 +142,7 @@ function getTutorContent({
   if (latestRunResult?.status === "success") {
     return {
       content:
-        "Nice, your code passed the available tests. Why does your approach include every value the problem asks for?",
+        "Your code passed the available checks. Why should the same idea still work on a different valid input?",
       questionType: "reflection" as const,
     };
   }
@@ -131,7 +150,7 @@ function getTutorContent({
   if (latestRunResult?.status === "timeout") {
     return {
       content:
-        "Your program took too long to finish. What condition guarantees that the loop eventually stops?",
+        "Your program took too long to finish. What condition guarantees that the program eventually stops?",
       questionType: "debugging" as const,
     };
   }
@@ -163,23 +182,30 @@ function getTutorContent({
   ) {
     return {
       content:
-        "I won’t write the full solution for you, but I can help you build it. What is the next small decision: choosing the loop range, or updating the stored value?",
+        "I won't write the full solution, but I can help you build it. What is the next small decision your program needs to make?",
       questionType: "decomposition" as const,
     };
   }
 
-  if (includesAny(studentMessage, ["不知道", "不懂", "not sure", "i don't know"])) {
+  if (includesAny(studentMessage, ["not sure", "i don't know", "i dont know"])) {
     return {
       content:
-        "Let’s shrink the problem. For a very small input, what output would you expect before thinking about the code?",
+        "Let's shrink the problem. For a very small input, what output would you expect before thinking about the code?",
       questionType: "understanding" as const,
     };
   }
 
   if (currentCode.trim().length === 0) {
     return {
+      content: `Before writing code for ${problemName}, what value or condition do you need to keep track of?`,
+      questionType: "understanding" as const,
+    };
+  }
+
+  if (latestPrediction?.trim() && !latestRunResult) {
+    return {
       content:
-        "Before writing code, what value do you need to keep track of while solving this task?",
+        "You have a prediction but no run yet. Which line of your code should make that prediction come true?",
       questionType: "understanding" as const,
     };
   }

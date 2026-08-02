@@ -8,9 +8,11 @@ const MAX_MESSAGE_LENGTH = 1000;
 
 export function TutorComposer({
   status,
+  placeholder,
   onSend,
 }: {
   status: TutorStatus;
+  placeholder: string;
   onSend: (message: string) => void;
 }) {
   const [draft, setDraft] = useState("");
@@ -48,7 +50,7 @@ export function TutorComposer({
               send();
             }
           }}
-          placeholder="Explain what you think the variable `total` should represent..."
+          placeholder={placeholder}
           className="max-h-28 min-h-[54px] flex-1 resize-none overflow-y-auto rounded-xl border border-[#E4E7F0] bg-[#FBFCFF] px-3 py-2 text-sm leading-6 text-[#101426] outline-none transition placeholder:text-slate-400 focus:border-[#6255f6] focus:ring-4 focus:ring-[#6255f6]/10 disabled:opacity-70"
         />
         <button
@@ -63,7 +65,7 @@ export function TutorComposer({
       </div>
       <div className="mt-2 flex items-center justify-between gap-3">
         <p className="text-xs font-semibold leading-5 text-slate-500">
-          The tutor will respond with guiding questions rather than direct
+          The tutor responds with guiding questions rather than direct
           answers.
         </p>
         <span className="shrink-0 text-xs font-bold text-slate-400">

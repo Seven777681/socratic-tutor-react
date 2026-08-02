@@ -154,4 +154,7 @@ export interface CodeEditorPanelProps {
   onRun?: (code: string) => void;
   onCodeChange?: (code: string) => void;
   onRunResultChange?: (result: import("@/types/code-run").CodeRunResult) => void;
+  onLearningContextChange?: (
+    context: import("@/types/tutor").TutorLearningContext,
+  ) => void;
 }

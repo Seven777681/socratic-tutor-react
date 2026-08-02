@@ -73,7 +73,7 @@ export function TutorHeader({
             Socratic AI Tutor
           </h2>
           <p className="hidden truncate text-xs font-semibold text-slate-500 2xl:block">
-            Multi-agent guidance for planning, debugging, testing, and reflection.
+            One tutor, multiple agents working behind the scenes.
           </p>
         </div>
       </div>

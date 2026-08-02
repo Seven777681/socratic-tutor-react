@@ -4,28 +4,41 @@ function createMessageId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1000)}`;
 }
 
-export function createInitialTutorMessages(stage: GuidanceStage, mode: TutorMode): TutorMessage[] {
+export function createInitialTutorMessages({
+  stage,
+  mode,
+  taskTitle,
+  hasRunResult,
+}: {
+  stage: GuidanceStage;
+  mode: TutorMode;
+  taskTitle: string;
+  hasRunResult: boolean;
+}): TutorMessage[] {
   const timestamp = new Date().toISOString();
+  const content =
+    stage === "plan"
+      ? `Let's start with "${taskTitle}". What is the main goal your program needs to accomplish before you write code?`
+      : stage === "reflect"
+        ? `Your latest run is available for "${taskTitle}". What part of your solution explains why the result is correct?`
+        : stage === "debug" && hasRunResult
+          ? `Look at the latest run for "${taskTitle}". What is the first difference between what you expected and what happened?`
+          : `For "${taskTitle}", what is the next small uncertainty you want to reason through?`;
 
   return [
     {
-      id: createMessageId("system"),
-      role: "system",
-      content:
-        "I can see your latest run completed, but none of the checks passed.",
-      timestamp,
-      stage,
-    },
-    {
       id: createMessageId("tutor"),
       role: "tutor",
-      content:
-        "Your program currently prints `0`.\n\nBefore writing the loop, what should the variable `total` represent while the program is running?",
+      content,
       timestamp,
-      questionType: "debugging",
+      questionType:
+        stage === "reflect"
+          ? "reflection"
+          : stage === "plan"
+            ? "understanding"
+            : "debugging",
       stage,
       mode,
-      visibleReasoningSummary: "Uses the latest observable run result to ask a debugging question.",
     },
   ];
 }
@@ -44,13 +57,6 @@ export function createTutorMessage(
     questionType,
     stage,
     mode,
-    visibleReasoningSummary: mode
-      ? {
-          step_by_step: "Breaks the task into one visible learning step.",
-          explore_strategies: "Surfaces alternatives for the student to compare.",
-          run_and_reflect: "Connects an observable run result to a debugging question.",
-        }[mode]
-      : undefined,
   };
 }
 

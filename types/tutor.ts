@@ -24,6 +24,7 @@ export type TutorActionType =
   | "check_edge_cases"
   | "reflect_solution"
   | "review_plan"
+  | "explain_success"
   | "generate_reflection_summary";
 
 export type TutorStatus = "ready" | "thinking" | "offline";
@@ -37,7 +38,6 @@ export interface TutorMessage {
   stage?: GuidanceStage;
   actionType?: TutorActionType;
   mode?: TutorMode;
-  visibleReasoningSummary?: string;
 }
 
 export interface TutorConversation {
@@ -52,9 +52,18 @@ export interface TutorConversation {
 
 export interface TutorRequest {
   taskId: string;
+  taskTitle?: string;
+  taskDescription?: string;
   studentMessage: string;
   currentCode: string;
   latestRunResult?: CodeRunResult;
+  planningData?: {
+    status: string;
+    approach: string;
+    steps: string[];
+  };
+  latestPrediction?: string;
+  hintLevel?: number;
   conversationId: string;
   stage: GuidanceStage;
   mode: TutorMode;
@@ -69,9 +78,22 @@ export interface TutorResponse {
 export interface TutorContextSnapshot {
   taskId: string;
   taskTitle: string;
+  taskDescription: string;
   topic: string;
   stage: GuidanceStage;
+  planningStatus: string;
+  latestPrediction: string;
   currentCodeLineCount: number;
   latestRunResult?: CodeRunResult;
+  latestError?: string;
+  hintLevel: number;
   lastActivity: "Code edited" | "Code run" | "Conversation";
+}
+
+export interface TutorLearningContext {
+  planningStatus: string;
+  planningApproach: string;
+  planningSteps: string[];
+  latestPrediction: string;
+  hintLevel: number;
 }

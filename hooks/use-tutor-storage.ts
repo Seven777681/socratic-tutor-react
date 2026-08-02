@@ -60,7 +60,6 @@ export function saveTutorConversation(conversation: TutorConversation) {
       questionType: message.questionType,
       actionType: message.actionType,
       mode: message.mode,
-      visibleReasoningSummary: message.visibleReasoningSummary,
     })),
   };
 

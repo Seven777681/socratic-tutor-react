@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CodeRunResult, RunScenario, RunStatus } from "@/types/code-run";
 import type {
   CodeEditorPanelProps,
@@ -26,6 +26,7 @@ import { ReflectionPanel } from "@/components/workspace/reflection-panel";
 import { useCodeAutosave } from "@/hooks/use-code-autosave";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useTaskLearningState } from "@/hooks/use-task-learning-state";
+import type { PlanningDraft, PlanningReview } from "@/hooks/use-task-learning-state";
 import { mockRunCode } from "@/services/mock-code-runner";
 import {
   difficultyLabels,
@@ -66,6 +67,7 @@ export function CodeEditorPanel({
   onRun,
   onCodeChange,
   onRunResultChange,
+  onLearningContextChange,
 }: CodeEditorPanelProps) {
   const [preferences, setPreferences] = useState<EditorPreferences>({
     fontSize: 16,
@@ -84,10 +86,11 @@ export function CodeEditorPanel({
   const [hasRunCode, setHasRunCode] = useState(false);
   const [isResultsOpen, setIsResultsOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [planningWarning, setPlanningWarning] = useState("");
+  const [planningErrors, setPlanningErrors] = useState<
+    Partial<Record<"approach" | "steps", string>>
+  >({});
   const [predictionWarning, setPredictionWarning] = useState("");
   const [isReviewingPlan, setIsReviewingPlan] = useState(false);
-  const [planReviewMessage, setPlanReviewMessage] = useState("");
   const [isGeneratingReflection, setIsGeneratingReflection] = useState(false);
   const [recentRuns, setRecentRuns] = useState<CodeRunResult[]>([]);
   const [demoRunScenario, setDemoRunScenario] =
@@ -100,6 +103,7 @@ export function CodeEditorPanel({
     resetCode,
   } = useCodeAutosave({ taskId, starterCode });
   const { state: learningState, updateState } = useTaskLearningState(taskId);
+  const firstPlanningFieldRef = useRef<HTMLInputElement>(null);
 
   const lineCount = useMemo(
     () => Math.max(1, currentCode.split("\n").length),
@@ -109,6 +113,22 @@ export function CodeEditorPanel({
   useEffect(() => {
     onCodeChange?.(currentCode);
   }, [currentCode, onCodeChange]);
+
+  useEffect(() => {
+    onLearningContextChange?.({
+      planningStatus: learningState.planningDraft.status,
+      planningApproach: learningState.planningDraft.approach,
+      planningSteps: learningState.planningDraft.steps,
+      latestPrediction: learningState.prediction,
+      hintLevel: 0,
+    });
+  }, [
+    learningState.planningDraft.approach,
+    learningState.planningDraft.status,
+    learningState.planningDraft.steps,
+    learningState.prediction,
+    onLearningContextChange,
+  ]);
 
   useEffect(() => {
     if (!isDetailsOpen) {
@@ -132,13 +152,11 @@ export function CodeEditorPanel({
     }
 
     const hasPlan =
-      learningState.planningDraft.problemGoal.trim() ||
-      learningState.planningDraft.input.trim() ||
-      learningState.planningDraft.output.trim() ||
+      learningState.planningDraft.approach.trim() ||
       learningState.planningDraft.steps.some((step) => step.trim());
 
-    setPlanningWarning(
-      hasPlan ? "" : "Try writing a short plan before running your code.",
+    setPlanningErrors(
+      hasPlan ? {} : { approach: "Try writing a short plan before running your code." },
     );
     setPredictionWarning(
       learningState.prediction.trim()
@@ -230,54 +248,166 @@ export function CodeEditorPanel({
     });
   };
 
+  const validatePlanningDraft = (draft: PlanningDraft) => {
+    const nextErrors: Partial<Record<"approach" | "steps", string>> = {};
+    if (!draft.approach.trim()) {
+      nextErrors.approach = "Add a short approach.";
+    }
+    if (!draft.steps[0].trim() || !draft.steps[1].trim()) {
+      nextErrors.steps = "Add at least two steps.";
+    }
+    return nextErrors;
+  };
+
+  const normalizePlanText = (text: string) =>
+    text.trim().toLowerCase().replace(/\s+/g, " ");
+
+  const createPlanningReview = (draft: PlanningDraft): PlanningReview => {
+    const approach = normalizePlanText(draft.approach);
+    const steps = draft.steps.map(normalizePlanText);
+    const title = normalizePlanText(task.title);
+    const descriptionText = normalizePlanText(task.description.join(" "));
+    const copiedTitle =
+      approach === title || steps.some((step) => step && step === title);
+    const duplicateSteps = Boolean(steps[0] && steps[0] === steps[1]);
+    const approachTooShort = draft.approach.trim().split(/\s+/).filter(Boolean).length < 5;
+    const usefulActionPattern =
+      /\b(read|get|take|ask|store|keep|set|start|check|compare|loop|repeat|calculate|count|sum|add|find|return|print|output|update|convert|split|join|sort|filter|call|use|create|build|validate|track|remember)\b/i;
+    const hasActionOrder =
+      draft.steps.slice(0, 2).every((step) => usefulActionPattern.test(step));
+    const copiesDescription =
+      descriptionText.includes(approach) && approach.length > 40;
+
+    const strengths: string[] = [];
+    if (!approachTooShort && !copiedTitle) {
+      strengths.push("Your approach identifies a clear strategy.");
+    } else {
+      strengths.push("You identified the main goal.");
+    }
+    if (!duplicateSteps && hasActionOrder) {
+      strengths.push("Your steps are in a logical order.");
+    }
+
+    if (approachTooShort) {
+      return {
+        status: "needs_revision",
+        strengths,
+        improvement: "Your approach is a little too short to guide your coding yet.",
+        question: "What main idea will your program use before writing the first line of code?",
+      };
+    }
+
+    if (copiedTitle || copiesDescription) {
+      return {
+        status: "needs_revision",
+        strengths,
+        improvement: "Your plan mostly repeats the task text right now.",
+        question: "What action will your program do with the input values?",
+      };
+    }
+
+    if (duplicateSteps) {
+      return {
+        status: "needs_revision",
+        strengths,
+        improvement: "Your first two steps are the same, so the order is not clear yet.",
+        question: "What should happen after the first step is finished?",
+      };
+    }
+
+    if (!hasActionOrder) {
+      return {
+        status: "needs_revision",
+        strengths,
+        improvement: "Your steps do not yet describe clear actions for the program.",
+        question: `For this ${task.concept} task, what should the program remember or change as it works?`,
+      };
+    }
+
+    return {
+      status: "ready",
+      strengths: strengths.length
+        ? strengths
+        : ["Your approach identifies a clear strategy."],
+      improvement: "Your plan is clear enough to start coding.",
+    };
+  };
+
   const reviewPlan = async () => {
     if (isReviewingPlan) {
       return;
     }
 
+    const errors = validatePlanningDraft(learningState.planningDraft);
+    setPlanningErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      window.setTimeout(() => firstPlanningFieldRef.current?.focus(), 0);
+      return;
+    }
+
     setIsReviewingPlan(true);
-    setPlanReviewMessage("");
+    updateState({
+      planningDraft: {
+        ...learningState.planningDraft,
+        status: "reviewing",
+        updatedAt: new Date().toISOString(),
+      },
+    });
 
     try {
-      const response = await fetch("/api/tutor/message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskId,
-          studentMessage: [
-            learningState.planningDraft.problemGoal,
-            learningState.planningDraft.input,
-            learningState.planningDraft.output,
-            ...learningState.planningDraft.steps,
-          ].join("\n"),
-          currentCode,
-          latestRunResult: learningState.latestRunResult,
-          conversationId: `plan-review-${taskId}`,
-          stage: "plan",
-          mode: "explore_strategies",
-          conversation: [],
-          action: "review_plan",
-        }),
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+      const tutorReview = createPlanningReview(learningState.planningDraft);
+      updateState({
+        planningDraft: {
+          ...learningState.planningDraft,
+          status: tutorReview.status,
+          tutorReview,
+          reviewBypassed: false,
+          updatedAt: new Date().toISOString(),
+        },
       });
-
-      if (!response.ok) {
-        throw new Error("Plan review failed");
-      }
-
-      const data = (await response.json()) as {
-        message?: { content?: string };
-      };
-      setPlanReviewMessage(
-        data.message?.content ??
-          "You identified the output, but what information should the program read before producing it?",
-      );
-    } catch {
-      setPlanReviewMessage(
-        "You identified part of the plan. What input should the program read before it prints the greeting?",
-      );
     } finally {
       setIsReviewingPlan(false);
     }
+  };
+
+  const updatePlanningDraft = (planningDraft: PlanningDraft) => {
+    setPlanningErrors({});
+    updateState({
+      planningDraft: {
+        ...planningDraft,
+        status:
+          planningDraft.status === "ready" ||
+          planningDraft.status === "needs_revision"
+            ? "editing"
+            : planningDraft.status === "not_started"
+              ? "editing"
+              : planningDraft.status,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  };
+
+  const collapsePlanning = (reviewBypassed = false) => {
+    updateState({
+      planningDraft: {
+        ...learningState.planningDraft,
+        status: "ready",
+        reviewBypassed,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  };
+
+  const editPlanning = () => {
+    updateState({
+      planningDraft: {
+        ...learningState.planningDraft,
+        status: "editing",
+        updatedAt: new Date().toISOString(),
+      },
+    });
+    window.setTimeout(() => firstPlanningFieldRef.current?.focus(), 0);
   };
 
   const generateReflectionSummary = async () => {
@@ -332,7 +462,7 @@ export function CodeEditorPanel({
 
   return (
     <>
-      <section className="flex min-h-[640px] min-w-0 flex-col overflow-hidden rounded-[22px] border border-[#E4E7F0] bg-white shadow-[0_16px_45px_rgba(78,91,130,0.08)]">
+      <section className="flex min-h-[640px] min-w-0 flex-col overflow-hidden rounded-[22px] border border-[#E4E7F0] bg-white shadow-[0_16px_45px_rgba(78,91,130,0.08)] lg:h-full">
       <div className="border-b border-[#E4E7F0] bg-white px-5 py-3.5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
@@ -372,16 +502,26 @@ export function CodeEditorPanel({
 
       <PlanningPanel
         value={learningState.planningDraft}
-        warning={planningWarning}
+        errors={planningErrors}
         isReviewing={isReviewingPlan}
-        reviewMessage={planReviewMessage}
-        onChange={(planningDraft) => {
-          setPlanningWarning("");
-          updateState({ planningDraft });
-        }}
+        isCollapsed={
+          learningState.planningDraft.status === "ready" &&
+          !isReviewingPlan
+        }
+        approachPlaceholder={
+          task.concept
+            ? `Briefly describe the main idea you will use for this ${topicLabels[task.concept].toLowerCase()} task.`
+            : "Briefly describe the main idea you will use."
+        }
+        firstInvalidRef={firstPlanningFieldRef}
+        onChange={updatePlanningDraft}
         onReviewPlan={() => {
           void reviewPlan();
         }}
+        onEditPlan={editPlanning}
+        onStartCoding={() => collapsePlanning(false)}
+        onUpdatePlan={editPlanning}
+        onContinueAnyway={() => collapsePlanning(true)}
       />
 
       <EditorToolbar

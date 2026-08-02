@@ -4,10 +4,26 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CodeRunResult, RunStatus } from "@/types/code-run";
 
 export interface PlanningDraft {
-  problemGoal: string;
-  input: string;
-  output: string;
-  steps: string[];
+  approach: string;
+  steps: [string, string, string];
+  status: PlanningStatus;
+  tutorReview?: PlanningReview;
+  reviewBypassed?: boolean;
+  updatedAt?: string;
+}
+
+export type PlanningStatus =
+  | "not_started"
+  | "editing"
+  | "reviewing"
+  | "needs_revision"
+  | "ready";
+
+export interface PlanningReview {
+  status: "ready" | "needs_revision";
+  strengths: string[];
+  improvement?: string;
+  question?: string;
 }
 
 export interface ReflectionAnswers {
@@ -29,10 +45,9 @@ export interface TaskLearningState {
 }
 
 const emptyPlanningDraft: PlanningDraft = {
-  problemGoal: "",
-  input: "",
-  output: "",
+  approach: "",
   steps: ["", "", ""],
+  status: "not_started",
 };
 
 const emptyReflectionAnswers: ReflectionAnswers = {
@@ -65,9 +80,7 @@ function canUseStorage() {
 function calculateProgress(state: TaskLearningState) {
   let progress = 0;
   const hasPlan =
-    state.planningDraft.problemGoal.trim() ||
-    state.planningDraft.input.trim() ||
-    state.planningDraft.output.trim() ||
+    state.planningDraft.approach.trim() ||
     state.planningDraft.steps.some((step) => step.trim());
   const hasReflection = Object.values(state.reflectionAnswers).some((answer) =>
     answer.trim(),
@@ -94,13 +107,32 @@ export function loadTaskLearningState(taskId: string): TaskLearningState {
 
   try {
     const parsed = JSON.parse(raw) as Partial<TaskLearningState>;
+    const parsedPlanning = parsed.planningDraft as
+      | Partial<PlanningDraft> & {
+          problemGoal?: string;
+          planFeedback?: string;
+        }
+      | undefined;
+    const migratedSteps = parsedPlanning?.steps?.slice(0, 3) ?? ["", "", ""];
+    const steps: [string, string, string] = [
+      migratedSteps[0] ?? "",
+      migratedSteps[1] ?? "",
+      migratedSteps[2] ?? "",
+    ];
+    const approach = parsedPlanning?.approach ?? parsedPlanning?.problemGoal ?? "";
+    const hasPlanContent = approach.trim() || steps.some((step) => step.trim());
+    const status =
+      parsedPlanning?.status ??
+      (hasPlanContent ? "editing" : "not_started");
     const state: TaskLearningState = {
       ...createInitialState(),
       ...parsed,
       planningDraft: {
         ...emptyPlanningDraft,
-        ...parsed.planningDraft,
-        steps: parsed.planningDraft?.steps?.slice(0, 3) ?? ["", "", ""],
+        ...parsedPlanning,
+        approach,
+        steps,
+        status,
       },
       reflectionAnswers: {
         ...emptyReflectionAnswers,

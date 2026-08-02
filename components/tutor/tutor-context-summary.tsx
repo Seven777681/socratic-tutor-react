@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { TutorContextSnapshot } from "@/types/tutor";
 import {
   BookOpenIcon,
   BugIcon,
   ChevronDownIcon,
   CodeIcon,
+  LightbulbIcon,
   TestTubeIcon,
 } from "@/components/dashboard/dashboard-icons";
 
@@ -16,10 +17,20 @@ export function TutorContextSummary({
   context: TutorContextSnapshot;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  useEffect(() => {
+    setIsOpen(false);
+  }, [context.taskId]);
+
   const passed = context.latestRunResult
     ? context.latestRunResult.tests.filter((test) => test.passed).length
     : 0;
   const total = context.latestRunResult?.tests.length ?? 0;
+  const latestRun =
+    total > 0
+      ? `${passed} of ${total} checks passed`
+      : context.latestRunResult?.status
+        ? context.latestRunResult.status.replace("_", " ")
+        : "Not run yet";
 
   return (
     <section className="border-b border-[#E4E7F0] px-4 py-3">
@@ -41,30 +52,37 @@ export function TutorContextSummary({
         <dl className="mt-3 grid gap-2 text-sm">
           <div className="flex items-center gap-2 rounded-xl bg-[#FBFCFF] px-3 py-2">
             <BookOpenIcon className="h-4 w-4 text-[#6255f6]" />
-            <dt className="font-bold text-slate-500">Task</dt>
+            <dt className="font-bold text-slate-500">Current problem</dt>
             <dd className="ml-auto truncate font-semibold text-[#101426]">
               {context.taskTitle}
             </dd>
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-[#FBFCFF] px-3 py-2">
             <BugIcon className="h-4 w-4 text-[#6255f6]" />
-            <dt className="font-bold text-slate-500">Stage</dt>
+            <dt className="font-bold text-slate-500">Planning status</dt>
             <dd className="ml-auto font-semibold capitalize text-[#101426]">
-              {context.stage}
+              {context.planningStatus.replace("_", " ")}
             </dd>
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-[#FBFCFF] px-3 py-2">
             <TestTubeIcon className="h-4 w-4 text-[#6255f6]" />
-            <dt className="font-bold text-slate-500">Latest run</dt>
+            <dt className="font-bold text-slate-500">Last run result</dt>
             <dd className="ml-auto font-semibold text-[#101426]">
-              {total > 0 ? `${passed} of ${total} checks passed` : "Not run yet"}
+              {latestRun}
             </dd>
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-[#FBFCFF] px-3 py-2">
             <CodeIcon className="h-4 w-4 text-[#6255f6]" />
-            <dt className="font-bold text-slate-500">Current code</dt>
+            <dt className="font-bold text-slate-500">Latest code available</dt>
             <dd className="ml-auto font-semibold text-[#101426]">
               {context.currentCodeLineCount} lines
+            </dd>
+          </div>
+          <div className="flex items-center gap-2 rounded-xl bg-[#FBFCFF] px-3 py-2">
+            <LightbulbIcon className="h-4 w-4 text-[#6255f6]" />
+            <dt className="font-bold text-slate-500">Current hint level</dt>
+            <dd className="ml-auto font-semibold text-[#101426]">
+              Level {context.hintLevel}
             </dd>
           </div>
         </dl>

@@ -6,31 +6,46 @@ import type {
   GuidanceStage,
   TutorActionType,
   TutorConversation,
+  TutorLearningContext,
   TutorMessage,
   TutorMode,
   TutorStatus,
 } from "@/types/tutor";
 import {
   createInitialTutorMessages,
-  createSystemTutorMessage,
 } from "@/data/mock-tutor-conversations";
 import { getTutorResponse } from "@/services/tutor-service";
 import {
   clearTutorConversation,
   loadTutorConversation,
-  loadTutorMode,
   saveTutorConversation,
-  saveTutorMode,
 } from "@/hooks/use-tutor-storage";
 
-function createConversation(taskId: string, stage: GuidanceStage, mode: TutorMode): TutorConversation {
+const INTERNAL_TUTOR_MODE: TutorMode = "run_and_reflect";
+
+function createConversation({
+  taskId,
+  stage,
+  taskTitle,
+  hasRunResult,
+}: {
+  taskId: string;
+  stage: GuidanceStage;
+  taskTitle: string;
+  hasRunResult: boolean;
+}): TutorConversation {
   const timestamp = new Date().toISOString();
   return {
     id: `conversation-${taskId}-${Date.now()}`,
     taskId,
     stage,
-    mode,
-    messages: createInitialTutorMessages(stage, mode),
+    mode: INTERNAL_TUTOR_MODE,
+    messages: createInitialTutorMessages({
+      stage,
+      mode: INTERNAL_TUTOR_MODE,
+      taskTitle,
+      hasRunResult,
+    }),
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -74,55 +89,64 @@ function trackTutorEvent({
 
 export function useTutorConversation({
   taskId,
+  taskTitle,
+  taskDescription,
   currentCode,
   latestRunResult,
+  learningContext,
   stage,
 }: {
   taskId: string;
+  taskTitle: string;
+  taskDescription: string;
   currentCode: string;
   latestRunResult?: CodeRunResult;
+  learningContext: TutorLearningContext;
   stage: GuidanceStage;
 }) {
   const [conversation, setConversation] = useState<TutorConversation>(() =>
-    createConversation(taskId, stage, "run_and_reflect"),
+    createConversation({ taskId, stage, taskTitle, hasRunResult: Boolean(latestRunResult) }),
   );
-  const [tutorMode, setTutorMode] = useState<TutorMode>("run_and_reflect");
   const [status, setStatus] = useState<TutorStatus>("ready");
   const [errorMessage, setErrorMessage] = useState("");
   const [lastHandledRunId, setLastHandledRunId] = useState<string | undefined>();
 
   useEffect(() => {
     const stored = loadTutorConversation(taskId);
-    const storedMode = loadTutorMode(taskId) ?? "run_and_reflect";
-    setTutorMode(storedMode);
     if (stored) {
-      setConversation({ ...stored, stage, mode: storedMode });
+      setConversation({
+        ...stored,
+        stage,
+        mode: INTERNAL_TUTOR_MODE,
+        messages: stored.messages.filter((message) => message.role !== "system"),
+      });
+      setLastHandledRunId(latestRunResult?.id);
+      setStatus("ready");
+      setErrorMessage("");
       return;
     }
 
-    setConversation(createConversation(taskId, stage, storedMode));
-  }, [stage, taskId]);
+    setConversation(createConversation({
+      taskId,
+      stage,
+      taskTitle,
+      hasRunResult: Boolean(latestRunResult),
+    }));
+    setLastHandledRunId(latestRunResult?.id);
+    setStatus("ready");
+    setErrorMessage("");
+  }, [latestRunResult, stage, taskId, taskTitle]);
 
   useEffect(() => {
     saveTutorConversation(conversation);
   }, [conversation]);
 
   useEffect(() => {
-    setConversation((current) => {
-      if (current.stage === stage) {
-        return current;
-      }
-
-      return {
-        ...current,
-        stage,
-        updatedAt: new Date().toISOString(),
-        messages: [
-          ...current.messages,
-          createSystemTutorMessage(`Current stage is now ${stage}.`, stage),
-        ],
-      };
-    });
+    setConversation((current) =>
+      current.stage === stage
+        ? current
+        : { ...current, stage, updatedAt: new Date().toISOString() },
+    );
   }, [stage]);
 
   useEffect(() => {
@@ -133,14 +157,8 @@ export function useTutorConversation({
     setLastHandledRunId(latestRunResult.id);
     setConversation((current) => ({
       ...current,
+      stage,
       updatedAt: new Date().toISOString(),
-      messages: [
-        ...current.messages,
-        createSystemTutorMessage(
-          "The tutor is now using your latest run result.",
-          stage,
-        ),
-      ],
     }));
   }, [lastHandledRunId, latestRunResult, stage]);
 
@@ -163,14 +181,23 @@ export function useTutorConversation({
       try {
         const response = await getTutorResponse({
           taskId,
+          taskTitle,
+          taskDescription,
           studentMessage,
           currentCode,
           latestRunResult,
+          planningData: {
+            status: learningContext.planningStatus,
+            approach: learningContext.planningApproach,
+            steps: learningContext.planningSteps,
+          },
+          latestPrediction: learningContext.latestPrediction,
+          hintLevel: learningContext.hintLevel,
           stage,
           conversationId: conversation.id,
-          conversation: conversation.messages,
+          conversation: conversation.messages.filter((message) => message.role !== "system"),
           action,
-          mode: tutorMode,
+          mode: INTERNAL_TUTOR_MODE,
         });
 
         setConversation((current) => ({
@@ -193,11 +220,18 @@ export function useTutorConversation({
     },
     [
       conversation.messages,
+      conversation.id,
       currentCode,
+      learningContext.hintLevel,
+      learningContext.latestPrediction,
+      learningContext.planningApproach,
+      learningContext.planningStatus,
+      learningContext.planningSteps,
       latestRunResult,
       stage,
       taskId,
-      tutorMode,
+      taskDescription,
+      taskTitle,
     ],
   );
 
@@ -256,9 +290,14 @@ export function useTutorConversation({
 
   const startNewConversation = useCallback(() => {
     clearTutorConversation(taskId);
-    setConversation(createConversation(taskId, stage, tutorMode));
+    setConversation(createConversation({
+      taskId,
+      stage,
+      taskTitle,
+      hasRunResult: Boolean(latestRunResult),
+    }));
     setErrorMessage("");
-  }, [stage, taskId, tutorMode]);
+  }, [latestRunResult, stage, taskId, taskTitle]);
 
   const clearConversation = useCallback(() => {
     clearTutorConversation(taskId);
@@ -267,39 +306,13 @@ export function useTutorConversation({
       id: `conversation-${taskId}-${Date.now()}`,
       taskId,
       stage,
-      mode: tutorMode,
+      mode: INTERNAL_TUTOR_MODE,
       messages: [],
       createdAt: timestamp,
       updatedAt: timestamp,
     });
     setErrorMessage("");
-  }, [stage, taskId, tutorMode]);
-
-  const changeTutorMode = useCallback((nextMode: TutorMode) => {
-    if (nextMode === tutorMode) return;
-    const modeCopy: Record<TutorMode, string> = {
-      step_by_step: "Guidance mode changed to Step-by-Step Guide.\nThe tutor will break the task into smaller learning steps.",
-      explore_strategies: "Guidance mode changed to Explore Strategies.\nThe tutor will help you compare possible approaches.",
-      run_and_reflect: "Guidance mode changed to Run & Reflect.\nThe tutor will now use your latest code and run result as context.",
-    };
-    setTutorMode(nextMode);
-    saveTutorMode(taskId, nextMode);
-    setConversation((current) => ({
-      ...current,
-      mode: nextMode,
-      updatedAt: new Date().toISOString(),
-      messages: [...current.messages, { ...createSystemTutorMessage(modeCopy[nextMode], stage), mode: nextMode }],
-    }));
-    if (process.env.NODE_ENV === "development") {
-      console.info("learning_event", {
-        eventType: "tutor_mode_changed",
-        taskId,
-        timestamp: new Date().toISOString(),
-        sessionId: "mock-session",
-        metadata: { mode: nextMode },
-      });
-    }
-  }, [stage, taskId, tutorMode]);
+  }, [stage, taskId]);
 
   const beginWithQuestion = useCallback(() => {
     setConversation((current) => ({
@@ -310,19 +323,17 @@ export function useTutorConversation({
         {
           id: `tutor-${Date.now()}`,
           role: "tutor",
-          content: "What part of this task feels most uncertain right now?",
+          content: `For "${taskTitle}", what part feels most uncertain right now?`,
           timestamp: new Date().toISOString(),
           questionType: "understanding",
           stage,
         },
       ],
     }));
-  }, [stage]);
+  }, [stage, taskTitle]);
 
   return {
     conversation,
-    tutorMode,
-    changeTutorMode,
     status,
     errorMessage,
     hasStudentMessage,
