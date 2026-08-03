@@ -27,7 +27,7 @@ import { useCodeAutosave } from "@/hooks/use-code-autosave";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useTaskLearningState } from "@/hooks/use-task-learning-state";
 import type { PlanningDraft, PlanningReview } from "@/hooks/use-task-learning-state";
-import { mockRunCode } from "@/services/mock-code-runner";
+import { runCode } from "@/services/code-runner-service";
 import {
   difficultyLabels,
   topicLabels,
@@ -179,12 +179,18 @@ export function CodeEditorPanel({
       },
     });
 
-    const result = await mockRunCode({
+    const result = await runCode({
       taskId,
       code: currentCode,
       stdin,
-      scenario: demoRunScenario,
+      testCases: task.examples.map((example) => ({
+        id: example.id,
+        name: example.id,
+        input: example.input,
+        expectedOutput: example.output,
+      })),
     });
+
 
     setRunResult(result);
     setRunStatus(result.status);
