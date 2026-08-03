@@ -26,3 +26,10 @@
  ✓ Compiled in 246ms (646 modules)
  ✓ Compiled in 192ms (634 modules)
  ✓ Compiled in 170ms (634 modules)
+ GET /dashboard 200 in 111ms
+ ○ Compiling /tasks/[taskId] ...
+ ✓ Compiled /tasks/[taskId] in 1466ms (798 modules)
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 964ms (1011 modules)
+ ✓ Compiled in 136ms (555 modules)
+ ✓ Compiled in 129ms (456 modules)
