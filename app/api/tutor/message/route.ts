@@ -7,6 +7,7 @@ import type {
   TutorQuestionType,
   TutorRequest,
 } from "@/types/tutor";
+import { runTutorMultiAgent } from "@/lib/server/tutor-multi-agent";
 
 function createTutorMessage({
   content,
@@ -14,12 +15,16 @@ function createTutorMessage({
   action,
   mode,
   questionType = "debugging",
+  hintLevel,
+  agentTrace,
 }: {
   content: string;
   stage: GuidanceStage;
   action: TutorActionType;
   mode: TutorMode;
   questionType?: TutorQuestionType;
+  hintLevel?: number;
+  agentTrace?: TutorMessage["agentTrace"];
 }): TutorMessage {
   return {
     id: `tutor-${Date.now()}-${Math.round(Math.random() * 1000)}`,
@@ -30,6 +35,8 @@ function createTutorMessage({
     actionType: action,
     mode,
     questionType,
+    hintLevel,
+    agentTrace,
   };
 }
 
@@ -228,7 +235,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const { content, questionType } = getTutorContent(body);
+    let content: string;
+    let questionType: TutorQuestionType;
+    let hintLevel: number | undefined;
+    let agentTrace: TutorMessage["agentTrace"];
+
+    try {
+      const multiAgentResult = await runTutorMultiAgent(body);
+      if (multiAgentResult) {
+        content = multiAgentResult.content;
+        questionType = multiAgentResult.questionType;
+        hintLevel = multiAgentResult.hintLevel;
+        agentTrace = multiAgentResult.trace;
+      } else {
+        ({ content, questionType } = getTutorContent(body));
+      }
+    } catch (error) {
+      console.error("Multi-agent tutor failed; using local tutor fallback.", error);
+      ({ content, questionType } = getTutorContent(body));
+    }
 
     return NextResponse.json({
       message: createTutorMessage({
@@ -237,6 +262,8 @@ export async function POST(request: Request) {
         action: body.action,
         mode: body.mode,
         questionType,
+        hintLevel,
+        agentTrace,
       }),
     });
   } catch {

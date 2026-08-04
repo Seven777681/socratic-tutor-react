@@ -6,10 +6,14 @@
     "predev": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
     "dev": "next dev",
     "build": "next build",
+    "test": "tsx --test tests/**/*.test.ts",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "@langchain/core": "^1.2.4",
+    "@langchain/langgraph": "^1.4.9",
+    "@langchain/openai": "^1.5.5",
     "@monaco-editor/react": "^4.7.0",
     "framer-motion": "^11.0.0",
     "jszip": "^3.10.1",
@@ -17,7 +21,8 @@
     "next": "^14.2.0",
     "pdf-parse": "^2.4.5",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^20.12.0",
@@ -28,6 +33,7 @@
     "eslint-config-next": "^14.2.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
+    "tsx": "^4.23.5",
     "typescript": "^5.4.0"
   }
 }

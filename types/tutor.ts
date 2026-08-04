@@ -38,6 +38,20 @@ export interface TutorMessage {
   stage?: GuidanceStage;
   actionType?: TutorActionType;
   mode?: TutorMode;
+  hintLevel?: number;
+  agentTrace?: TutorAgentTrace[];
+}
+
+export type TutorAgentName =
+  | "problem_understanding"
+  | "socratic_questioning"
+  | "code_analysis"
+  | "metacognitive_monitor"
+  | "assessment";
+
+export interface TutorAgentTrace {
+  agent: TutorAgentName;
+  summary: string;
 }
 
 export interface TutorConversation {
@@ -64,6 +78,7 @@ export interface TutorRequest {
   };
   latestPrediction?: string;
   hintLevel?: number;
+  idleSeconds?: number;
   conversationId: string;
   stage: GuidanceStage;
   mode: TutorMode;

@@ -27,6 +27,20 @@ npm run dev
 
 打开浏览器访问 [http://localhost:3000](http://localhost:3000)
 
+### 启用 LangGraph 五 Agent 导师
+
+导师 API 使用 LangGraph 按事件调度五个角色：问题理解、苏格拉底提问、代码分析、元认知监测和评估反思。请复制 `.env.example` 为 `.env.local`（不要提交它），并填入：
+
+```bash
+OPENAI_API_KEY=your_api_key_here
+# 可选；不设置时使用 gpt-4.1-mini
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+重新启动开发服务器后，`/api/tutor/message` 会自动使用 LangGraph 条件路由。不同事件只运行必要的 Agent，并通过共享 Tutor State 传递结构化结果。没有配置 Key 时，系统会自动使用内置规则导师，方便继续离线开发和演示。
+
+当前四级 Hint 边界：Level 0 元认知提问、Level 1 概念提示、Level 2 语法方向、Level 3 伪代码或与当前题目无关的极小语法示例。所有等级都禁止输出当前题目的完整答案代码。
+
 ### 3. 构建生产版本
 
 ```bash
