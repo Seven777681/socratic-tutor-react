@@ -23,6 +23,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 19000);
+
   try {
     const backendResponse = await fetch(`${BACKEND_URL}/api/tutor/message`, {
       method: "POST",
@@ -30,6 +33,7 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
       // The Python agents call an LLM and can take a while to respond.
       cache: "no-store",
     });
@@ -51,5 +55,7 @@ export async function POST(request: Request) {
       { error: "Tutor backend is unreachable." },
       { status: 503 },
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

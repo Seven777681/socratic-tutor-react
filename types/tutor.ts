@@ -38,6 +38,13 @@ export interface TutorMessage {
   stage?: GuidanceStage;
   actionType?: TutorActionType;
   mode?: TutorMode;
+  agentTrace?: TutorAgentTraceItem[];
+}
+
+export interface TutorAgentTraceItem {
+  agent: string;
+  label: string;
+  summary: string;
 }
 
 export interface TutorConversation {

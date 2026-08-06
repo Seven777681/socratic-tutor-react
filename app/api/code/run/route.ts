@@ -34,6 +34,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 7000);
+
   try {
     const backendResponse = await fetch(`${BACKEND_URL}/api/code/run`, {
       method: "POST",
@@ -41,6 +44,7 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
       // Real subprocess execution can take a few seconds for slow loops.
       cache: "no-store",
     });
@@ -62,5 +66,7 @@ export async function POST(request: Request) {
       { error: "Code execution backend is unreachable." },
       { status: 503 },
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

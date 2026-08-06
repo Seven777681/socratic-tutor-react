@@ -95,6 +95,7 @@ class TutorMessage(BaseModel):
     actionType: str
     mode: str
     questionType: Optional[str] = None
+    agentTrace: List[dict] = []
 
 
 class TutorResponse(BaseModel):
@@ -162,6 +163,7 @@ def get_tutor_content(req: TutorRequest):
     problem = req.taskDescription or req.taskTitle or "the current problem"
     code = req.currentCode or ""
     chat_history = _build_chat_history(req.conversation)
+    agent_trace = []
 
     # Stage/action: Plan review -> Agent 1
     if req.action == "review_plan" or req.stage == "plan":
@@ -173,7 +175,12 @@ def get_tutor_content(req: TutorRequest):
         )
         result = run_agent1(problem, approach, steps)
         content = result.get("guide_question") or "Tell me more about your current plan."
-        return content, "decomposition"
+        agent_trace.append({
+            "agent": "Agent 1",
+            "label": "Plan understanding",
+            "summary": f"understanding_score={result.get('understanding_score', 'unknown')}",
+        })
+        return content, "decomposition", agent_trace
 
     # Reflection summary -> Agent 5
     if req.action == "generate_reflection_summary":
@@ -184,7 +191,12 @@ def get_tutor_content(req: TutorRequest):
             chat_history=chat_history,
             reflection_text=req.studentMessage,
         )
-        return result.get("summary", ""), "reflection"
+        agent_trace.append({
+            "agent": "Agent 5",
+            "label": "Reflection assessment",
+            "summary": "Generated learning summary.",
+        })
+        return result.get("summary", ""), "reflection", agent_trace
 
     # Default coding/debug flow -> Agent 3 (analysis) -> Agent 4 (monitor) -> Agent 2 (dialogue)
     error_type = "No Error"
@@ -192,11 +204,21 @@ def get_tutor_content(req: TutorRequest):
         predicted_output = req.latestPrediction or ""
         analysis = run_agent3(problem, code, predicted_output)
         error_type = analysis.get("error_type", "No Error")
+        agent_trace.append({
+            "agent": "Agent 3",
+            "label": "Code analysis",
+            "summary": f"error_type={error_type}",
+        })
 
     error_records = [error_type] if error_type != "No Error" else []
     monitor = run_agent4(chat_history, error_records, idle_over_1min=False)
     confusion_level = monitor.get("confusion_level", 0)
     is_stuck = monitor.get("is_stuck", False)
+    agent_trace.append({
+        "agent": "Agent 4",
+        "label": "Learning monitor",
+        "summary": f"confusion_level={confusion_level}, is_stuck={is_stuck}",
+    })
 
     hint_level = req.hintLevel or 0
     if is_stuck and hint_level < 3:
@@ -212,6 +234,11 @@ def get_tutor_content(req: TutorRequest):
         chat_history=chat_history,
     )
     content = dialogue.get("question", "")
+    agent_trace.append({
+        "agent": "Agent 2",
+        "label": "Socratic dialogue",
+        "summary": f"hint_level={hint_level}",
+    })
 
     if error_type != "No Error":
         question_type = "debugging"
@@ -220,10 +247,10 @@ def get_tutor_content(req: TutorRequest):
     else:
         question_type = "understanding"
 
-    return content, question_type
+    return content, question_type, agent_trace
 
 
-def _make_tutor_message(content: str, question_type: str, req: TutorRequest) -> TutorMessage:
+def _make_tutor_message(content: str, question_type: str, agent_trace: List[dict], req: TutorRequest) -> TutorMessage:
     return TutorMessage(
         id=f"tutor-{int(time.time() * 1000)}-{random.randint(0, 1000)}",
         role="tutor",
@@ -233,6 +260,7 @@ def _make_tutor_message(content: str, question_type: str, req: TutorRequest) -> 
         actionType=req.action,
         mode=req.mode,
         questionType=question_type,
+        agentTrace=agent_trace,
     )
 
 
@@ -444,6 +472,6 @@ def health():
 
 @app.post("/api/tutor/message", response_model=TutorResponse)
 def tutor_message(req: TutorRequest):
-    content, question_type = get_tutor_content(req)
-    message = _make_tutor_message(content, question_type, req)
+    content, question_type, agent_trace = get_tutor_content(req)
+    message = _make_tutor_message(content, question_type, agent_trace, req)
     return TutorResponse(message=message)

@@ -60,6 +60,29 @@ export function TutorMessage({ message }: { message: TutorMessageType }) {
         <p className="whitespace-pre-wrap break-words">
           {renderInlineCode(message.content)}
         </p>
+        {message.agentTrace?.length ? (
+          <div className="mt-3 border-t border-[#E4E7F0] pt-2">
+            <p className="text-xs font-extrabold text-slate-500">
+              Agent pipeline
+            </p>
+            <ul className="mt-1 grid gap-1">
+              {message.agentTrace.map((item) => (
+                <li
+                  key={`${message.id}-${item.agent}-${item.label}`}
+                  className="rounded-lg bg-white/75 px-2 py-1 text-xs leading-5 text-slate-600"
+                >
+                  <span className="font-extrabold text-[#6255f6]">
+                    {item.agent}
+                  </span>{" "}
+                  <span className="font-bold text-slate-700">
+                    {item.label}:
+                  </span>{" "}
+                  {item.summary}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <time className="sr-only" dateTime={message.timestamp}>
           {message.timestamp}
         </time>

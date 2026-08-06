@@ -18,6 +18,10 @@ function buildRunId() {
   return `run-error-${Date.now()}-${Math.round(Math.random() * 1000)}`;
 }
 
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 /**
  * Sends the student's code to the Python execution backend
  * (via the Next.js /api/code/run proxy) and returns the real result.
@@ -30,11 +34,15 @@ export async function runCode({
   stdin,
   testCases = [],
 }: RunCodeInput): Promise<CodeRunResult> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+
   try {
     const response = await fetch("/api/code/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId, code, stdin, testCases }),
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -43,6 +51,8 @@ export async function runCode({
 
     return (await response.json()) as CodeRunResult;
   } catch (error) {
+    const timedOut = isAbortError(error);
+
     return {
       id: buildRunId(),
       taskId,
@@ -50,19 +60,27 @@ export async function runCode({
       scenario: "system_error",
       stdin,
       stdout: "",
-      stderr: error instanceof Error ? error.message : "Unknown error",
+      stderr: timedOut
+        ? "The code execution request timed out."
+        : error instanceof Error
+          ? error.message
+          : "Unknown error",
       elapsedMs: 0,
       createdAt: new Date().toISOString(),
       summary:
-        "The code execution service is unavailable. Your code was not executed.",
+        timedOut
+          ? "The code execution service did not respond in time. Your code may not have run."
+          : "The code execution service is unavailable. Your code was not executed.",
       tests: [],
       error: {
         type: "system",
-        title: "System Error",
+        title: timedOut ? "Execution Service Timeout" : "System Error",
         message:
-          "Could not reach the code execution backend at http://127.0.0.1:8000.",
+          "Could not get a response from the code execution backend at http://127.0.0.1:8000.",
         hint: "Start it with: cd socratic_backend && uvicorn server:app --reload --port 8000",
       },
     };
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }

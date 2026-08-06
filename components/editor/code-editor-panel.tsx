@@ -202,10 +202,10 @@ export function CodeEditorPanel({
     onRunResultChange?.(result);
     setRecentRuns((runs) => [result, ...runs].slice(0, 5));
 
-    if (result.status === "success" || result.status === "failed") {
-      setActiveResultTab("tests");
-    } else {
+    if (result.status === "error" || result.status === "timeout" || result.status === "system_error") {
       setActiveResultTab("errors");
+    } else {
+      setActiveResultTab("console");
     }
 
     trackLearningEvent({
@@ -234,6 +234,7 @@ export function CodeEditorPanel({
     runStatus,
     saveNow,
     stdin,
+    task.examples,
     taskId,
     updateState,
   ]);
@@ -544,7 +545,7 @@ export function CodeEditorPanel({
         onDemoRunScenarioChange={setDemoRunScenario}
       />
 
-      <div className="grid min-h-0 flex-1 bg-[#F5F7FF] p-3">
+      <div className="grid min-h-[280px] flex-1 bg-[#F5F7FF] p-3">
         <div className="flex min-h-0 flex-col overflow-hidden rounded-[14px] border border-[#E4E7F0] bg-[#FBFCFF]">
           <MonacoCodeEditor
             value={currentCode}
@@ -571,42 +572,45 @@ export function CodeEditorPanel({
           updateState({ prediction: learningState.prediction });
         }}
       />
-      </section>
-
       {hasRunCode || runStatus === "running" ? (
-        <RunResultsPanel
-          status={runStatus}
-          result={runResult}
-          stdin={stdin}
-          activeTab={activeResultTab}
-          isOpen={isResultsOpen}
-          isRunning={runStatus === "running"}
-          recentRuns={recentRuns}
-          onStdinChange={setStdin}
-          onActiveTabChange={setActiveResultTab}
-          onOpenChange={setIsResultsOpen}
-          onClear={() => {
-            setRunStatus("idle");
-            setRunResult(undefined);
-            setActiveResultTab("console");
-          }}
-          onRunAgain={() => {
-            void handleRun();
-          }}
-          onSelectRecentRun={(run) => {
-            setHasRunCode(true);
-            setRunResult(run);
-            setRunStatus(run.status);
-            setStdin(run.stdin);
-            setIsResultsOpen(true);
-            setActiveResultTab(
-              run.status === "success" || run.status === "failed"
-                ? "tests"
-                : "errors",
-            );
-          }}
-        />
+        <div className="border-t border-[#E4E7F0] bg-[#FBFCFF] p-3">
+          <RunResultsPanel
+            status={runStatus}
+            result={runResult}
+            stdin={stdin}
+            activeTab={activeResultTab}
+            isOpen={isResultsOpen}
+            isRunning={runStatus === "running"}
+            recentRuns={recentRuns}
+            onStdinChange={setStdin}
+            onActiveTabChange={setActiveResultTab}
+            onOpenChange={setIsResultsOpen}
+            onClear={() => {
+              setRunStatus("idle");
+              setRunResult(undefined);
+              setActiveResultTab("console");
+            }}
+            onRunAgain={() => {
+              void handleRun();
+            }}
+            onSelectRecentRun={(run) => {
+              setHasRunCode(true);
+              setRunResult(run);
+              setRunStatus(run.status);
+              setStdin(run.stdin);
+              setIsResultsOpen(true);
+              setActiveResultTab(
+                run.status === "error" ||
+                  run.status === "timeout" ||
+                  run.status === "system_error"
+                  ? "errors"
+                  : "console",
+              );
+            }}
+          />
+        </div>
       ) : null}
+      </section>
 
       {shouldShowReflection ? (
         <ReflectionPanel
