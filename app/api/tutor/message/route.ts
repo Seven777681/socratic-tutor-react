@@ -223,18 +223,26 @@ function getTutorContent({
     questionType: "debugging" as const,
   };
 }
-
 export async function POST(request: Request) {
+  let body: TutorRequest;
+
   try {
-    const body = (await request.json()) as TutorRequest;
+    body = (await request.json()) as TutorRequest;
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid tutor request." },
+      { status: 400 },
+    );
+  }
 
-    if (!body.taskId || !body.stage || !body.mode || !Array.isArray(body.conversation)) {
-      return NextResponse.json(
-        { error: "Invalid tutor request." },
-        { status: 400 },
-      );
-    }
+  if (!body.taskId || !body.stage || !body.mode || !Array.isArray(body.conversation)) {
+    return NextResponse.json(
+      { error: "Invalid tutor request." },
+      { status: 400 },
+    );
+  }
 
+  try {
     let content: string;
     let questionType: TutorQuestionType;
     let hintLevel: number | undefined;
@@ -266,7 +274,8 @@ export async function POST(request: Request) {
         agentTrace,
       }),
     });
-  } catch {
+  } catch (error) {
+    console.error("Tutor request could not be processed.", error);
     return NextResponse.json(
       { error: "Tutor request could not be processed." },
       { status: 500 },

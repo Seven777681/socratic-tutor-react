@@ -3,3 +3,11 @@ node_modules
 .env*.local
 dev-server.log
 dev-server.err
+next-dev.log
+
+# Python backend
+socratic_backend/.venv
+socratic_backend/__pycache__
+socratic_backend/.idea
+socratic_backend/*.log
+socratic_backend/.env
