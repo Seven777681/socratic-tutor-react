@@ -23,14 +23,24 @@ function renderInlineCode(content: string) {
 
 const questionTypeLabels = {
   understanding: "Guiding Question",
-  decomposition: "Planning Review",
+  decomposition: "Guiding Question",
   debugging: "Debugging Question",
   reflection: "Reflection Prompt",
   transfer: "Edge Case Prompt",
   strategy_comparison: "Guiding Question",
 };
 
-export function TutorMessage({ message }: { message: TutorMessageType }) {
+export function TutorMessage({
+  message,
+  onBeginPlanningHelp,
+  onHasPlanningIdea,
+  canChoosePlanningPath = false,
+}: {
+  message: TutorMessageType;
+  onBeginPlanningHelp?: () => void;
+  onHasPlanningIdea?: () => void;
+  canChoosePlanningPath?: boolean;
+}) {
   if (message.role === "system") {
     return null;
   }
@@ -60,27 +70,22 @@ export function TutorMessage({ message }: { message: TutorMessageType }) {
         <p className="whitespace-pre-wrap break-words">
           {renderInlineCode(message.content)}
         </p>
-        {message.agentTrace?.length ? (
-          <div className="mt-3 border-t border-[#E4E7F0] pt-2">
-            <p className="text-xs font-extrabold text-slate-500">
-              Agent pipeline
-            </p>
-            <ul className="mt-1 grid gap-1">
-              {message.agentTrace.map((item) => (
-                <li
-                  key={`${message.id}-${item.agent}-${item.label}`}
-                  className="rounded-lg bg-white/75 px-2 py-1 text-xs leading-5 text-slate-600"
-                >
-                  <span className="font-extrabold text-[#6255f6]">
-                    {item.agent}
-                  </span>{" "}
-                  <span className="font-bold text-slate-700">
-                    {item.label}:
-                  </span>{" "}
-                  {item.summary}
-                </li>
-              ))}
-            </ul>
+        {message.choicePrompt === "planning_entry" && canChoosePlanningPath ? (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={onHasPlanningIdea}
+              className="rounded-lg border border-[#b9b2ff] bg-white px-3 py-2 text-xs font-extrabold text-[#6255f6] transition hover:bg-indigo-50/70 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 active:scale-[0.99]"
+            >
+              Yes, I have an idea
+            </button>
+            <button
+              type="button"
+              onClick={onBeginPlanningHelp}
+              className="rounded-lg bg-[linear-gradient(90deg,#6657f5,#4678ff)] px-3 py-2 text-xs font-extrabold text-white shadow-sm shadow-indigo-200/70 transition hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 active:scale-[0.99]"
+            >
+              No, help me understand
+            </button>
           </div>
         ) : null}
         <time className="sr-only" dateTime={message.timestamp}>

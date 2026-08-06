@@ -22,6 +22,26 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+
+  .tutor-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+
+  .tutor-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .tutor-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .tutor-scroll::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {

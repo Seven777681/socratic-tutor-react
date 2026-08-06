@@ -1,15 +1,10 @@
 "use client";
 
 import type { RefObject } from "react";
-import type {
-  PlanningDraft,
-  PlanningReview,
-} from "@/hooks/use-task-learning-state";
+import type { PlanningDraft } from "@/hooks/use-task-learning-state";
 import {
   BrainIcon,
   CheckCircleIcon,
-  CodeIcon,
-  TriangleAlertIcon,
 } from "@/components/dashboard/dashboard-icons";
 
 type PlanningErrors = Partial<Record<"approach" | "steps", string>>;
@@ -24,9 +19,6 @@ export function PlanningPanel({
   onChange,
   onReviewPlan,
   onEditPlan,
-  onStartCoding,
-  onUpdatePlan,
-  onContinueAnyway,
 }: {
   value: PlanningDraft;
   errors: PlanningErrors;
@@ -37,12 +29,7 @@ export function PlanningPanel({
   onChange: (value: PlanningDraft) => void;
   onReviewPlan: () => void;
   onEditPlan: () => void;
-  onStartCoding: () => void;
-  onUpdatePlan: () => void;
-  onContinueAnyway: () => void;
 }) {
-  const review = value.tutorReview;
-
   const updateStep = (index: number, step: string) => {
     const steps: [string, string, string] = [...value.steps];
     steps[index] = step;
@@ -162,15 +149,6 @@ export function PlanningPanel({
         </div>
       </div>
 
-      {review ? (
-        <TutorReviewCard
-          review={review}
-          onStartCoding={onStartCoding}
-          onUpdatePlan={onUpdatePlan}
-          onContinueAnyway={onContinueAnyway}
-        />
-      ) : null}
-
       <div className="mt-4 flex justify-end">
         <button
           type="button"
@@ -181,87 +159,6 @@ export function PlanningPanel({
           <BrainIcon className="h-4 w-4" />
           {isReviewing ? "Reviewing..." : "Review My Plan"}
         </button>
-      </div>
-    </section>
-  );
-}
-
-function TutorReviewCard({
-  review,
-  onStartCoding,
-  onUpdatePlan,
-  onContinueAnyway,
-}: {
-  review: PlanningReview;
-  onStartCoding: () => void;
-  onUpdatePlan: () => void;
-  onContinueAnyway: () => void;
-}) {
-  const ready = review.status === "ready";
-
-  return (
-    <section className="mt-4 rounded-xl border border-[#d9d5ff] bg-white px-4 py-3 shadow-sm">
-      <div className="flex items-start gap-3">
-        {ready ? (
-          <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-        ) : (
-          <TriangleAlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-        )}
-        <div className="min-w-0 flex-1">
-          <h4 className="text-sm font-extrabold text-[#101426]">
-            Tutor Review
-          </h4>
-          <div className="mt-2 space-y-1 text-sm font-semibold leading-6 text-slate-600">
-            {review.strengths.slice(0, 2).map((strength) => (
-              <p key={strength}>{strength}</p>
-            ))}
-            {review.improvement ? <p>{review.improvement}</p> : null}
-            {review.question ? (
-              <p>
-                <span className="font-extrabold text-[#101426]">Think about: </span>
-                {review.question}
-              </p>
-            ) : null}
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {ready ? (
-              <>
-                <button
-                  type="button"
-                  onClick={onUpdatePlan}
-                  className="inline-flex h-9 items-center justify-center rounded-lg border border-[#b9b2ff] bg-white px-3 text-sm font-bold text-[#6255f6] transition hover:bg-indigo-50/70 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15"
-                >
-                  Edit Plan
-                </button>
-                <button
-                  type="button"
-                  onClick={onStartCoding}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#6255f6] px-3 text-sm font-bold text-white transition hover:bg-[#5146d8] focus:outline-none focus:ring-4 focus:ring-[#6255f6]/20"
-                >
-                  <CodeIcon className="h-4 w-4" />
-                  Start Coding
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={onUpdatePlan}
-                  className="inline-flex h-9 items-center justify-center rounded-lg bg-[#6255f6] px-3 text-sm font-bold text-white transition hover:bg-[#5146d8] focus:outline-none focus:ring-4 focus:ring-[#6255f6]/20"
-                >
-                  Update My Plan
-                </button>
-                <button
-                  type="button"
-                  onClick={onContinueAnyway}
-                  className="inline-flex h-9 items-center justify-center rounded-lg border border-[#b9b2ff] bg-white px-3 text-sm font-bold text-[#6255f6] transition hover:bg-indigo-50/70 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15"
-                >
-                  Continue Anyway
-                </button>
-              </>
-            )}
-          </div>
-        </div>
       </div>
     </section>
   );

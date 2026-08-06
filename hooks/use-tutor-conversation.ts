@@ -9,11 +9,9 @@ import type {
   TutorLearningContext,
   TutorMessage,
   TutorMode,
+  TutorPlanInteraction,
   TutorStatus,
 } from "@/types/tutor";
-import {
-  createInitialTutorMessages,
-} from "@/data/mock-tutor-conversations";
 import { getTutorResponse } from "@/services/tutor-service";
 import {
   clearTutorConversation,
@@ -23,16 +21,25 @@ import {
 
 const INTERNAL_TUTOR_MODE: TutorMode = "run_and_reflect";
 
+function createPlanningEntryMessage(stage: GuidanceStage): TutorMessage {
+  return {
+    id: `tutor-entry-${Date.now()}-${Math.round(Math.random() * 1000)}`,
+    role: "tutor",
+    content: "Before planning, do you already have an approach?",
+    timestamp: new Date().toISOString(),
+    questionType: "understanding",
+    stage,
+    mode: INTERNAL_TUTOR_MODE,
+    choicePrompt: "planning_entry",
+  };
+}
+
 function createConversation({
   taskId,
   stage,
-  taskTitle,
-  hasRunResult,
 }: {
   taskId: string;
   stage: GuidanceStage;
-  taskTitle: string;
-  hasRunResult: boolean;
 }): TutorConversation {
   const timestamp = new Date().toISOString();
   return {
@@ -40,12 +47,7 @@ function createConversation({
     taskId,
     stage,
     mode: INTERNAL_TUTOR_MODE,
-    messages: createInitialTutorMessages({
-      stage,
-      mode: INTERNAL_TUTOR_MODE,
-      taskTitle,
-      hasRunResult,
-    }),
+    messages: stage === "plan" ? [createPlanningEntryMessage(stage)] : [],
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -72,7 +74,8 @@ function trackTutorEvent({
     | "tutor_response_received"
     | "hint_level_requested"
     | "tutor_rephrase_requested"
-    | "reasoning_check_requested";
+    | "reasoning_check_requested"
+    | "problem_understanding_requested";
   taskId: string;
   metadata: Record<string, number | string>;
 }) {
@@ -95,6 +98,7 @@ export function useTutorConversation({
   latestRunResult,
   learningContext,
   stage,
+  onPlanInteraction,
 }: {
   taskId: string;
   taskTitle: string;
@@ -103,9 +107,10 @@ export function useTutorConversation({
   latestRunResult?: CodeRunResult;
   learningContext: TutorLearningContext;
   stage: GuidanceStage;
+  onPlanInteraction?: (review: TutorPlanInteraction) => void;
 }) {
   const [conversation, setConversation] = useState<TutorConversation>(() =>
-    createConversation({ taskId, stage, taskTitle, hasRunResult: Boolean(latestRunResult) }),
+    createConversation({ taskId, stage }),
   );
   const [status, setStatus] = useState<TutorStatus>("ready");
   const [errorMessage, setErrorMessage] = useState("");
@@ -114,11 +119,17 @@ export function useTutorConversation({
   useEffect(() => {
     const stored = loadTutorConversation(taskId);
     if (stored) {
+      const storedMessages = stored.messages.filter((message) => message.role !== "system");
       setConversation({
         ...stored,
         stage,
         mode: INTERNAL_TUTOR_MODE,
-        messages: stored.messages.filter((message) => message.role !== "system"),
+        messages:
+          storedMessages.length > 0
+            ? storedMessages
+            : stage === "plan"
+              ? [createPlanningEntryMessage(stage)]
+              : [],
       });
       setLastHandledRunId(latestRunResult?.id);
       setStatus("ready");
@@ -129,8 +140,6 @@ export function useTutorConversation({
     setConversation(createConversation({
       taskId,
       stage,
-      taskTitle,
-      hasRunResult: Boolean(latestRunResult),
     }));
     setLastHandledRunId(latestRunResult?.id);
     setStatus("ready");
@@ -166,6 +175,19 @@ export function useTutorConversation({
     () => conversation.messages.some((message) => message.role === "student"),
     [conversation.messages],
   );
+  const hasUnresolvedPlanReview = useMemo(() => {
+    const latestPlanMessage = [...conversation.messages]
+      .reverse()
+      .find(
+        (message) =>
+          message.role === "tutor" &&
+          (message.planInteraction || message.planReview),
+      );
+    const latestPlanState =
+      latestPlanMessage?.planInteraction ?? latestPlanMessage?.planReview;
+
+    return Boolean(latestPlanState && !latestPlanState.canEnterCoding);
+  }, [conversation.messages]);
 
   const requestTutorResponse = useCallback(
     async ({
@@ -205,6 +227,13 @@ export function useTutorConversation({
           updatedAt: new Date().toISOString(),
           messages: [...current.messages, { ...response, actionType: action }],
         }));
+        const planState = response.planInteraction ?? response.planReview;
+        if (planState) {
+          onPlanInteraction?.({
+            ...planState,
+            showReviewCard: Boolean(response.planReview),
+          });
+        }
         setStatus("ready");
         trackTutorEvent({
           eventType: "tutor_response_received",
@@ -228,6 +257,7 @@ export function useTutorConversation({
       learningContext.planningStatus,
       learningContext.planningSteps,
       latestRunResult,
+      onPlanInteraction,
       stage,
       taskId,
       taskDescription,
@@ -256,10 +286,10 @@ export function useTutorConversation({
 
       await requestTutorResponse({
         studentMessage: trimmed,
-        action: "message",
+        action: hasUnresolvedPlanReview ? "review_plan" : "message",
       });
     },
-    [requestTutorResponse, stage, status, taskId],
+    [hasUnresolvedPlanReview, requestTutorResponse, stage, status, taskId],
   );
 
   const triggerAction = useCallback(
@@ -290,12 +320,7 @@ export function useTutorConversation({
 
   const startNewConversation = useCallback(() => {
     clearTutorConversation(taskId);
-    setConversation(createConversation({
-      taskId,
-      stage,
-      taskTitle,
-      hasRunResult: Boolean(latestRunResult),
-    }));
+    setConversation(createConversation({ taskId, stage }));
     setErrorMessage("");
   }, [latestRunResult, stage, taskId, taskTitle]);
 
@@ -307,7 +332,7 @@ export function useTutorConversation({
       taskId,
       stage,
       mode: INTERNAL_TUTOR_MODE,
-      messages: [],
+      messages: stage === "plan" ? [createPlanningEntryMessage(stage)] : [],
       createdAt: timestamp,
       updatedAt: timestamp,
     });
@@ -320,17 +345,33 @@ export function useTutorConversation({
       updatedAt: new Date().toISOString(),
       messages: [
         ...current.messages,
+        createStudentMessage("No, help me understand.", stage),
+      ],
+    }));
+    void requestTutorResponse({
+      studentMessage: "I don't know how to start.",
+      action: "understand_problem",
+    });
+  }, [requestTutorResponse, stage]);
+
+  const beginWithPlan = useCallback(() => {
+    setConversation((current) => ({
+      ...current,
+      updatedAt: new Date().toISOString(),
+      messages: [
+        ...current.messages,
+        createStudentMessage("Yes, I have an idea.", stage),
         {
           id: `tutor-${Date.now()}`,
           role: "tutor",
-          content: `For "${taskTitle}", what part feels most uncertain right now?`,
+          content: `Great. Write your approach and steps in the Plan section, then use Review My Plan when you want a quick check.`,
           timestamp: new Date().toISOString(),
           questionType: "understanding",
           stage,
         },
       ],
     }));
-  }, [stage, taskTitle]);
+  }, [stage]);
 
   return {
     conversation,
@@ -342,5 +383,6 @@ export function useTutorConversation({
     startNewConversation,
     clearConversation,
     beginWithQuestion,
+    beginWithPlan,
   };
 }

@@ -24,6 +24,7 @@ export type TutorActionType =
   | "check_edge_cases"
   | "reflect_solution"
   | "review_plan"
+  | "understand_problem"
   | "explain_success"
   | "generate_reflection_summary";
 
@@ -38,13 +39,26 @@ export interface TutorMessage {
   stage?: GuidanceStage;
   actionType?: TutorActionType;
   mode?: TutorMode;
+  choicePrompt?: "planning_entry";
   agentTrace?: TutorAgentTraceItem[];
+  planReview?: TutorPlanReview;
+  planInteraction?: TutorPlanInteraction;
 }
 
 export interface TutorAgentTraceItem {
   agent: string;
   label: string;
   summary: string;
+}
+
+export interface TutorPlanReview {
+  understandingScore: number;
+  missingSteps: string[];
+  canEnterCoding: boolean;
+}
+
+export interface TutorPlanInteraction extends TutorPlanReview {
+  showReviewCard: boolean;
 }
 
 export interface TutorConversation {

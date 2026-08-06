@@ -1,29 +1,35 @@
-from typing import TypedDict, List, Optional
-from langchain_core.messages import BaseMessage
+from typing import Any, Dict, List, Optional, TypedDict
 
-class TutorState(TypedDict):
-    # 题目基础信息
+
+class TutorState(TypedDict, total=False):
     problem_content: str
-    difficulty: str
+    action: str
+    stage: str
+    mode: str
 
-    # 学生输入内容
-    plan_form: dict
+    plan_form: Dict[str, Any]
+    student_answer: str
     student_code: str
     code_prediction: str
+    latest_run_status: Optional[str]
+    latest_error_message: Optional[str]
     student_reflection: str
+    messages: List[Dict[str, str]]
 
-    # 对话记忆
-    messages: List[BaseMessage]
+    understanding_score: int
+    missing_steps: List[str]
+    can_enter_coding: bool
+    current_state: Dict[str, bool]
+    selected_action: Optional[str]
+    reasoning_summary: Optional[str]
 
-    # Agent输出缓存
-    understanding_score: Optional[int]
+    code_error_type: str
     confusion_level: int
-    code_error_type: Optional[str]
-    socratic_question: str
-    hint_level: int
-    learning_summary: str
-
-    # 流程控制标记
-    current_phase: str
     is_stuck: bool
-    task_finished: bool
+    hint_level: int
+
+    tutor_message: str
+    question_type: str
+    learning_summary: str
+    agent_trace: List[Dict[str, str]]
+    route: str

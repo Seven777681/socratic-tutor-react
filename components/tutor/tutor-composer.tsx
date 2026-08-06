@@ -63,12 +63,8 @@ export function TutorComposer({
           <SendIcon className="h-5 w-5" />
         </button>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold leading-5 text-slate-500">
-          The tutor responds with guiding questions rather than direct
-          answers.
-        </p>
-        <span className="shrink-0 text-xs font-bold text-slate-400">
+      <div className="mt-2 flex justify-end">
+        <span className="text-xs font-bold text-slate-400">
           {draft.length}/{MAX_MESSAGE_LENGTH}
         </span>
       </div>

@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CodeRunResult } from "@/types/code-run";
-import type { GuidanceStage, TutorContextSnapshot, TutorLearningContext } from "@/types/tutor";
+import type {
+  GuidanceStage,
+  TutorContextSnapshot,
+  TutorPlanInteraction,
+  TutorLearningContext,
+} from "@/types/tutor";
 import type { ProgrammingTaskDetail } from "@/types/task";
 import { TutorClearDialog } from "@/components/tutor/tutor-clear-dialog";
 import { TutorComposer } from "@/components/tutor/tutor-composer";
@@ -10,7 +15,6 @@ import { TutorContextSummary } from "@/components/tutor/tutor-context-summary";
 import { TutorConversation } from "@/components/tutor/tutor-conversation";
 import { TutorGuidelinesDialog } from "@/components/tutor/tutor-guidelines-dialog";
 import { TutorHeader } from "@/components/tutor/tutor-header";
-import { TutorQuickActions } from "@/components/tutor/tutor-quick-actions";
 import { useTutorConversation } from "@/hooks/use-tutor-conversation";
 
 function getGuidanceStage({
@@ -42,11 +46,15 @@ export function SocraticTutorPanel({
   currentCode,
   latestRunResult,
   learningContext,
+  planReviewRequestId,
+  onPlanInteraction,
 }: {
   task: ProgrammingTaskDetail;
   currentCode: string;
   latestRunResult?: CodeRunResult;
   learningContext: TutorLearningContext;
+  planReviewRequestId?: number;
+  onPlanInteraction?: (review: TutorPlanInteraction) => void;
 }) {
   const [isGuidelinesOpen, setIsGuidelinesOpen] = useState(false);
   const [isClearOpen, setIsClearOpen] = useState(false);
@@ -64,6 +72,7 @@ export function SocraticTutorPanel({
     startNewConversation,
     clearConversation,
     beginWithQuestion,
+    beginWithPlan,
   } = useTutorConversation({
     taskId: task.id,
     taskTitle: task.title,
@@ -72,7 +81,18 @@ export function SocraticTutorPanel({
     latestRunResult,
     learningContext,
     stage,
+    onPlanInteraction,
   });
+  const lastHandledPlanReviewId = useRef(planReviewRequestId ?? 0);
+
+  useEffect(() => {
+    if (!planReviewRequestId || planReviewRequestId === lastHandledPlanReviewId.current) {
+      return;
+    }
+
+    lastHandledPlanReviewId.current = planReviewRequestId;
+    void triggerAction("review_plan");
+  }, [planReviewRequestId, triggerAction]);
 
   const context = useMemo<TutorContextSnapshot>(
     () => ({
@@ -102,7 +122,6 @@ export function SocraticTutorPanel({
       task.topic,
     ],
   );
-  const hasEditedCode = currentCode.trim() !== task.starterCode.trim();
   const composerPlaceholder =
     stage === "plan"
       ? "Describe the part of the plan you are unsure about..."
@@ -113,7 +132,7 @@ export function SocraticTutorPanel({
           : "Ask about the task, your code, or the next small step...";
 
   return (
-    <section className="flex min-h-[620px] w-full flex-col overflow-hidden rounded-[18px] border border-[#E4E7F0] bg-white shadow-[0_14px_40px_rgba(78,91,130,0.07)] lg:h-full lg:min-h-0">
+    <section className="flex min-h-[620px] w-full min-w-0 flex-col overflow-hidden rounded-[18px] border border-[#E4E7F0] bg-white shadow-[0_14px_40px_rgba(78,91,130,0.07)] lg:h-full lg:min-h-0">
       <TutorHeader
         status={status}
         onStartNew={startNewConversation}
@@ -125,19 +144,13 @@ export function SocraticTutorPanel({
         messages={conversation.messages}
         status={status}
         onBegin={beginWithQuestion}
+        onHasIdea={beginWithPlan}
       />
       {errorMessage ? (
         <div role="alert" className="mx-4 mb-3 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm font-semibold leading-6 text-rose-700">
           {errorMessage}
         </div>
       ) : null}
-      <TutorQuickActions
-        status={status}
-        stage={stage}
-        hasEditedCode={hasEditedCode}
-        latestRunStatus={latestRunResult?.status}
-        onAction={triggerAction}
-      />
       <TutorComposer
         status={status}
         placeholder={composerPlaceholder}

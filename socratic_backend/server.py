@@ -24,7 +24,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from agent_services import run_agent1, run_agent2, run_agent3, run_agent4, run_agent5
+from tutor_graph import graph
 
 app = FastAPI(title="Socratic Tutor Backend")
 
@@ -96,6 +96,8 @@ class TutorMessage(BaseModel):
     mode: str
     questionType: Optional[str] = None
     agentTrace: List[dict] = []
+    planReview: Optional[dict] = None
+    planInteraction: Optional[dict] = None
 
 
 class TutorResponse(BaseModel):
@@ -161,96 +163,59 @@ def _build_chat_history(conversation: List[ConversationMessage]) -> str:
 
 def get_tutor_content(req: TutorRequest):
     problem = req.taskDescription or req.taskTitle or "the current problem"
-    code = req.currentCode or ""
-    chat_history = _build_chat_history(req.conversation)
-    agent_trace = []
+    plan_form = {
+        "status": req.planningData.status if req.planningData else "",
+        "approach": req.planningData.approach if req.planningData else "",
+        "steps": req.planningData.steps if req.planningData else [],
+    }
+    initial_state = {
+        "problem_content": problem,
+        "action": req.action,
+        "stage": req.stage,
+        "mode": req.mode,
+        "plan_form": plan_form,
+        "student_answer": req.studentMessage,
+        "student_code": req.currentCode or "",
+        "code_prediction": req.latestPrediction or "",
+        "latest_run_status": req.latestRunResult.status if req.latestRunResult else None,
+        "latest_error_message": (
+            req.latestRunResult.error.message
+            if req.latestRunResult and req.latestRunResult.error
+            else None
+        ),
+        "student_reflection": req.studentMessage,
+        "messages": [message.model_dump() for message in req.conversation],
+        "hint_level": req.hintLevel or 0,
+        "confusion_level": 0,
+        "is_stuck": False,
+        "code_error_type": "No Error",
+        "agent_trace": [],
+    }
+    result_state = graph.invoke(initial_state)
+    content = result_state.get("tutor_message") or "What is your next thought?"
+    question_type = result_state.get("question_type") or "understanding"
+    agent_trace = result_state.get("agent_trace", [])
 
-    # Stage/action: Plan review -> Agent 1
-    if req.action == "review_plan" or req.stage == "plan":
-        approach = (req.planningData.approach if req.planningData else "") or ""
-        steps = (
-            "\n".join(req.planningData.steps)
-            if req.planningData and req.planningData.steps
-            else ""
-        )
-        result = run_agent1(problem, approach, steps)
-        content = result.get("guide_question") or "Tell me more about your current plan."
-        agent_trace.append({
-            "agent": "Agent 1",
-            "label": "Plan understanding",
-            "summary": f"understanding_score={result.get('understanding_score', 'unknown')}",
-        })
-        return content, "decomposition", agent_trace
+    plan_review = None
+    plan_interaction = None
+    if req.action in {"review_plan", "understand_problem"} or req.stage == "plan":
+        plan_data = {
+            "understandingScore": result_state.get("understanding_score", 0),
+            "missingSteps": result_state.get("missing_steps", []),
+            "canEnterCoding": result_state.get("can_enter_coding", False),
+            "action": result_state.get("selected_action"),
+            "currentState": result_state.get("current_state"),
+            "reasoningSummary": result_state.get("reasoning_summary"),
+        }
+        if req.studentMessage.strip():
+            plan_interaction = {**plan_data, "showReviewCard": False}
+        else:
+            plan_review = plan_data
 
-    # Reflection summary -> Agent 5
-    if req.action == "generate_reflection_summary":
-        result = run_agent5(
-            problem=problem,
-            code=code,
-            error_records=[],
-            chat_history=chat_history,
-            reflection_text=req.studentMessage,
-        )
-        agent_trace.append({
-            "agent": "Agent 5",
-            "label": "Reflection assessment",
-            "summary": "Generated learning summary.",
-        })
-        return result.get("summary", ""), "reflection", agent_trace
-
-    # Default coding/debug flow -> Agent 3 (analysis) -> Agent 4 (monitor) -> Agent 2 (dialogue)
-    error_type = "No Error"
-    if code.strip():
-        predicted_output = req.latestPrediction or ""
-        analysis = run_agent3(problem, code, predicted_output)
-        error_type = analysis.get("error_type", "No Error")
-        agent_trace.append({
-            "agent": "Agent 3",
-            "label": "Code analysis",
-            "summary": f"error_type={error_type}",
-        })
-
-    error_records = [error_type] if error_type != "No Error" else []
-    monitor = run_agent4(chat_history, error_records, idle_over_1min=False)
-    confusion_level = monitor.get("confusion_level", 0)
-    is_stuck = monitor.get("is_stuck", False)
-    agent_trace.append({
-        "agent": "Agent 4",
-        "label": "Learning monitor",
-        "summary": f"confusion_level={confusion_level}, is_stuck={is_stuck}",
-    })
-
-    hint_level = req.hintLevel or 0
-    if is_stuck and hint_level < 3:
-        hint_level += 1
-
-    dialogue = run_agent2(
-        problem=problem,
-        code=code,
-        error_type=error_type,
-        confusion_level=confusion_level,
-        is_stuck=is_stuck,
-        hint_level=hint_level,
-        chat_history=chat_history,
-    )
-    content = dialogue.get("question", "")
-    agent_trace.append({
-        "agent": "Agent 2",
-        "label": "Socratic dialogue",
-        "summary": f"hint_level={hint_level}",
-    })
-
-    if error_type != "No Error":
-        question_type = "debugging"
-    elif req.stage == "reflect":
-        question_type = "reflection"
-    else:
-        question_type = "understanding"
-
-    return content, question_type, agent_trace
+    return content, question_type, agent_trace, plan_review, plan_interaction
 
 
-def _make_tutor_message(content: str, question_type: str, agent_trace: List[dict], req: TutorRequest) -> TutorMessage:
+def _make_tutor_message(content: str, question_type: str, agent_trace: List[dict], plan_review: Optional[dict], plan_interaction: Optional[dict], req: TutorRequest) -> TutorMessage:
     return TutorMessage(
         id=f"tutor-{int(time.time() * 1000)}-{random.randint(0, 1000)}",
         role="tutor",
@@ -261,6 +226,8 @@ def _make_tutor_message(content: str, question_type: str, agent_trace: List[dict
         mode=req.mode,
         questionType=question_type,
         agentTrace=agent_trace,
+        planReview=plan_review,
+        planInteraction=plan_interaction,
     )
 
 
@@ -472,6 +439,6 @@ def health():
 
 @app.post("/api/tutor/message", response_model=TutorResponse)
 def tutor_message(req: TutorRequest):
-    content, question_type, agent_trace = get_tutor_content(req)
-    message = _make_tutor_message(content, question_type, agent_trace, req)
+    content, question_type, agent_trace, plan_review, plan_interaction = get_tutor_content(req)
+    message = _make_tutor_message(content, question_type, agent_trace, plan_review, plan_interaction, req)
     return TutorResponse(message=message)

@@ -26,7 +26,7 @@ import { ReflectionPanel } from "@/components/workspace/reflection-panel";
 import { useCodeAutosave } from "@/hooks/use-code-autosave";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useTaskLearningState } from "@/hooks/use-task-learning-state";
-import type { PlanningDraft, PlanningReview } from "@/hooks/use-task-learning-state";
+import type { PlanningDraft } from "@/hooks/use-task-learning-state";
 import { runCode } from "@/services/code-runner-service";
 import {
   difficultyLabels,
@@ -67,6 +67,8 @@ export function CodeEditorPanel({
   onRun,
   onCodeChange,
   onRunResultChange,
+  planInteraction,
+  onReviewPlanInTutor,
   onLearningContextChange,
 }: CodeEditorPanelProps) {
   const [preferences, setPreferences] = useState<EditorPreferences>({
@@ -113,6 +115,25 @@ export function CodeEditorPanel({
   useEffect(() => {
     onCodeChange?.(currentCode);
   }, [currentCode, onCodeChange]);
+
+  useEffect(() => {
+    if (!planInteraction) {
+      return;
+    }
+
+    const nextStatus = planInteraction.canEnterCoding ? "ready" : "needs_revision";
+    if (learningState.planningDraft.status === nextStatus) {
+      return;
+    }
+
+    updateState({
+      planningDraft: {
+        ...learningState.planningDraft,
+        status: nextStatus,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  }, [learningState.planningDraft, planInteraction, updateState]);
 
   useEffect(() => {
     onLearningContextChange?.({
@@ -266,80 +287,6 @@ export function CodeEditorPanel({
     return nextErrors;
   };
 
-  const normalizePlanText = (text: string) =>
-    text.trim().toLowerCase().replace(/\s+/g, " ");
-
-  const createPlanningReview = (draft: PlanningDraft): PlanningReview => {
-    const approach = normalizePlanText(draft.approach);
-    const steps = draft.steps.map(normalizePlanText);
-    const title = normalizePlanText(task.title);
-    const descriptionText = normalizePlanText(task.description.join(" "));
-    const copiedTitle =
-      approach === title || steps.some((step) => step && step === title);
-    const duplicateSteps = Boolean(steps[0] && steps[0] === steps[1]);
-    const approachTooShort = draft.approach.trim().split(/\s+/).filter(Boolean).length < 5;
-    const usefulActionPattern =
-      /\b(read|get|take|ask|store|keep|set|start|check|compare|loop|repeat|calculate|count|sum|add|find|return|print|output|update|convert|split|join|sort|filter|call|use|create|build|validate|track|remember)\b/i;
-    const hasActionOrder =
-      draft.steps.slice(0, 2).every((step) => usefulActionPattern.test(step));
-    const copiesDescription =
-      descriptionText.includes(approach) && approach.length > 40;
-
-    const strengths: string[] = [];
-    if (!approachTooShort && !copiedTitle) {
-      strengths.push("Your approach identifies a clear strategy.");
-    } else {
-      strengths.push("You identified the main goal.");
-    }
-    if (!duplicateSteps && hasActionOrder) {
-      strengths.push("Your steps are in a logical order.");
-    }
-
-    if (approachTooShort) {
-      return {
-        status: "needs_revision",
-        strengths,
-        improvement: "Your approach is a little too short to guide your coding yet.",
-        question: "What main idea will your program use before writing the first line of code?",
-      };
-    }
-
-    if (copiedTitle || copiesDescription) {
-      return {
-        status: "needs_revision",
-        strengths,
-        improvement: "Your plan mostly repeats the task text right now.",
-        question: "What action will your program do with the input values?",
-      };
-    }
-
-    if (duplicateSteps) {
-      return {
-        status: "needs_revision",
-        strengths,
-        improvement: "Your first two steps are the same, so the order is not clear yet.",
-        question: "What should happen after the first step is finished?",
-      };
-    }
-
-    if (!hasActionOrder) {
-      return {
-        status: "needs_revision",
-        strengths,
-        improvement: "Your steps do not yet describe clear actions for the program.",
-        question: `For this ${task.concept} task, what should the program remember or change as it works?`,
-      };
-    }
-
-    return {
-      status: "ready",
-      strengths: strengths.length
-        ? strengths
-        : ["Your approach identifies a clear strategy."],
-      improvement: "Your plan is clear enough to start coding.",
-    };
-  };
-
   const reviewPlan = async () => {
     if (isReviewingPlan) {
       return;
@@ -362,13 +309,18 @@ export function CodeEditorPanel({
     });
 
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 450));
-      const tutorReview = createPlanningReview(learningState.planningDraft);
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
+      onReviewPlanInTutor?.({
+        planningStatus: "reviewing",
+        planningApproach: learningState.planningDraft.approach,
+        planningSteps: learningState.planningDraft.steps,
+        latestPrediction: learningState.prediction,
+        hintLevel: 0,
+      });
       updateState({
         planningDraft: {
           ...learningState.planningDraft,
-          status: tutorReview.status,
-          tutorReview,
+          status: "reviewing",
           reviewBypassed: false,
           updatedAt: new Date().toISOString(),
         },
@@ -390,17 +342,6 @@ export function CodeEditorPanel({
             : planningDraft.status === "not_started"
               ? "editing"
               : planningDraft.status,
-        updatedAt: new Date().toISOString(),
-      },
-    });
-  };
-
-  const collapsePlanning = (reviewBypassed = false) => {
-    updateState({
-      planningDraft: {
-        ...learningState.planningDraft,
-        status: "ready",
-        reviewBypassed,
         updatedAt: new Date().toISOString(),
       },
     });
@@ -526,9 +467,6 @@ export function CodeEditorPanel({
           void reviewPlan();
         }}
         onEditPlan={editPlanning}
-        onStartCoding={() => collapsePlanning(false)}
-        onUpdatePlan={editPlanning}
-        onContinueAnyway={() => collapsePlanning(true)}
       />
 
       <EditorToolbar
