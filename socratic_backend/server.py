@@ -65,6 +65,8 @@ class ConversationMessage(BaseModel):
     role: str
     content: str
     timestamp: Optional[str] = None
+    hintLevel: Optional[int] = None
+    learnerState: Optional[dict] = None
 
 
 class TutorRequest(BaseModel):
@@ -95,6 +97,8 @@ class TutorMessage(BaseModel):
     actionType: str
     mode: str
     questionType: Optional[str] = None
+    hintLevel: int = 0
+    learnerState: Optional[dict] = None
     agentTrace: List[dict] = []
     planReview: Optional[dict] = None
     planInteraction: Optional[dict] = None
@@ -168,6 +172,14 @@ def get_tutor_content(req: TutorRequest):
         "approach": req.planningData.approach if req.planningData else "",
         "steps": req.planningData.steps if req.planningData else [],
     }
+    previous_learner_state = next(
+        (
+            message.learnerState
+            for message in reversed(req.conversation)
+            if message.learnerState
+        ),
+        {},
+    )
     initial_state = {
         "problem_content": problem,
         "action": req.action,
@@ -183,8 +195,17 @@ def get_tutor_content(req: TutorRequest):
             if req.latestRunResult and req.latestRunResult.error
             else None
         ),
+        "execution_result": "\n".join(
+            part for part in [
+                f"status: {req.latestRunResult.status}" if req.latestRunResult and req.latestRunResult.status else "",
+                f"stdout: {req.latestRunResult.stdout}" if req.latestRunResult and req.latestRunResult.stdout else "",
+                f"stderr: {req.latestRunResult.stderr}" if req.latestRunResult and req.latestRunResult.stderr else "",
+                f"error: {req.latestRunResult.error.message}" if req.latestRunResult and req.latestRunResult.error and req.latestRunResult.error.message else "",
+            ] if part
+        ),
         "student_reflection": req.studentMessage,
         "messages": [message.model_dump() for message in req.conversation],
+        "learner_state": previous_learner_state,
         "hint_level": req.hintLevel or 0,
         "confusion_level": 0,
         "is_stuck": False,
@@ -212,10 +233,18 @@ def get_tutor_content(req: TutorRequest):
         else:
             plan_review = plan_data
 
-    return content, question_type, agent_trace, plan_review, plan_interaction
+    return (
+        content,
+        question_type,
+        agent_trace,
+        plan_review,
+        plan_interaction,
+        result_state.get("hint_level", req.hintLevel or 0),
+        result_state.get("learner_state") or previous_learner_state,
+    )
 
 
-def _make_tutor_message(content: str, question_type: str, agent_trace: List[dict], plan_review: Optional[dict], plan_interaction: Optional[dict], req: TutorRequest) -> TutorMessage:
+def _make_tutor_message(content: str, question_type: str, agent_trace: List[dict], plan_review: Optional[dict], plan_interaction: Optional[dict], hint_level: int, learner_state: Optional[dict], req: TutorRequest) -> TutorMessage:
     return TutorMessage(
         id=f"tutor-{int(time.time() * 1000)}-{random.randint(0, 1000)}",
         role="tutor",
@@ -225,6 +254,8 @@ def _make_tutor_message(content: str, question_type: str, agent_trace: List[dict
         actionType=req.action,
         mode=req.mode,
         questionType=question_type,
+        hintLevel=hint_level,
+        learnerState=learner_state,
         agentTrace=agent_trace,
         planReview=plan_review,
         planInteraction=plan_interaction,
@@ -439,6 +470,6 @@ def health():
 
 @app.post("/api/tutor/message", response_model=TutorResponse)
 def tutor_message(req: TutorRequest):
-    content, question_type, agent_trace, plan_review, plan_interaction = get_tutor_content(req)
-    message = _make_tutor_message(content, question_type, agent_trace, plan_review, plan_interaction, req)
+    content, question_type, agent_trace, plan_review, plan_interaction, hint_level, learner_state = get_tutor_content(req)
+    message = _make_tutor_message(content, question_type, agent_trace, plan_review, plan_interaction, hint_level, learner_state, req)
     return TutorResponse(message=message)

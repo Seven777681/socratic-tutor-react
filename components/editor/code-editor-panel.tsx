@@ -20,7 +20,6 @@ import { MonacoCodeEditor } from "@/components/editor/monaco-code-editor";
 import { RunResultsPanel } from "@/components/results/run-results-panel";
 import type { RunResultTab } from "@/components/results/run-result-tabs";
 import { TaskExample } from "@/components/workspace/task-example";
-import { MonitoringPrediction } from "@/components/workspace/monitoring-prediction";
 import { PlanningPanel } from "@/components/workspace/planning-panel";
 import { ReflectionPanel } from "@/components/workspace/reflection-panel";
 import { useCodeAutosave } from "@/hooks/use-code-autosave";
@@ -91,9 +90,9 @@ export function CodeEditorPanel({
   const [planningErrors, setPlanningErrors] = useState<
     Partial<Record<"approach" | "steps", string>>
   >({});
-  const [predictionWarning, setPredictionWarning] = useState("");
   const [isReviewingPlan, setIsReviewingPlan] = useState(false);
   const [isGeneratingReflection, setIsGeneratingReflection] = useState(false);
+  const lastReflectionSignatureRef = useRef("");
   const [recentRuns, setRecentRuns] = useState<CodeRunResult[]>([]);
   const [demoRunScenario, setDemoRunScenario] =
     useState<RunScenario>("failed");
@@ -106,6 +105,7 @@ export function CodeEditorPanel({
   } = useCodeAutosave({ taskId, starterCode });
   const { state: learningState, updateState } = useTaskLearningState(taskId);
   const firstPlanningFieldRef = useRef<HTMLInputElement>(null);
+  const runResultsRef = useRef<HTMLDivElement>(null);
 
   const lineCount = useMemo(
     () => Math.max(1, currentCode.split("\n").length),
@@ -167,6 +167,21 @@ export function CodeEditorPanel({
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [isDetailsOpen]);
 
+  useEffect(() => {
+    if (!hasRunCode || !isResultsOpen) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      runResultsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [hasRunCode, isResultsOpen, runStatus]);
+
   const handleRun = useCallback(async () => {
     if (runStatus === "running") {
       return;
@@ -178,11 +193,6 @@ export function CodeEditorPanel({
 
     setPlanningErrors(
       hasPlan ? {} : { approach: "Try writing a short plan before running your code." },
-    );
-    setPredictionWarning(
-      learningState.prediction.trim()
-        ? ""
-        : "Predicting the output can help you monitor your reasoning.",
     );
     saveNow();
     onRun?.(currentCode);
@@ -249,7 +259,6 @@ export function CodeEditorPanel({
     currentCode,
     demoRunScenario,
     learningState.planningDraft,
-    learningState.prediction,
     onRun,
     onRunResultChange,
     runStatus,
@@ -358,7 +367,7 @@ export function CodeEditorPanel({
     window.setTimeout(() => firstPlanningFieldRef.current?.focus(), 0);
   };
 
-  const generateReflectionSummary = async () => {
+  const generateReflectionSummary = useCallback(async () => {
     if (isGeneratingReflection) {
       return;
     }
@@ -402,7 +411,60 @@ export function CodeEditorPanel({
     } finally {
       setIsGeneratingReflection(false);
     }
-  };
+  }, [
+    currentCode,
+    isGeneratingReflection,
+    learningState.latestRunResult,
+    learningState.reflectionAnswers,
+    taskId,
+    updateState,
+  ]);
+
+  const reflectionSignature = useMemo(
+    () =>
+      Object.values(learningState.reflectionAnswers)
+        .map((answer) => answer.trim())
+        .join("\u001f"),
+    [learningState.reflectionAnswers],
+  );
+  const isReflectionComplete = useMemo(
+    () =>
+      Object.values(learningState.reflectionAnswers).every(
+        (answer) => answer.trim().length > 0,
+      ),
+    [learningState.reflectionAnswers],
+  );
+
+  useEffect(() => {
+    if (!isReflectionComplete || isGeneratingReflection) {
+      return;
+    }
+
+    if (
+      learningState.reflectionSummary.trim() &&
+      !lastReflectionSignatureRef.current
+    ) {
+      lastReflectionSignatureRef.current = reflectionSignature;
+      return;
+    }
+
+    if (lastReflectionSignatureRef.current === reflectionSignature) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      lastReflectionSignatureRef.current = reflectionSignature;
+      void generateReflectionSummary();
+    }, 800);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    generateReflectionSummary,
+    isGeneratingReflection,
+    isReflectionComplete,
+    learningState.reflectionSummary,
+    reflectionSignature,
+  ]);
 
   const shouldShowReflection =
     runResult?.status === "success" ||
@@ -410,7 +472,7 @@ export function CodeEditorPanel({
 
   return (
     <>
-      <section className="flex min-h-[640px] min-w-0 flex-col overflow-hidden rounded-[22px] border border-[#E4E7F0] bg-white shadow-[0_16px_45px_rgba(78,91,130,0.08)] lg:h-full">
+      <section className="flex min-h-[640px] min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-[22px] border border-[#E4E7F0] bg-white shadow-[0_16px_45px_rgba(78,91,130,0.08)] lg:h-[calc(100dvh-108px)] lg:min-h-0">
       <div className="border-b border-[#E4E7F0] bg-white px-5 py-3.5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
@@ -498,20 +560,11 @@ export function CodeEditorPanel({
         </div>
       </div>
 
-      <MonitoringPrediction
-        value={learningState.prediction}
-        warning={predictionWarning}
-        onChange={(prediction) => {
-          setPredictionWarning("");
-          updateState({ prediction });
-        }}
-        onSave={() => {
-          setPredictionWarning("");
-          updateState({ prediction: learningState.prediction });
-        }}
-      />
       {hasRunCode || runStatus === "running" ? (
-        <div className="border-t border-[#E4E7F0] bg-[#FBFCFF] p-3">
+        <div
+          ref={runResultsRef}
+          className="scroll-mt-4 border-t border-[#E4E7F0] bg-[#FBFCFF] p-3"
+        >
           <RunResultsPanel
             status={runStatus}
             result={runResult}
@@ -555,10 +608,9 @@ export function CodeEditorPanel({
           answers={learningState.reflectionAnswers}
           summary={learningState.reflectionSummary}
           isGenerating={isGeneratingReflection}
-          onAnswersChange={(reflectionAnswers) => updateState({ reflectionAnswers })}
-          onGenerateSummary={() => {
-            void generateReflectionSummary();
-          }}
+          onAnswersChange={(reflectionAnswers) =>
+            updateState({ reflectionAnswers, reflectionSummary: "" })
+          }
         />
       ) : null}
 

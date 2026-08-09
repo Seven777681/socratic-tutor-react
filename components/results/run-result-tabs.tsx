@@ -5,7 +5,7 @@ export type RunResultTab = "console" | "tests" | "errors";
 const tabs: { id: RunResultTab; label: string }[] = [
   { id: "console", label: "Console" },
   { id: "tests", label: "Test Results" },
-  { id: "errors", label: "Error Details" },
+  { id: "errors", label: "Error Type" },
 ];
 
 export function RunResultTabs({

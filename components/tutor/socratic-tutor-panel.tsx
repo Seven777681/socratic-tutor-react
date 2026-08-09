@@ -21,24 +21,22 @@ function getGuidanceStage({
   currentCode,
   starterCode,
   latestRunResult,
+  planningStatus,
 }: {
   currentCode: string;
   starterCode: string;
   latestRunResult?: CodeRunResult;
+  planningStatus: string;
 }): GuidanceStage {
-  if (!latestRunResult && currentCode.trim() === starterCode.trim()) {
-    return "plan";
+  if (latestRunResult) {
+    return latestRunResult.status === "success" ? "reflect" : "debug";
   }
 
-  if (!latestRunResult) {
+  if (planningStatus === "ready" || currentCode.trim() !== starterCode.trim()) {
     return "code";
   }
 
-  if (latestRunResult.status === "success") {
-    return "reflect";
-  }
-
-  return "debug";
+  return "plan";
 }
 
 export function SocraticTutorPanel({
@@ -48,6 +46,7 @@ export function SocraticTutorPanel({
   learningContext,
   planReviewRequestId,
   onPlanInteraction,
+  onHintLevelChange,
 }: {
   task: ProgrammingTaskDetail;
   currentCode: string;
@@ -55,6 +54,7 @@ export function SocraticTutorPanel({
   learningContext: TutorLearningContext;
   planReviewRequestId?: number;
   onPlanInteraction?: (review: TutorPlanInteraction) => void;
+  onHintLevelChange?: (hintLevel: number) => void;
 }) {
   const [isGuidelinesOpen, setIsGuidelinesOpen] = useState(false);
   const [isClearOpen, setIsClearOpen] = useState(false);
@@ -62,6 +62,7 @@ export function SocraticTutorPanel({
     currentCode,
     starterCode: task.starterCode,
     latestRunResult,
+    planningStatus: learningContext.planningStatus,
   });
   const {
     conversation,
@@ -82,6 +83,7 @@ export function SocraticTutorPanel({
     learningContext,
     stage,
     onPlanInteraction,
+    onHintLevelChange,
   });
   const lastHandledPlanReviewId = useRef(planReviewRequestId ?? 0);
 

@@ -4,7 +4,7 @@ export async function getTutorResponse(
   payload: TutorRequest,
 ): Promise<TutorResponse["message"]> {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 20000);
+  const timeoutId = window.setTimeout(() => controller.abort(), 60000);
 
   try {
     const response = await fetch("/api/tutor/message", {

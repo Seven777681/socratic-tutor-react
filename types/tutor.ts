@@ -30,12 +30,43 @@ export type TutorActionType =
 
 export type TutorStatus = "ready" | "thinking" | "offline";
 
+export type LearnerConceptStatus = "missing" | "partial" | "understood";
+export type LearnerAnswerQuality =
+  | "correct"
+  | "partial"
+  | "off_target"
+  | "uncertain";
+
+export interface TutorLearnerState {
+  currentFocus: string;
+  hintLevel: number;
+  attemptsOnFocus: number;
+  consecutiveOffTarget: number;
+  studentState: "beginner" | "confused" | "understanding";
+  concepts: Record<
+    string,
+    {
+      status: LearnerConceptStatus;
+      confidence: number;
+      evidence: string;
+    }
+  >;
+  latestAnswer: {
+    quality: LearnerAnswerQuality;
+    recognizedIdeas: string[];
+    missingIdeas: string[];
+    misconception?: string;
+  };
+}
+
 export interface TutorMessage {
   id: string;
   role: "student" | "tutor" | "system";
   content: string;
   timestamp: string;
   questionType?: TutorQuestionType;
+  hintLevel?: number;
+  learnerState?: TutorLearnerState;
   stage?: GuidanceStage;
   actionType?: TutorActionType;
   mode?: TutorMode;

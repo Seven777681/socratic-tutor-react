@@ -21,6 +21,10 @@ import {
 
 const INTERNAL_TUTOR_MODE: TutorMode = "run_and_reflect";
 
+function handledRunStorageKey(taskId: string) {
+  return `socratic-tutor-handled-run:${taskId}`;
+}
+
 function createPlanningEntryMessage(stage: GuidanceStage): TutorMessage {
   return {
     id: `tutor-entry-${Date.now()}-${Math.round(Math.random() * 1000)}`,
@@ -99,6 +103,7 @@ export function useTutorConversation({
   learningContext,
   stage,
   onPlanInteraction,
+  onHintLevelChange,
 }: {
   taskId: string;
   taskTitle: string;
@@ -108,43 +113,46 @@ export function useTutorConversation({
   learningContext: TutorLearningContext;
   stage: GuidanceStage;
   onPlanInteraction?: (review: TutorPlanInteraction) => void;
+  onHintLevelChange?: (hintLevel: number) => void;
 }) {
   const [conversation, setConversation] = useState<TutorConversation>(() =>
     createConversation({ taskId, stage }),
   );
   const [status, setStatus] = useState<TutorStatus>("ready");
   const [errorMessage, setErrorMessage] = useState("");
-  const [lastHandledRunId, setLastHandledRunId] = useState<string | undefined>();
-
   useEffect(() => {
+    const initialStage = stage;
+    if (latestRunResult?.id) {
+      window.sessionStorage.setItem(
+        handledRunStorageKey(taskId),
+        latestRunResult.id,
+      );
+    }
     const stored = loadTutorConversation(taskId);
     if (stored) {
       const storedMessages = stored.messages.filter((message) => message.role !== "system");
       setConversation({
         ...stored,
-        stage,
+        stage: initialStage,
         mode: INTERNAL_TUTOR_MODE,
         messages:
           storedMessages.length > 0
             ? storedMessages
-            : stage === "plan"
-              ? [createPlanningEntryMessage(stage)]
+            : initialStage === "plan"
+              ? [createPlanningEntryMessage(initialStage)]
               : [],
       });
-      setLastHandledRunId(latestRunResult?.id);
       setStatus("ready");
       setErrorMessage("");
       return;
     }
 
-    setConversation(createConversation({
-      taskId,
-      stage,
-    }));
-    setLastHandledRunId(latestRunResult?.id);
+    setConversation(createConversation({ taskId, stage: initialStage }));
     setStatus("ready");
     setErrorMessage("");
-  }, [latestRunResult, stage, taskId, taskTitle]);
+    // Initialization belongs to a task change. Stage/run changes are handled below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskId]);
 
   useEffect(() => {
     saveTutorConversation(conversation);
@@ -157,19 +165,6 @@ export function useTutorConversation({
         : { ...current, stage, updatedAt: new Date().toISOString() },
     );
   }, [stage]);
-
-  useEffect(() => {
-    if (!latestRunResult || latestRunResult.id === lastHandledRunId) {
-      return;
-    }
-
-    setLastHandledRunId(latestRunResult.id);
-    setConversation((current) => ({
-      ...current,
-      stage,
-      updatedAt: new Date().toISOString(),
-    }));
-  }, [lastHandledRunId, latestRunResult, stage]);
 
   const hasStudentMessage = useMemo(
     () => conversation.messages.some((message) => message.role === "student"),
@@ -234,6 +229,9 @@ export function useTutorConversation({
             showReviewCard: Boolean(response.planReview),
           });
         }
+        if (typeof response.hintLevel === "number") {
+          onHintLevelChange?.(response.hintLevel);
+        }
         setStatus("ready");
         trackTutorEvent({
           eventType: "tutor_response_received",
@@ -258,12 +256,38 @@ export function useTutorConversation({
       learningContext.planningSteps,
       latestRunResult,
       onPlanInteraction,
+      onHintLevelChange,
       stage,
       taskId,
       taskDescription,
       taskTitle,
     ],
   );
+
+  useEffect(() => {
+    if (!latestRunResult) {
+      return;
+    }
+
+    const storageKey = handledRunStorageKey(taskId);
+    if (window.sessionStorage.getItem(storageKey) === latestRunResult.id) {
+      return;
+    }
+
+    window.sessionStorage.setItem(storageKey, latestRunResult.id);
+    setConversation((current) => ({
+      ...current,
+      stage,
+      updatedAt: new Date().toISOString(),
+    }));
+
+    if (latestRunResult.status !== "success") {
+      void requestTutorResponse({
+        studentMessage: "",
+        action: "debug",
+      });
+    }
+  }, [latestRunResult, requestTutorResponse, stage, taskId]);
 
   const sendMessage = useCallback(
     async (message: string) => {
@@ -286,7 +310,10 @@ export function useTutorConversation({
 
       await requestTutorResponse({
         studentMessage: trimmed,
-        action: hasUnresolvedPlanReview ? "review_plan" : "message",
+        action:
+          stage === "plan" && hasUnresolvedPlanReview
+            ? "review_plan"
+            : "message",
       });
     },
     [hasUnresolvedPlanReview, requestTutorResponse, stage, status, taskId],

@@ -68,6 +68,8 @@ export function saveTutorConversation(conversation: TutorConversation) {
       timestamp: message.timestamp,
       stage: message.stage,
       questionType: message.questionType,
+      hintLevel: message.hintLevel,
+      learnerState: message.learnerState,
       actionType: message.actionType,
       mode: message.mode,
       choicePrompt: message.choicePrompt,

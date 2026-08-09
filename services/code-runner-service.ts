@@ -76,8 +76,8 @@ export async function runCode({
         type: "system",
         title: timedOut ? "Execution Service Timeout" : "System Error",
         message:
-          "Could not get a response from the code execution backend at http://127.0.0.1:8000.",
-        hint: "Start it with: cd socratic_backend && uvicorn server:app --reload --port 8000",
+          "Could not get a response from the code execution backend at http://127.0.0.1:8001.",
+        hint: "Start it with: cd socratic_backend && uvicorn server:app --port 8001",
       },
     };
   } finally {

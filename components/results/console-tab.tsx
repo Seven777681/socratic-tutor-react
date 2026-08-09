@@ -51,7 +51,7 @@ export function ConsoleTab({
                   : result?.stdout || "No stdout was produced."}
               </code>
             </pre>
-            {result?.stderr ? (
+            {result?.stderr && !result.error ? (
               <pre className="max-h-24 overflow-auto rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm leading-6 text-rose-700">
                 <code>{result.stderr}</code>
               </pre>

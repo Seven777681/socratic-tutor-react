@@ -10,11 +10,13 @@ class TutorState(TypedDict, total=False):
     plan_form: Dict[str, Any]
     student_answer: str
     student_code: str
+    execution_result: str
     code_prediction: str
     latest_run_status: Optional[str]
     latest_error_message: Optional[str]
     student_reflection: str
     messages: List[Dict[str, str]]
+    learner_state: Dict[str, Any]
 
     understanding_score: int
     missing_steps: List[str]
@@ -27,6 +29,12 @@ class TutorState(TypedDict, total=False):
     confusion_level: int
     is_stuck: bool
     hint_level: int
+    student_state: str
+    issue_type: str
+    misconception: str
+    pedagogical_action: str
+    final_question: str
+    question_validation: Dict[str, Any]
 
     tutor_message: str
     question_type: str

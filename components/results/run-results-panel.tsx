@@ -40,7 +40,9 @@ export function RunResultsPanel({
   onSelectRecentRun: (run: CodeRunResult) => void;
 }) {
   const copyOutput = () => {
-    const text = [result?.stdout, result?.stderr].filter(Boolean).join("\n");
+    const text = result?.error
+      ? result.stdout
+      : [result?.stdout, result?.stderr].filter(Boolean).join("\n");
     if (text) {
       void navigator.clipboard?.writeText(text);
     }
@@ -85,7 +87,6 @@ export function RunResultsPanel({
               result={result}
               isRunning={isRunning}
               onRunAgain={onRunAgain}
-              onGoToLine={() => undefined}
             />
           ) : null}
         </div>

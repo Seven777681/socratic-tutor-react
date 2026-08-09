@@ -56,10 +56,18 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
             onReviewPlanInTutor={(context) => {
               setIsTutorCollapsed(false);
               setPlanInteraction(undefined);
-              setLearningContext(context);
+              setLearningContext((current) => ({
+                ...context,
+                hintLevel: current.hintLevel,
+              }));
               setPlanReviewRequestId((requestId) => requestId + 1);
             }}
-            onLearningContextChange={setLearningContext}
+            onLearningContextChange={(context) => {
+              setLearningContext((current) => ({
+                ...context,
+                hintLevel: current.hintLevel,
+              }));
+            }}
           />
         </div>
 
@@ -89,6 +97,9 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
                 learningContext={learningContext}
                 planReviewRequestId={planReviewRequestId}
                 onPlanInteraction={setPlanInteraction}
+                onHintLevelChange={(hintLevel) => {
+                  setLearningContext((current) => ({ ...current, hintLevel }));
+                }}
               />
             </div>
           )}

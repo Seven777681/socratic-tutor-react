@@ -17,7 +17,13 @@ def route_entry(state: TutorState):
         return "assessment_agent"
     if action in {"review_plan", "understand_problem"} or stage == "plan":
         return "plan_agent"
-    return "code_analysis_agent"
+    if action == "debug" or stage == "debug":
+        return "code_analysis_agent"
+    return "monitor_agent"
+
+
+def route_after_plan(state: TutorState):
+    return END if state.get("can_enter_coding", False) else "monitor_agent"
 
 
 builder = StateGraph(TutorState)
@@ -29,7 +35,7 @@ builder.add_node("socratic_agent", socratic_agent)
 builder.add_node("assessment_agent", assessment_agent)
 
 builder.add_conditional_edges(START, route_entry)
-builder.add_edge("plan_agent", END)
+builder.add_conditional_edges("plan_agent", route_after_plan)
 builder.add_edge("assessment_agent", END)
 builder.add_edge("code_analysis_agent", "monitor_agent")
 builder.add_edge("monitor_agent", "socratic_agent")

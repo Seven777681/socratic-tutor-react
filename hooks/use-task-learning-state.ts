@@ -121,9 +121,18 @@ export function loadTaskLearningState(taskId: string): TaskLearningState {
     ];
     const approach = parsedPlanning?.approach ?? parsedPlanning?.problemGoal ?? "";
     const hasPlanContent = approach.trim() || steps.some((step) => step.trim());
-    const status =
+    const storedStatus =
       parsedPlanning?.status ??
       (hasPlanContent ? "editing" : "not_started");
+    const hasSubmittedPlan =
+      approach.trim().length >= 5 &&
+      steps.slice(0, 2).every((step) => step.trim().length > 0);
+    const status =
+      storedStatus === "ready" && !hasSubmittedPlan
+        ? hasPlanContent
+          ? "editing"
+          : "not_started"
+        : storedStatus;
     const state: TaskLearningState = {
       ...createInitialState(),
       ...parsed,

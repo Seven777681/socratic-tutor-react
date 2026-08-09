@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { TutorRequest } from "@/types/tutor";
 
 const BACKEND_URL =
-  process.env.SOCRATIC_BACKEND_URL || "http://127.0.0.1:8000";
+  process.env.SOCRATIC_BACKEND_URL || "http://127.0.0.1:8001";
 
 export async function POST(request: Request) {
   let body: TutorRequest;
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 19000);
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
 
   try {
     const backendResponse = await fetch(`${BACKEND_URL}/api/tutor/message`, {

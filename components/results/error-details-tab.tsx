@@ -10,12 +10,10 @@ export function ErrorDetailsTab({
   result,
   isRunning,
   onRunAgain,
-  onGoToLine,
 }: {
   result?: CodeRunResult;
   isRunning: boolean;
   onRunAgain: () => void;
-  onGoToLine: (lineNumber: number) => void;
 }) {
   const error = result?.error;
 
@@ -48,19 +46,6 @@ export function ErrorDetailsTab({
               <p className="text-sm font-extrabold text-rose-800">
                 {error.title}
               </p>
-              <p className="mt-1 text-sm leading-6 text-rose-700">
-                {error.message}
-              </p>
-              {error.lineNumber ? (
-                <p className="mt-2 text-xs font-bold text-rose-700">
-                  Line {error.lineNumber}
-                </p>
-              ) : null}
-              {error.hint ? (
-                <p className="mt-3 rounded-xl border border-rose-100 bg-white px-3 py-2 text-sm leading-6 text-slate-700">
-                  {error.hint}
-                </p>
-              ) : null}
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -69,15 +54,6 @@ export function ErrorDetailsTab({
                 >
                   Try Again
                 </button>
-                {error.lineNumber ? (
-                  <button
-                    type="button"
-                    onClick={() => onGoToLine(error.lineNumber as number)}
-                    className="inline-flex h-9 items-center justify-center rounded-lg border border-[#E4E7F0] bg-white px-3 text-sm font-extrabold text-[#6255f6] transition hover:border-indigo-200 hover:bg-indigo-50/70 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 active:scale-[0.99]"
-                  >
-                    Go to line
-                  </button>
-                ) : null}
               </div>
             </div>
           </div>
