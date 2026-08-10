@@ -40,7 +40,9 @@ export function RunResultsPanel({
   onSelectRecentRun: (run: CodeRunResult) => void;
 }) {
   const copyOutput = () => {
-    const text = [result?.stdout, result?.stderr].filter(Boolean).join("\n");
+    const text = result?.error
+      ? result.stdout
+      : [result?.stdout, result?.stderr].filter(Boolean).join("\n");
     if (text) {
       void navigator.clipboard?.writeText(text);
     }
@@ -49,7 +51,7 @@ export function RunResultsPanel({
   return (
     <section
       className={`overflow-hidden rounded-[18px] border border-[#E4E7F0] bg-white shadow-[0_14px_40px_rgba(78,91,130,0.07)] transition-[max-height] duration-300 motion-reduce:transition-none ${
-        isOpen ? "max-h-[280px]" : "max-h-[52px]"
+        isOpen ? "max-h-[420px]" : "max-h-[52px]"
       }`}
     >
       <RunResultsHeader
@@ -64,7 +66,7 @@ export function RunResultsPanel({
       />
 
       {isOpen ? (
-        <div className="grid max-h-[228px] min-h-0 gap-3 overflow-auto p-3 motion-safe:animate-[fadeIn_200ms_ease-out]">
+        <div className="grid max-h-[368px] min-h-0 gap-3 overflow-auto p-3 motion-safe:animate-[fadeIn_200ms_ease-out]">
           <RunResultTabs
             activeTab={activeTab}
             onActiveTabChange={onActiveTabChange}
@@ -85,7 +87,6 @@ export function RunResultsPanel({
               result={result}
               isRunning={isRunning}
               onRunAgain={onRunAgain}
-              onGoToLine={() => undefined}
             />
           ) : null}
         </div>

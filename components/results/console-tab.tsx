@@ -34,7 +34,7 @@ export function ConsoleTab({
           onChange={(event) => onStdinChange(event.target.value)}
           rows={5}
           className="mt-2 w-full resize-none rounded-xl border border-[#E4E7F0] bg-[#FBFCFF] px-3 py-2 font-mono text-sm leading-6 text-[#101426] outline-none transition placeholder:text-slate-400 focus:border-[#6255f6] focus:ring-4 focus:ring-[#6255f6]/10"
-          placeholder="Enter stdin for the mock run"
+          placeholder="Enter stdin for this run"
         />
       </div>
 
@@ -44,14 +44,14 @@ export function ConsoleTab({
         </p>
         {result || isRunning ? (
           <div className="mt-2 grid gap-3">
-            <pre className="max-h-32 overflow-auto rounded-xl border border-[#E4E7F0] bg-[#F8FAFF] px-3 py-2 text-sm leading-6 text-[#101426]">
+            <pre className="min-h-24 max-h-56 overflow-auto rounded-xl border border-[#E4E7F0] bg-[#F8FAFF] px-3 py-2 text-sm leading-6 text-[#101426]">
               <code>
                 {isRunning
-                  ? "Running mock result..."
+                  ? "Running your code..."
                   : result?.stdout || "No stdout was produced."}
               </code>
             </pre>
-            {result?.stderr ? (
+            {result?.stderr && !result.error ? (
               <pre className="max-h-24 overflow-auto rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm leading-6 text-rose-700">
                 <code>{result.stderr}</code>
               </pre>

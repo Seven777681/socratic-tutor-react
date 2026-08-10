@@ -55,7 +55,7 @@ export function TaskProblemPanel({ task }: { task: ProgrammingTaskDetail }) {
                 {task.inputDescription}
               </p>
               <pre className="mt-3 overflow-x-auto rounded-lg border border-[#E4E7F0] bg-white px-3 py-2 text-sm text-[#101426]">
-                <code>5</code>
+                <code>{task.examples[0]?.input ?? "No example input"}</code>
               </pre>
             </div>
             <div className="rounded-xl border border-[#E4E7F0] bg-[#F8FAFF] p-3">
@@ -64,7 +64,7 @@ export function TaskProblemPanel({ task }: { task: ProgrammingTaskDetail }) {
                 {task.outputDescription}
               </p>
               <pre className="mt-3 overflow-x-auto rounded-lg border border-[#E4E7F0] bg-white px-3 py-2 text-sm text-[#101426]">
-                <code>15</code>
+                <code>{task.examples[0]?.output ?? "No example output"}</code>
               </pre>
             </div>
           </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { CodeRunResult } from "@/types/code-run";
 import type { ProgrammingTaskDetail } from "@/types/task";
-import type { TutorLearningContext } from "@/types/tutor";
+import type { TutorLearningContext, TutorPlanInteraction } from "@/types/tutor";
 import { CodeEditorPanel } from "@/components/editor/code-editor-panel";
 import { SocraticTutorPanel } from "@/components/tutor/socratic-tutor-panel";
 import { TutorPanelToggle } from "@/components/tutor/tutor-panel-toggle";
@@ -12,6 +12,8 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
   const [isTutorCollapsed, setIsTutorCollapsed] = useState(false);
   const [currentCode, setCurrentCode] = useState(task.starterCode);
   const [latestRunResult, setLatestRunResult] = useState<CodeRunResult | undefined>();
+  const [planReviewRequestId, setPlanReviewRequestId] = useState(0);
+  const [planInteraction, setPlanInteraction] = useState<TutorPlanInteraction | undefined>();
   const [learningContext, setLearningContext] = useState<TutorLearningContext>({
     planningStatus: "not_started",
     planningApproach: "",
@@ -24,6 +26,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
   useEffect(() => {
     setCurrentCode(task.starterCode);
     setLatestRunResult(undefined);
+    setPlanInteraction(undefined);
     setLearningContext({
       planningStatus: "not_started",
       planningApproach: "",
@@ -51,11 +54,26 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
             language={task.language}
             onCodeChange={setCurrentCode}
             onRunResultChange={setLatestRunResult}
-            onLearningContextChange={setLearningContext}
+            planInteraction={planInteraction}
+            onReviewPlanInTutor={(context) => {
+              setIsTutorCollapsed(false);
+              setPlanInteraction(undefined);
+              setLearningContext((current) => ({
+                ...context,
+                hintLevel: current.hintLevel,
+              }));
+              setPlanReviewRequestId((requestId) => requestId + 1);
+            }}
+            onLearningContextChange={(context) => {
+              setLearningContext((current) => ({
+                ...context,
+                hintLevel: current.hintLevel,
+              }));
+            }}
           />
         </div>
 
-        <div className="min-w-0 lg:flex lg:min-h-0">
+        <div className="min-w-0 lg:flex lg:h-[calc(100dvh-108px)] lg:min-h-0">
           {isTutorCollapsed ? (
             <div className="hidden h-full flex-col items-center rounded-[20px] border border-[#E4E7F0] bg-white py-3 shadow-[0_14px_40px_rgba(78,91,130,0.06)] lg:flex">
               <TutorPanelToggle
@@ -67,7 +85,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
               </p>
             </div>
           ) : (
-            <div className="relative w-full lg:flex lg:min-h-0">
+            <div className="relative w-full lg:flex lg:h-full lg:min-h-0">
               <div className="absolute -left-3 top-3 z-10 hidden lg:block">
                 <TutorPanelToggle
                   isCollapsed={isTutorCollapsed}
@@ -79,6 +97,11 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
                 currentCode={currentCode}
                 latestRunResult={latestRunResult}
                 learningContext={learningContext}
+                planReviewRequestId={planReviewRequestId}
+                onPlanInteraction={setPlanInteraction}
+                onHintLevelChange={(hintLevel) => {
+                  setLearningContext((current) => ({ ...current, hintLevel }));
+                }}
               />
             </div>
           )}

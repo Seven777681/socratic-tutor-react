@@ -34,15 +34,15 @@ MODEL_NAME=...
 ## Run
 
 ```bash
-uvicorn server:app --reload --port 8000
+uvicorn server:app --reload --port 8001
 ```
 
-Health check: `GET http://127.0.0.1:8000/health`
+Health check: `GET http://127.0.0.1:8001/health`
 
 ## How it connects to the frontend
 
 The Next.js route `app/api/code/run/route.ts` proxies code execution to
-`POST http://127.0.0.1:8000/api/code/run`, configurable with the
+`POST http://127.0.0.1:8001/api/code/run`, configurable with the
 `SOCRATIC_BACKEND_URL` environment variable. Tutor requests remain inside the
 Next.js server and use `lib/server/tutor-multi-agent.ts`.
 
@@ -59,11 +59,9 @@ routes requests by `stage`/`action`:
 
 The subprocess code runner is intended for trusted local development only. Python isolated mode and execution timeouts are not a security sandbox, so do not expose this endpoint publicly or run untrusted code in production without a dedicated sandbox.
 
-- `agent_services.py` (plain function calls via `llm_base.py`) is loaded lazily
-  only if the legacy Python tutor route is called.
-- `graph_nodes.py` + `tutor_graph.py` is an alternate LangGraph state-machine
-  implementation of the same 5 agents. It is currently unused by the HTTP
-  server but kept for reference/future use if you want the strict
-  Plan → Code → Monitor → Reflect state machine enforced server-side instead
-  of being driven by the frontend's `stage` field.
+- `graph_nodes.py` + `tutor_graph.py` contains the teammate's alternate Python
+  LangGraph workflow. It is loaded lazily only when the legacy Python tutor
+  endpoint is called, so the code runner can start with the base requirements.
+- The active Next.js tutor API uses the TypeScript LangGraph workflow. The
+  Python workflow is retained for comparison and future experiments.
 - `main.py` is an unused PyCharm template file and can be deleted.

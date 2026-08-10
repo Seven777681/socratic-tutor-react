@@ -20,6 +20,8 @@ function createTutorMessage({
   agentTrace,
   understandingAssessment,
   codeAnalysis,
+  planReview,
+  planInteraction,
 }: {
   content: string;
   stage: GuidanceStage;
@@ -31,6 +33,8 @@ function createTutorMessage({
   agentTrace?: TutorMessage["agentTrace"];
   understandingAssessment?: TutorMessage["understandingAssessment"];
   codeAnalysis?: TutorMessage["codeAnalysis"];
+  planReview?: TutorMessage["planReview"];
+  planInteraction?: TutorMessage["planInteraction"];
 }): TutorMessage {
   return {
     id: `tutor-${Date.now()}-${Math.round(Math.random() * 1000)}`,
@@ -46,6 +50,23 @@ function createTutorMessage({
     agentTrace,
     understandingAssessment,
     codeAnalysis,
+    planReview,
+    planInteraction,
+  };
+}
+
+function createFallbackPlanState(body: TutorRequest) {
+  const approachPresent = Boolean(body.planningData?.approach.trim());
+  const completedSteps =
+    body.planningData?.steps.filter((step) => step.trim()).length ?? 0;
+  const canEnterCoding = approachPresent && completedSteps >= 2;
+  return {
+    understandingScore: canEnterCoding ? 7 : approachPresent ? 5 : 2,
+    missingSteps: [
+      ...(!approachPresent ? ["Describe the main approach."] : []),
+      ...(completedSteps < 2 ? ["Add at least two ordered steps."] : []),
+    ],
+    canEnterCoding,
   };
 }
 
@@ -259,6 +280,8 @@ export async function POST(request: Request) {
     let agentTrace: TutorMessage["agentTrace"];
     let understandingAssessment: TutorMessage["understandingAssessment"];
     let codeAnalysis: TutorMessage["codeAnalysis"];
+    let planReview: TutorMessage["planReview"];
+    let planInteraction: TutorMessage["planInteraction"];
 
     try {
       const multiAgentResult = await runTutorMultiAgent(body);
@@ -270,12 +293,31 @@ export async function POST(request: Request) {
         agentTrace = multiAgentResult.trace;
         understandingAssessment = multiAgentResult.understandingAssessment;
         codeAnalysis = multiAgentResult.codeAnalysis;
+        planReview = multiAgentResult.planReview;
+        planInteraction = multiAgentResult.planInteraction;
       } else {
         ({ content, questionType } = getTutorContent(body));
+        if (body.stage === "plan") {
+          const fallbackPlan = createFallbackPlanState(body);
+          if (body.action === "review_plan" && !body.studentMessage.trim()) {
+            planReview = fallbackPlan;
+          } else if (body.studentMessage.trim()) {
+            planInteraction = { ...fallbackPlan, showReviewCard: false };
+          }
+        }
       }
     } catch (error) {
       console.error("Multi-agent tutor failed; using local tutor fallback.", error);
       ({ content, questionType } = getTutorContent(body));
+      if (body.stage === "plan") {
+        const fallbackPlan = createFallbackPlanState(body);
+        planReview = body.action === "review_plan"
+          ? fallbackPlan
+          : undefined;
+        planInteraction = body.studentMessage.trim()
+          ? { ...fallbackPlan, showReviewCard: false }
+          : undefined;
+      }
     }
 
     return NextResponse.json({
@@ -290,6 +332,8 @@ export async function POST(request: Request) {
         agentTrace,
         understandingAssessment,
         codeAnalysis,
+        planReview,
+        planInteraction,
       }),
     });
   } catch (error) {

@@ -1,4 +1,5 @@
 import type { CodeRunResult } from "@/types/code-run";
+import type { TaskPedagogy } from "@/types/task";
 
 export type GuidanceStage = "understand" | "plan" | "code" | "debug" | "reflect";
 
@@ -33,10 +34,40 @@ export type TutorActionType =
   | "check_edge_cases"
   | "reflect_solution"
   | "review_plan"
+  | "understand_problem"
   | "explain_success"
   | "generate_reflection_summary";
 
 export type TutorStatus = "ready" | "thinking" | "offline";
+
+export type LearnerConceptStatus = "missing" | "partial" | "understood";
+export type LearnerAnswerQuality =
+  | "correct"
+  | "partial"
+  | "off_target"
+  | "uncertain";
+
+export interface TutorLearnerState {
+  currentFocus: string;
+  hintLevel: number;
+  attemptsOnFocus: number;
+  consecutiveOffTarget: number;
+  studentState: "beginner" | "confused" | "understanding";
+  concepts: Record<
+    string,
+    {
+      status: LearnerConceptStatus;
+      confidence: number;
+      evidence: string;
+    }
+  >;
+  latestAnswer: {
+    quality: LearnerAnswerQuality;
+    recognizedIdeas: string[];
+    missingIdeas: string[];
+    misconception?: string;
+  };
+}
 
 export interface TutorMessage {
   id: string;
@@ -45,11 +76,15 @@ export interface TutorMessage {
   timestamp: string;
   questionType?: TutorQuestionType;
   questionStrategy?: TutorQuestionStrategy;
+  hintLevel?: number;
+  learnerState?: TutorLearnerState;
   stage?: GuidanceStage;
   actionType?: TutorActionType;
   mode?: TutorMode;
-  hintLevel?: number;
+  choicePrompt?: "planning_entry";
   agentTrace?: TutorAgentTrace[];
+  planReview?: TutorPlanReview;
+  planInteraction?: TutorPlanInteraction;
   understandingAssessment?: TutorUnderstandingAssessment;
   codeAnalysis?: TutorCodeAnalysis;
 }
@@ -149,8 +184,21 @@ export type TutorAgentName =
   | "assessment";
 
 export interface TutorAgentTrace {
-  agent: TutorAgentName;
+  agent: string;
+  label?: string;
   summary: string;
+}
+
+export type TutorAgentTraceItem = TutorAgentTrace;
+
+export interface TutorPlanReview {
+  understandingScore: number;
+  missingSteps: string[];
+  canEnterCoding: boolean;
+}
+
+export interface TutorPlanInteraction extends TutorPlanReview {
+  showReviewCard: boolean;
 }
 
 export interface TutorConversation {
@@ -167,6 +215,7 @@ export interface TutorRequest {
   taskId: string;
   taskTitle?: string;
   taskDescription?: string;
+  taskPedagogy?: TaskPedagogy;
   studentMessage: string;
   currentCode: string;
   latestRunResult?: CodeRunResult;

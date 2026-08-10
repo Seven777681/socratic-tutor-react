@@ -20,14 +20,13 @@ import { MonacoCodeEditor } from "@/components/editor/monaco-code-editor";
 import { RunResultsPanel } from "@/components/results/run-results-panel";
 import type { RunResultTab } from "@/components/results/run-result-tabs";
 import { TaskExample } from "@/components/workspace/task-example";
-import { MonitoringPrediction } from "@/components/workspace/monitoring-prediction";
 import { PlanningPanel } from "@/components/workspace/planning-panel";
 import { ReflectionPanel } from "@/components/workspace/reflection-panel";
 import { useCodeAutosave } from "@/hooks/use-code-autosave";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useTaskLearningState } from "@/hooks/use-task-learning-state";
 import { loadTutorConversation } from "@/hooks/use-tutor-storage";
-import type { PlanningDraft, PlanningReview } from "@/hooks/use-task-learning-state";
+import type { PlanningDraft } from "@/hooks/use-task-learning-state";
 import { runCode } from "@/services/code-runner-service";
 import {
   difficultyLabels,
@@ -68,6 +67,8 @@ export function CodeEditorPanel({
   onRun,
   onCodeChange,
   onRunResultChange,
+  planInteraction,
+  onReviewPlanInTutor,
   onLearningContextChange,
 }: CodeEditorPanelProps) {
   const [preferences, setPreferences] = useState<EditorPreferences>({
@@ -90,9 +91,9 @@ export function CodeEditorPanel({
   const [planningErrors, setPlanningErrors] = useState<
     Partial<Record<"approach" | "steps" | "confidence", string>>
   >({});
-  const [predictionWarning, setPredictionWarning] = useState("");
   const [isReviewingPlan, setIsReviewingPlan] = useState(false);
   const [isGeneratingReflection, setIsGeneratingReflection] = useState(false);
+  const lastReflectionSignatureRef = useRef("");
   const [recentRuns, setRecentRuns] = useState<CodeRunResult[]>([]);
   const [demoRunScenario, setDemoRunScenario] =
     useState<RunScenario>("failed");
@@ -105,6 +106,7 @@ export function CodeEditorPanel({
   } = useCodeAutosave({ taskId, starterCode });
   const { state: learningState, updateState } = useTaskLearningState(taskId);
   const firstPlanningFieldRef = useRef<HTMLInputElement>(null);
+  const runResultsRef = useRef<HTMLDivElement>(null);
 
   const lineCount = useMemo(
     () => Math.max(1, currentCode.split("\n").length),
@@ -114,6 +116,25 @@ export function CodeEditorPanel({
   useEffect(() => {
     onCodeChange?.(currentCode);
   }, [currentCode, onCodeChange]);
+
+  useEffect(() => {
+    if (!planInteraction) {
+      return;
+    }
+
+    const nextStatus = planInteraction.canEnterCoding ? "ready" : "needs_revision";
+    if (learningState.planningDraft.status === nextStatus) {
+      return;
+    }
+
+    updateState({
+      planningDraft: {
+        ...learningState.planningDraft,
+        status: nextStatus,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  }, [learningState.planningDraft, planInteraction, updateState]);
 
   useEffect(() => {
     onLearningContextChange?.({
@@ -149,6 +170,21 @@ export function CodeEditorPanel({
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [isDetailsOpen]);
 
+  useEffect(() => {
+    if (!hasRunCode || !isResultsOpen) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      runResultsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [hasRunCode, isResultsOpen, runStatus]);
+
   const handleRun = useCallback(async () => {
     if (runStatus === "running") {
       return;
@@ -160,11 +196,6 @@ export function CodeEditorPanel({
 
     setPlanningErrors(
       hasPlan ? {} : { approach: "Try writing a short plan before running your code." },
-    );
-    setPredictionWarning(
-      learningState.prediction.trim()
-        ? ""
-        : "Predicting the output can help you monitor your reasoning.",
     );
     saveNow();
     onRun?.(currentCode);
@@ -186,12 +217,22 @@ export function CodeEditorPanel({
       taskId,
       code: currentCode,
       stdin,
-      testCases: task.examples.map((example) => ({
-        id: example.id,
-        name: example.id,
-        input: example.input,
-        expectedOutput: example.output,
-      })),
+      testCases: task.testCases
+        ? task.testCases.map((testCase) => ({
+            id: testCase.id,
+            name: testCase.name,
+            input: testCase.input,
+            expectedOutput: testCase.output,
+            visibility: testCase.visibility,
+            misconceptionTag: testCase.misconceptionTag,
+          }))
+        : task.examples.map((example) => ({
+            id: example.id,
+            name: example.id,
+            input: example.input,
+            expectedOutput: example.output,
+            visibility: "public" as const,
+          })),
     });
 
 
@@ -205,10 +246,10 @@ export function CodeEditorPanel({
     onRunResultChange?.(result);
     setRecentRuns((runs) => [result, ...runs].slice(0, 5));
 
-    if (result.status === "success" || result.status === "failed") {
-      setActiveResultTab("tests");
-    } else {
+    if (result.status === "error" || result.status === "timeout" || result.status === "system_error") {
       setActiveResultTab("errors");
+    } else {
+      setActiveResultTab("console");
     }
 
     trackLearningEvent({
@@ -231,13 +272,13 @@ export function CodeEditorPanel({
     currentCode,
     demoRunScenario,
     learningState.planningDraft,
-    learningState.prediction,
     onRun,
     onRunResultChange,
     runStatus,
     saveNow,
     stdin,
     task.examples,
+    task.testCases,
     taskId,
     updateState,
   ]);
@@ -272,80 +313,6 @@ export function CodeEditorPanel({
     return nextErrors;
   };
 
-  const normalizePlanText = (text: string) =>
-    text.trim().toLowerCase().replace(/\s+/g, " ");
-
-  const createPlanningReview = (draft: PlanningDraft): PlanningReview => {
-    const approach = normalizePlanText(draft.approach);
-    const steps = draft.steps.map(normalizePlanText);
-    const title = normalizePlanText(task.title);
-    const descriptionText = normalizePlanText(task.description.join(" "));
-    const copiedTitle =
-      approach === title || steps.some((step) => step && step === title);
-    const duplicateSteps = Boolean(steps[0] && steps[0] === steps[1]);
-    const approachTooShort = draft.approach.trim().split(/\s+/).filter(Boolean).length < 5;
-    const usefulActionPattern =
-      /\b(read|get|take|ask|store|keep|set|start|check|compare|loop|repeat|calculate|count|sum|add|find|return|print|output|update|convert|split|join|sort|filter|call|use|create|build|validate|track|remember)\b/i;
-    const hasActionOrder =
-      draft.steps.slice(0, 2).every((step) => usefulActionPattern.test(step));
-    const copiesDescription =
-      descriptionText.includes(approach) && approach.length > 40;
-
-    const strengths: string[] = [];
-    if (!approachTooShort && !copiedTitle) {
-      strengths.push("Your approach identifies a clear strategy.");
-    } else {
-      strengths.push("You identified the main goal.");
-    }
-    if (!duplicateSteps && hasActionOrder) {
-      strengths.push("Your steps are in a logical order.");
-    }
-
-    if (approachTooShort) {
-      return {
-        status: "needs_revision",
-        strengths,
-        improvement: "Your approach is a little too short to guide your coding yet.",
-        question: "What main idea will your program use before writing the first line of code?",
-      };
-    }
-
-    if (copiedTitle || copiesDescription) {
-      return {
-        status: "needs_revision",
-        strengths,
-        improvement: "Your plan mostly repeats the task text right now.",
-        question: "What action will your program do with the input values?",
-      };
-    }
-
-    if (duplicateSteps) {
-      return {
-        status: "needs_revision",
-        strengths,
-        improvement: "Your first two steps are the same, so the order is not clear yet.",
-        question: "What should happen after the first step is finished?",
-      };
-    }
-
-    if (!hasActionOrder) {
-      return {
-        status: "needs_revision",
-        strengths,
-        improvement: "Your steps do not yet describe clear actions for the program.",
-        question: `For this ${task.concept} task, what should the program remember or change as it works?`,
-      };
-    }
-
-    return {
-      status: "ready",
-      strengths: strengths.length
-        ? strengths
-        : ["Your approach identifies a clear strategy."],
-      improvement: "Your plan is clear enough to start coding.",
-    };
-  };
-
   const reviewPlan = async () => {
     if (isReviewingPlan) {
       return;
@@ -368,13 +335,19 @@ export function CodeEditorPanel({
     });
 
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 450));
-      const tutorReview = createPlanningReview(learningState.planningDraft);
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
+      onReviewPlanInTutor?.({
+        planningStatus: "reviewing",
+        planningApproach: learningState.planningDraft.approach,
+        planningSteps: learningState.planningDraft.steps,
+        confidenceRating: learningState.planningDraft.confidenceRating,
+        latestPrediction: learningState.prediction,
+        hintLevel: 0,
+      });
       updateState({
         planningDraft: {
           ...learningState.planningDraft,
-          status: tutorReview.status,
-          tutorReview,
+          status: "reviewing",
           reviewBypassed: false,
           updatedAt: new Date().toISOString(),
         },
@@ -401,17 +374,6 @@ export function CodeEditorPanel({
     });
   };
 
-  const collapsePlanning = (reviewBypassed = false) => {
-    updateState({
-      planningDraft: {
-        ...learningState.planningDraft,
-        status: "ready",
-        reviewBypassed,
-        updatedAt: new Date().toISOString(),
-      },
-    });
-  };
-
   const editPlanning = () => {
     updateState({
       planningDraft: {
@@ -423,7 +385,7 @@ export function CodeEditorPanel({
     window.setTimeout(() => firstPlanningFieldRef.current?.focus(), 0);
   };
 
-  const generateReflectionSummary = async () => {
+  const generateReflectionSummary = useCallback(async () => {
     if (isGeneratingReflection) {
       return;
     }
@@ -478,7 +440,65 @@ export function CodeEditorPanel({
     } finally {
       setIsGeneratingReflection(false);
     }
-  };
+  }, [
+    currentCode,
+    isGeneratingReflection,
+    learningState.latestRunResult,
+    learningState.planningDraft.approach,
+    learningState.planningDraft.confidenceRating,
+    learningState.planningDraft.status,
+    learningState.planningDraft.steps,
+    learningState.prediction,
+    learningState.reflectionAnswers,
+    taskId,
+    updateState,
+  ]);
+
+  const reflectionSignature = useMemo(
+    () =>
+      Object.values(learningState.reflectionAnswers)
+        .map((answer) => answer.trim())
+        .join("\u001f"),
+    [learningState.reflectionAnswers],
+  );
+  const isReflectionComplete = useMemo(
+    () =>
+      Object.values(learningState.reflectionAnswers).every(
+        (answer) => answer.trim().length > 0,
+      ),
+    [learningState.reflectionAnswers],
+  );
+
+  useEffect(() => {
+    if (!isReflectionComplete || isGeneratingReflection) {
+      return;
+    }
+
+    if (
+      learningState.reflectionSummary.trim() &&
+      !lastReflectionSignatureRef.current
+    ) {
+      lastReflectionSignatureRef.current = reflectionSignature;
+      return;
+    }
+
+    if (lastReflectionSignatureRef.current === reflectionSignature) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      lastReflectionSignatureRef.current = reflectionSignature;
+      void generateReflectionSummary();
+    }, 800);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    generateReflectionSummary,
+    isGeneratingReflection,
+    isReflectionComplete,
+    learningState.reflectionSummary,
+    reflectionSignature,
+  ]);
 
   const shouldShowReflection =
     runResult?.status === "success" ||
@@ -486,7 +506,7 @@ export function CodeEditorPanel({
 
   return (
     <>
-      <section className="flex min-h-[640px] min-w-0 flex-col overflow-hidden rounded-[22px] border border-[#E4E7F0] bg-white shadow-[0_16px_45px_rgba(78,91,130,0.08)] lg:h-full">
+      <section className="flex min-h-[640px] min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-[22px] border border-[#E4E7F0] bg-white shadow-[0_16px_45px_rgba(78,91,130,0.08)] lg:h-[calc(100dvh-108px)] lg:min-h-0">
       <div className="border-b border-[#E4E7F0] bg-white px-5 py-3.5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
@@ -497,7 +517,7 @@ export function CodeEditorPanel({
               {task.title}
             </h2>
             <p className="mt-2 max-w-[840px] text-sm leading-6 text-slate-600">
-              {task.description[0]}
+              {task.description.join(" ")}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#eceaff] px-3 py-1 text-xs font-bold text-[#6255f6]">
@@ -543,9 +563,6 @@ export function CodeEditorPanel({
           void reviewPlan();
         }}
         onEditPlan={editPlanning}
-        onStartCoding={() => collapsePlanning(false)}
-        onUpdatePlan={editPlanning}
-        onContinueAnyway={() => collapsePlanning(true)}
       />
 
       <EditorToolbar
@@ -562,7 +579,7 @@ export function CodeEditorPanel({
         onDemoRunScenarioChange={setDemoRunScenario}
       />
 
-      <div className="grid min-h-0 flex-1 bg-[#F5F7FF] p-3">
+      <div className="grid min-h-[280px] flex-1 bg-[#F5F7FF] p-3">
         <div className="flex min-h-0 flex-col overflow-hidden rounded-[14px] border border-[#E4E7F0] bg-[#FBFCFF]">
           <MonacoCodeEditor
             value={currentCode}
@@ -577,64 +594,57 @@ export function CodeEditorPanel({
         </div>
       </div>
 
-      <MonitoringPrediction
-        value={learningState.prediction}
-        warning={predictionWarning}
-        onChange={(prediction) => {
-          setPredictionWarning("");
-          updateState({ prediction });
-        }}
-        onSave={() => {
-          setPredictionWarning("");
-          updateState({ prediction: learningState.prediction });
-        }}
-      />
-      </section>
-
       {hasRunCode || runStatus === "running" ? (
-        <RunResultsPanel
-          status={runStatus}
-          result={runResult}
-          stdin={stdin}
-          activeTab={activeResultTab}
-          isOpen={isResultsOpen}
-          isRunning={runStatus === "running"}
-          recentRuns={recentRuns}
-          onStdinChange={setStdin}
-          onActiveTabChange={setActiveResultTab}
-          onOpenChange={setIsResultsOpen}
-          onClear={() => {
-            setRunStatus("idle");
-            setRunResult(undefined);
-            setActiveResultTab("console");
-          }}
-          onRunAgain={() => {
-            void handleRun();
-          }}
-          onSelectRecentRun={(run) => {
-            setHasRunCode(true);
-            setRunResult(run);
-            setRunStatus(run.status);
-            setStdin(run.stdin);
-            setIsResultsOpen(true);
-            setActiveResultTab(
-              run.status === "success" || run.status === "failed"
-                ? "tests"
-                : "errors",
-            );
-          }}
-        />
+        <div
+          ref={runResultsRef}
+          className="scroll-mt-4 border-t border-[#E4E7F0] bg-[#FBFCFF] p-3"
+        >
+          <RunResultsPanel
+            status={runStatus}
+            result={runResult}
+            stdin={stdin}
+            activeTab={activeResultTab}
+            isOpen={isResultsOpen}
+            isRunning={runStatus === "running"}
+            recentRuns={recentRuns}
+            onStdinChange={setStdin}
+            onActiveTabChange={setActiveResultTab}
+            onOpenChange={setIsResultsOpen}
+            onClear={() => {
+              setRunStatus("idle");
+              setRunResult(undefined);
+              setActiveResultTab("console");
+            }}
+            onRunAgain={() => {
+              void handleRun();
+            }}
+            onSelectRecentRun={(run) => {
+              setHasRunCode(true);
+              setRunResult(run);
+              setRunStatus(run.status);
+              setStdin(run.stdin);
+              setIsResultsOpen(true);
+              setActiveResultTab(
+                run.status === "error" ||
+                  run.status === "timeout" ||
+                  run.status === "system_error"
+                  ? "errors"
+                  : "console",
+              );
+            }}
+          />
+        </div>
       ) : null}
+      </section>
 
       {shouldShowReflection ? (
         <ReflectionPanel
           answers={learningState.reflectionAnswers}
           summary={learningState.reflectionSummary}
           isGenerating={isGeneratingReflection}
-          onAnswersChange={(reflectionAnswers) => updateState({ reflectionAnswers })}
-          onGenerateSummary={() => {
-            void generateReflectionSummary();
-          }}
+          onAnswersChange={(reflectionAnswers) =>
+            updateState({ reflectionAnswers, reflectionSummary: "" })
+          }
         />
       ) : null}
 

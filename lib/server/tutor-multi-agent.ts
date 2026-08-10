@@ -37,6 +37,8 @@ import type {
   TutorErrorPatternHistory,
   TutorQuestionStrategy,
   TutorQuestionType,
+  TutorPlanInteraction,
+  TutorPlanReview,
   TutorRequest,
   TutorUnderstandingAssessment,
 } from "@/types/tutor";
@@ -87,6 +89,8 @@ export interface MultiAgentTutorResult {
   trace: TutorAgentTrace[];
   understandingAssessment?: TutorUnderstandingAssessment;
   codeAnalysis?: TutorCodeAnalysis;
+  planReview?: TutorPlanReview;
+  planInteraction?: TutorPlanInteraction;
 }
 
 const hintRules = [
@@ -509,21 +513,40 @@ export async function runTutorMultiAgent(
   if (!result.finalContent.trim()) {
     throw new Error("The tutor graph produced an empty response.");
   }
+  const ranProblemUnderstanding = result.trace.some(
+    (entry) => entry.agent === "problem_understanding",
+  );
+  const planReviewData: TutorPlanReview | undefined = ranProblemUnderstanding
+    ? {
+        understandingScore: result.understandingScore,
+        missingSteps: result.missingPlanElement.trim()
+          ? [result.missingPlanElement]
+          : [],
+        canEnterCoding:
+          result.planStatus === "ready" && result.understandingScore >= 7,
+      }
+    : undefined;
   return {
     content: result.finalContent,
     questionType: result.questionType,
     questionStrategy: result.questionStrategy,
     hintLevel: result.hintLevel,
     trace: result.trace,
-    understandingAssessment: result.trace.some(
-      (entry) => entry.agent === "problem_understanding",
-    )
+    understandingAssessment: ranProblemUnderstanding
       ? {
           dimensions: result.understandingDimensions,
           misconceptions: result.misconceptions,
           confidence: result.confidenceAssessment,
         }
       : undefined,
+    planReview:
+      planReviewData && request.action === "review_plan" && !request.studentMessage.trim()
+        ? planReviewData
+        : undefined,
+    planInteraction:
+      planReviewData && request.stage === "plan" && request.studentMessage.trim()
+        ? { ...planReviewData, showReviewCard: false }
+        : undefined,
     codeAnalysis: result.trace.some((entry) => entry.agent === "code_analysis")
       ? {
           hasError: result.codeHasError,

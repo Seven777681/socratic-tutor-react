@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const BACKEND_URL =
-  process.env.SOCRATIC_BACKEND_URL || "http://127.0.0.1:8000";
+  process.env.SOCRATIC_BACKEND_URL || "http://127.0.0.1:8001";
 
 interface CodeRunRequestBody {
   taskId: string;
@@ -12,6 +12,8 @@ interface CodeRunRequestBody {
     name?: string;
     input?: string;
     expectedOutput?: string;
+    visibility?: "public" | "hidden";
+    misconceptionTag?: string;
   }>;
 }
 
@@ -34,6 +36,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 7000);
+
   try {
     const backendResponse = await fetch(`${BACKEND_URL}/api/code/run`, {
       method: "POST",
@@ -41,6 +46,7 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
       // Real subprocess execution can take a few seconds for slow loops.
       cache: "no-store",
     });
@@ -62,5 +68,7 @@ export async function POST(request: Request) {
       { error: "Code execution backend is unreachable." },
       { status: 503 },
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

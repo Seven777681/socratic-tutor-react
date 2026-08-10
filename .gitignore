@@ -4,6 +4,11 @@ node_modules
 dev-server.log
 dev-server.err
 next-dev.log
+dev-server-current.*.log
+next.err.log
+next.out.log
+backend_check*.txt
+*.tsbuildinfo
 
 # Python backend
 socratic_backend/.venv

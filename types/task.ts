@@ -93,6 +93,21 @@ export interface TaskExample {
   output: string;
 }
 
+export interface TaskTestCase extends TaskExample {
+  name: string;
+  visibility: "public" | "hidden";
+  misconceptionTag?: string;
+}
+
+export interface TaskPedagogy {
+  primaryConcept: string;
+  secondaryConcepts: string[];
+  prerequisites: string[];
+  commonMisconceptions: string[];
+  expectedPlanElements: string[];
+  reflectionPrompts: string[];
+}
+
 export interface ProgrammingTaskDetail {
   id: string;
   taskNumber: number;
@@ -120,6 +135,8 @@ export interface ProgrammingTaskDetail {
   inputDescription: string;
   outputDescription: string;
   examples: TaskExample[];
+  testCases?: TaskTestCase[];
+  pedagogy?: TaskPedagogy;
   constraints: string[];
   helpfulReminder?: string;
   starterCode: string;
@@ -154,6 +171,10 @@ export interface CodeEditorPanelProps {
   onRun?: (code: string) => void;
   onCodeChange?: (code: string) => void;
   onRunResultChange?: (result: import("@/types/code-run").CodeRunResult) => void;
+  planInteraction?: import("@/types/tutor").TutorPlanInteraction;
+  onReviewPlanInTutor?: (
+    context: import("@/types/tutor").TutorLearningContext,
+  ) => void;
   onLearningContextChange?: (
     context: import("@/types/tutor").TutorLearningContext,
   ) => void;

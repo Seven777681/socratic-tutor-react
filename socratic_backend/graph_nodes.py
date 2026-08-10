@@ -1,83 +1,242 @@
-from langchain_openai import ChatOpenAI
 from graph_state import TutorState
-from prompts import AGENT1_PROMPT, AGENT2_PROMPT, AGENT3_PROMPT, AGENT4_PROMPT, AGENT5_PROMPT
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-llm = ChatOpenAI(
-    model=os.getenv("MODEL_NAME"),
-    api_key=os.getenv("OPENAI_API_KEY"),
-    base_url=os.getenv("OPENAI_BASE_URL"),
-    temperature=0.1
+from agent_services import (
+    evaluate_tutor_answer,
+    run_agent1_personalized,
+    run_agent3_diagnosis,
+    run_agent4_monitor,
+    run_agent5,
 )
+from agent2_graph import agent2_graph
 
-# Agent1：计划理解节点
+
+def _append_trace(state: TutorState, agent: str, label: str, summary: str):
+    state.setdefault("agent_trace", []).append({
+        "agent": agent,
+        "label": label,
+        "summary": summary,
+    })
+
+
 def plan_agent(state: TutorState) -> TutorState:
-    user_input = f"Problem: {state['problem_content']}\nPlan Info: {state['plan_form']}"
-    resp = llm.invoke([("system", AGENT1_PROMPT), ("human", user_input)])
-    text = resp.content.strip()
-    score = 0
-    q = ""
-    for line in text.splitlines():
-        if line.startswith("understanding_score:"):
-            score = int(line.split(":")[1].strip())
-        if line.startswith("guide_question:"):
-            q = line.split(":")[1].strip()
-    state["understanding_score"] = score
-    state["socratic_question"] = q
+    plan_form = state.get("plan_form", {})
+    steps = plan_form.get("steps", [])
+    previous_answers = [
+        message.get("content", "")
+        for message in state.get("messages", [])
+        if message.get("role") == "student"
+    ]
+    latest_answer = state.get("student_answer", "") or ""
+    if latest_answer.strip() and (
+        not previous_answers or previous_answers[-1].strip() != latest_answer.strip()
+    ):
+        previous_answers.append(latest_answer)
+    accumulated_answers = "\n".join(answer for answer in previous_answers if answer.strip())
+
+    result = run_agent1_personalized(
+        problem=state.get("problem_content", ""),
+        approach=plan_form.get("approach", "") or "",
+        steps="\n".join(steps) if isinstance(steps, list) else str(steps or ""),
+        accumulated_answers=accumulated_answers,
+        latest_answer=latest_answer,
+        previous_learner_state=state.get("learner_state", {}),
+    )
+
+    can_enter_coding = bool(result.get("can_enter_coding", False))
+    message = (
+        result.get("message")
+        or result.get("guide_question")
+        or "What is your next thought about the plan?"
+    )
+
+    state["understanding_score"] = result.get("understanding_score", 0)
+    state["missing_steps"] = result.get("missing_steps", [])
+    state["can_enter_coding"] = can_enter_coding
+    state["current_state"] = result.get("current_state", {})
+    state["selected_action"] = result.get("action")
+    state["reasoning_summary"] = result.get("reasoning_summary")
+    state["learner_state"] = result.get("learner_state", {})
+    state["issue_type"] = result.get("action", "plan_understanding")
+    latest_diagnosis = state["learner_state"].get("latestAnswer", {})
+    state["misconception"] = (
+        latest_diagnosis.get("misconception")
+        or "; ".join(latest_diagnosis.get("missingIdeas", []))
+        or f"Needs support with {state['learner_state'].get('currentFocus', 'planning')}"
+    )
+    state["student_state"] = state["learner_state"].get("studentState", "beginner")
+    state["tutor_message"] = message
+    state["question_type"] = "understanding"
+
+    _append_trace(
+        state,
+        "Agent 1",
+        "Problem understanding",
+        f"action={result.get('action', 'unknown')}, plan_complete={result.get('current_state', {}).get('plan_complete', False)}",
+    )
     return state
 
-# Agent3：代码分析节点
+
 def code_analysis_agent(state: TutorState) -> TutorState:
-    user_input = f"Problem: {state['problem_content']}\nCode: {state['student_code']}\nPredicted Output: {state['code_prediction']}"
-    resp = llm.invoke([("system", AGENT3_PROMPT), ("human", user_input)])
-    err_type = resp.content.split("error_type:")[-1].strip()
-    state["code_error_type"] = err_type
+    if not state.get("student_code", "").strip():
+        state["code_error_type"] = "no_error"
+        state["issue_type"] = "no_error"
+        return state
+
+    result = run_agent3_diagnosis(
+        problem=state.get("problem_content", ""),
+        code=state.get("student_code", ""),
+        execution_result=state.get("execution_result", ""),
+    )
+    state["code_error_type"] = result.get("issue_type", "logical_error")
+    state["issue_type"] = state["code_error_type"]
+    state["misconception"] = result.get("misconception", "")
+    _append_trace(
+        state,
+        "Agent 3",
+        "Code analysis",
+        f"issue_type={state['code_error_type']}",
+    )
     return state
 
-# Agent4：元认知监测节点
+
+def answer_evaluation_agent(state: TutorState) -> TutorState:
+    latest_answer = state.get("student_answer", "") or ""
+    if not latest_answer.strip():
+        return state
+
+    learner_state = evaluate_tutor_answer(
+        problem=state.get("problem_content", ""),
+        code=state.get("student_code", ""),
+        stage=state.get("stage", "code"),
+        latest_question=state.get("latest_tutor_question", ""),
+        latest_answer=latest_answer,
+        previous_learner_state=state.get("learner_state", {}),
+    )
+    state["learner_state"] = learner_state
+    diagnosis = learner_state.get("latestAnswer", {})
+    state["misconception"] = diagnosis.get("misconception", "")
+    _append_trace(
+        state,
+        "Answer Evaluator",
+        "Learner answer evaluation",
+        f"quality={diagnosis.get('quality', 'uncertain')}, focus_resolved={diagnosis.get('focusResolved', False)}",
+    )
+    return state
+
+
 def monitor_agent(state: TutorState) -> TutorState:
-    chat = str(state["messages"])
-    err_records = state["code_error_type"]
-    idle = state["is_stuck"]
-    user_input = f"Chat History: {chat}\nError Records: {err_records}\nIdle Over 1min: {idle}"
-    resp = llm.invoke([("system", AGENT4_PROMPT), ("human", user_input)])
-    cl = 0
-    stuck = False
-    for line in resp.content.splitlines():
-        if line.startswith("confusion_level:"):
-            cl = int(line.split(":")[1].strip())
-        if line.startswith("is_stuck:"):
-            stuck = line.split(":")[1].strip().lower() == "true"
-    state["confusion_level"] = cl
-    state["is_stuck"] = stuck
-    # 卡顿自动升级hint等级，最高3级
-    if stuck and state["hint_level"] < 3:
-        state["hint_level"] += 1
+    chat_history = "\n".join(
+        f"{message.get('role', 'unknown')}: {message.get('content', '')}"
+        for message in state.get("messages", [])
+    ) or "(no messages yet)"
+    learner_state = state.get("learner_state", {})
+    latest_answer = learner_state.get("latestAnswer", {})
+    result = run_agent4_monitor(
+        chat_history=chat_history,
+        issue_type=state.get("issue_type", "no_error"),
+        current_hint_level=state.get("hint_level", 0),
+        latest_run_status=state.get("latest_run_status", "") or "",
+        attempts_on_focus=int(learner_state.get("attemptsOnFocus", 0) or 0),
+        consecutive_off_target=int(learner_state.get("consecutiveOffTarget", 0) or 0),
+        latest_answer_quality=latest_answer.get("quality", "uncertain"),
+        latest_student_answer=state.get("student_answer", "") or "",
+    )
+    state["student_state"] = result.get("student_state", "beginner")
+    state["confusion_level"] = result.get("confusion_level", 0)
+    state["is_stuck"] = result.get("is_stuck", False)
+    state["hint_level"] = result.get("hint_level", state.get("hint_level", 0))
+    if learner_state:
+        learner_state["hintLevel"] = state["hint_level"]
+        learner_state["studentState"] = state["student_state"]
+        state["learner_state"] = learner_state
+    _append_trace(
+        state,
+        "Agent 4",
+        "Learning monitor",
+        f"student_state={state['student_state']}, is_stuck={state['is_stuck']}, hint_level={state['hint_level']}",
+    )
     return state
 
-# Agent2：苏格拉底对话节点
+
 def socratic_agent(state: TutorState) -> TutorState:
-    user_input = (
-        f"Problem: {state['problem_content']}\nCode: {state['student_code']}\n"
-        f"Error Type: {state['code_error_type']}\nConfusion Level: {state['confusion_level']}\n"
-        f"Is Stuck: {state['is_stuck']}\nHint Level: {state['hint_level']}\nChat: {state['messages']}"
+    learner_state = dict(state.get("learner_state", {}))
+    if state.get("stage") == "debug":
+        diagnostic_focus = state.get("issue_type", "logical_error")
+        previous_focus = learner_state.get("currentFocus")
+        learner_state["currentFocus"] = diagnostic_focus
+        learner_state["attemptsOnFocus"] = (
+            int(learner_state.get("attemptsOnFocus", 0) or 0) + 1
+            if previous_focus == diagnostic_focus
+            else 0
+        )
+        learner_state["latestAnswer"] = {
+            "quality": "uncertain",
+            "recognizedIdeas": [],
+            "missingIdeas": [state.get("misconception", "")],
+            "misconception": state.get("misconception", ""),
+        }
+        state["learner_state"] = learner_state
+    elif (
+        state.get("stage") in {"code", "coding"}
+        and learner_state.get("currentFocus") in {"plan_submission", "plan_complete"}
+    ):
+        learner_state["currentFocus"] = "coding_progress"
+        learner_state["attemptsOnFocus"] = 0
+        state["learner_state"] = learner_state
+    elif state.get("stage") == "reflect":
+        learner_state["currentFocus"] = "reflection_learning"
+        state["learner_state"] = learner_state
+
+    result = agent2_graph.invoke({
+        "problem": state.get("problem_content", ""),
+        "student_code": state.get("student_code", ""),
+        "conversation_history": state.get("messages", []),
+        "stage": state.get("stage", "coding"),
+        "issue_type": state.get("issue_type", "no_error"),
+        "misconception": state.get("misconception", ""),
+        "student_state": state.get("student_state", "beginner"),
+        "hint_level": state.get("hint_level", 0),
+        "learner_state": learner_state,
+        "student_answer": state.get("student_answer", ""),
+    })
+    state["pedagogical_action"] = result.get("action", "ASK_METACOGNITIVE")
+    state["final_question"] = result.get("final_question", "")
+    state["question_validation"] = result.get("validation", {})
+    state["tutor_message"] = state["final_question"]
+    state["question_type"] = (
+        "debugging"
+        if state.get("stage") == "debug"
+        else "reflection"
+        if state.get("stage") == "reflect"
+        else "understanding"
     )
-    resp = llm.invoke([("system", AGENT2_PROMPT), ("human", user_input)])
-    q = resp.content.split("question:")[-1].strip()
-    state["socratic_question"] = q
-    state["messages"].append(resp)
+    _append_trace(
+        state,
+        "Agent 2",
+        "Socratic dialogue",
+        f"stage={state['stage']}, action={state['pedagogical_action']}, hint_level={state['hint_level']}, validated={state['question_validation'].get('valid', False)}",
+    )
     return state
 
-# Agent5：评估反思节点
+
 def assessment_agent(state: TutorState) -> TutorState:
-    user_input = (
-        f"Problem: {state['problem_content']}\nCode: {state['student_code']}\n"
-        f"Error Records: {state['code_error_type']}\nChat History: {state['messages']}\nReflection: {state['student_reflection']}"
+    chat_history = "\n".join(
+        f"{message.get('role', 'unknown')}: {message.get('content', '')}"
+        for message in state.get("messages", [])
+    ) or "(no messages yet)"
+    result = run_agent5(
+        problem=state.get("problem_content", ""),
+        code=state.get("student_code", ""),
+        error_records=[],
+        chat_history=chat_history,
+        reflection_text=state.get("student_reflection", ""),
     )
-    resp = llm.invoke([("system", AGENT5_PROMPT), ("human", user_input)])
-    summary = resp.content.split("summary:")[-1].strip()
-    state["learning_summary"] = summary
-    state["task_finished"] = True
+    state["learning_summary"] = result.get("summary", "")
+    state["tutor_message"] = state["learning_summary"]
+    state["question_type"] = "reflection"
+    _append_trace(
+        state,
+        "Agent 5",
+        "Reflection assessment",
+        "Generated learning summary.",
+    )
     return state

@@ -26,6 +26,7 @@ export interface TestCaseResult {
   actualOutput?: string;
   passed: boolean;
   feedback: string;
+  diagnosticTag?: string;
 }
 
 export interface CodeExecutionError {

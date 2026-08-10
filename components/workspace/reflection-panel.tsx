@@ -34,13 +34,11 @@ export function ReflectionPanel({
   summary,
   isGenerating,
   onAnswersChange,
-  onGenerateSummary,
 }: {
   answers: ReflectionAnswers;
   summary: string;
   isGenerating: boolean;
   onAnswersChange: (answers: ReflectionAnswers) => void;
-  onGenerateSummary: () => void;
 }) {
   return (
     <section className="rounded-[18px] border border-[#E4E7F0] bg-white p-5 shadow-[0_14px_40px_rgba(78,91,130,0.07)]">
@@ -53,14 +51,9 @@ export function ReflectionPanel({
             Capture what changed in your thinking before moving on.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onGenerateSummary}
-          disabled={isGenerating}
-          className="inline-flex h-10 w-fit items-center justify-center rounded-lg bg-[linear-gradient(90deg,#6657f5,#4678ff)] px-3 text-sm font-bold text-white shadow-lg shadow-indigo-200/80 transition hover:shadow-xl disabled:cursor-wait disabled:opacity-75"
-        >
-          {isGenerating ? "Generating..." : "Generate Reflection Summary"}
-        </button>
+        {isGenerating ? (
+          <p className="text-sm font-bold text-[#6255f6]">Generating summary...</p>
+        ) : null}
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">

@@ -2,6 +2,8 @@
 
 import type { TutorConversation, TutorMode } from "@/types/tutor";
 
+const TUTOR_STORAGE_VERSION = 4;
+
 export function getTutorStorageKey(taskId: string) {
   return `socratic-tutor-${taskId}`;
 }
@@ -37,7 +39,14 @@ export function loadTutorConversation(taskId: string) {
   }
 
   try {
-    return JSON.parse(stored) as TutorConversation;
+    const parsed = JSON.parse(stored) as TutorConversation & {
+      schemaVersion?: number;
+    };
+    if (parsed.schemaVersion !== TUTOR_STORAGE_VERSION) {
+      window.localStorage.removeItem(getTutorStorageKey(taskId));
+      return undefined;
+    }
+    return parsed;
   } catch {
     window.localStorage.removeItem(getTutorStorageKey(taskId));
     return undefined;
@@ -49,8 +58,9 @@ export function saveTutorConversation(conversation: TutorConversation) {
     return;
   }
 
-  const safeConversation: TutorConversation = {
+  const safeConversation: TutorConversation & { schemaVersion: number } = {
     ...conversation,
+    schemaVersion: TUTOR_STORAGE_VERSION,
     messages: conversation.messages.map((message) => ({
       id: message.id,
       role: message.role,
@@ -58,8 +68,17 @@ export function saveTutorConversation(conversation: TutorConversation) {
       timestamp: message.timestamp,
       stage: message.stage,
       questionType: message.questionType,
+      questionStrategy: message.questionStrategy,
+      hintLevel: message.hintLevel,
+      learnerState: message.learnerState,
       actionType: message.actionType,
       mode: message.mode,
+      choicePrompt: message.choicePrompt,
+      agentTrace: message.agentTrace,
+      planReview: message.planReview,
+      planInteraction: message.planInteraction,
+      understandingAssessment: message.understandingAssessment,
+      codeAnalysis: message.codeAnalysis,
     })),
   };
 
