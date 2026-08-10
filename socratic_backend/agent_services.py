@@ -70,7 +70,12 @@ def analyze_plan_steps(approach: str, steps: str, student_answer: str = ""):
     text = f"{approach}\n{steps}\n{student_answer}".lower()
     has_approach = len(approach.strip().split()) >= 5
     has_input = _contains_any(text, ["input", "read", "get", "split", "value", "number", "data", "list", "first"])
-    has_logic = _contains_any(text, ["loop", "for", "while", "compare", "if", "condition", "calculate", "sum", "max", "min", "count", "update", "bigger", "larger", "largest"])
+    # Objective words such as "largest" or "sum" describe what to produce,
+    # not how to compute it. Only procedural evidence counts as algorithm logic.
+    has_logic = _contains_any(text, [
+        "loop", "for each", "iterate", "while", "compare", "if ",
+        "condition", "calculate", "accumulate", "update", "keep track",
+    ])
     has_output = _contains_any(text, ["print", "output", "return", "display", "answer", "result", "show"])
     written_steps = [line.strip() for line in steps.splitlines() if line.strip()]
     has_submitted_plan = len(approach.strip()) >= 5 and len(written_steps) >= 2
@@ -526,6 +531,18 @@ Rules:
         "output": ("maximum", "largest", "minimum", "smallest", "sum", "total", "average", "result", "answer"),
         "algorithm": ("loop", "compare", "iterate", "track", "update", "check"),
     }
+    # In many introductory tasks the program goal and its output are the same
+    # fact (for example, "find the largest number"). Treat explicit objective
+    # language as evidence for both concepts so the tutor does not ask the same
+    # question again under a different label.
+    objective_terms = {
+        "maximum", "largest", "minimum", "smallest", "sum", "total",
+        "average", "count", "result", "answer",
+    }
+    expressed_objective = any(term in short_answer for term in objective_terms)
+    if previous_focus in {"problem_goal", "output"} and expressed_objective:
+        resolved_concepts.update({"problem_goal", "output"})
+        quality = "correct"
     semantically_supported_focus_answer = (
         previous_focus in short_answer_terms
         and bool(short_answer)
@@ -648,6 +665,91 @@ def run_agent3(problem: str, code: str, predict_output: str):
     user_input = f"Problem: {problem}\nCode: {code}\nPredicted Output: {predict_output}"
     response_text = base_llm_call(AGENT3_PROMPT, user_input)
     return {"error_type": response_text.split("error_type:")[-1].strip()}
+
+
+def evaluate_tutor_answer(
+    problem: str,
+    code: str,
+    stage: str,
+    latest_question: str,
+    latest_answer: str,
+    previous_learner_state: dict | None = None,
+):
+    """Evaluate a conversational answer outside Planning and update learner memory."""
+    previous_learner_state = previous_learner_state or {}
+    if not latest_answer.strip():
+        return previous_learner_state
+
+    prompt = """
+You evaluate a student's latest answer in a Socratic programming conversation.
+Do not teach, ask a question, or provide a solution. Return only valid JSON:
+{
+  "quality": "correct|partial|off_target|uncertain",
+  "focusResolved": true,
+  "recognizedIdeas": ["..."],
+  "missingIdeas": ["..."],
+  "misconception": "... or empty"
+}
+
+Judge the answer against the latest tutor question and current learning focus. Mark
+focusResolved only when the answer explicitly resolves that focus. A useful but
+incomplete answer is partial; an answer about a different issue is off_target.
+Use only evidence written by the student. Do not output chain-of-thought.
+"""
+    previous_focus = previous_learner_state.get("currentFocus")
+    if stage in {"code", "coding"} and previous_focus in {
+        "plan_submission", "plan_complete"
+    }:
+        previous_focus = "coding_progress"
+    if stage == "reflect":
+        previous_focus = "reflection_learning"
+
+    response_text = base_llm_call(
+        prompt,
+        (
+            f"Stage: {stage}\nProblem: {problem}\nStudent code:\n{code or '(none)'}\n"
+            f"Current focus: {previous_focus or 'coding_progress'}\n"
+            f"Latest tutor question: {latest_question or '(none)'}\n"
+            f"Latest student answer: {latest_answer}"
+        ),
+    )
+    match = re.search(r"\{.*\}", response_text, re.DOTALL)
+    parsed = {}
+    if match:
+        try:
+            parsed = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            parsed = {}
+
+    quality = parsed.get("quality")
+    if quality not in {"correct", "partial", "off_target", "uncertain"}:
+        quality = "partial"
+    resolved = bool(parsed.get("focusResolved", False))
+    default_focus = "reflection_learning" if stage == "reflect" else "coding_progress"
+    current_focus = default_focus if resolved or not previous_focus else previous_focus
+    previous_attempts = int(previous_learner_state.get("attemptsOnFocus", 0) or 0)
+    previous_off_target = int(previous_learner_state.get("consecutiveOffTarget", 0) or 0)
+
+    learner_state = dict(previous_learner_state)
+    learner_state.update({
+        "currentFocus": current_focus,
+        "attemptsOnFocus": (
+            0
+            if resolved
+            else previous_attempts + 1
+            if current_focus == previous_focus
+            else 0
+        ),
+        "consecutiveOffTarget": previous_off_target + 1 if quality == "off_target" else 0,
+        "latestAnswer": {
+            "quality": quality,
+            "focusResolved": resolved,
+            "recognizedIdeas": [str(item)[:160] for item in parsed.get("recognizedIdeas", [])[:4]],
+            "missingIdeas": [str(item)[:160] for item in parsed.get("missingIdeas", [])[:4]],
+            "misconception": str(parsed.get("misconception") or "")[:240],
+        },
+    })
+    return learner_state
 
 def run_agent3_diagnosis(problem: str, code: str, execution_result: str):
     prompt = """

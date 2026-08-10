@@ -17,7 +17,10 @@ export async function getTutorResponse(
     });
 
     if (!response.ok) {
-      throw new Error("Tutor request failed");
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      throw new Error(data?.error || "Tutor request failed.");
     }
 
     const data = (await response.json()) as TutorResponse;

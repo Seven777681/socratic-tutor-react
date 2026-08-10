@@ -25,15 +25,15 @@ MODEL_NAME=deepseek-coder
 ## Run
 
 ```bash
-uvicorn server:app --reload --port 8000
+uvicorn server:app --reload --port 8001
 ```
 
-Health check: `GET http://127.0.0.1:8000/health`
+Health check: `GET http://127.0.0.1:8001/health`
 
 ## How it connects to the frontend
 
 The Next.js route `app/api/tutor/message/route.ts` proxies every tutor
-request to `POST http://127.0.0.1:8000/api/tutor/message` (configurable via
+request to `POST http://127.0.0.1:8001/api/tutor/message` (configurable via
 the `SOCRATIC_BACKEND_URL` env var on the Next.js side). Request/response
 JSON field names match `types/tutor.ts` (`TutorRequest` / `TutorResponse`)
 so no field remapping is needed on either side.

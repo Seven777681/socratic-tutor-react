@@ -28,6 +28,7 @@ class Agent2State(TypedDict, total=False):
     action: PedagogicalAction
     final_question: str
     learner_state: Dict[str, Any]
+    student_answer: str
     validation: Dict[str, Any]
     retry_count: int
 
@@ -108,6 +109,27 @@ def _is_repeated_question(question: str, previous_questions: List[str]) -> bool:
     )
 
 
+def _question_intent(text: str) -> str:
+    """Classify common tutoring intents that lexical overlap can miss."""
+    normalized = " ".join(text.lower().split())
+    intent_terms = {
+        "output": (
+            "produce", "print", "display", "show", "final result",
+            "end up", "when it finishes", "after processing",
+        ),
+        "input": ("receive", "given", "available at the start", "input data"),
+        "algorithm": (
+            "each value", "each number", "one by one", "keep track",
+            "update", "compare", "next step",
+        ),
+        "plan_submission": ("plan section", "record your plan", "write your plan"),
+    }
+    for intent, terms in intent_terms.items():
+        if any(term in normalized for term in terms):
+            return intent
+    return ""
+
+
 def generate_socratic_question_node(state: Agent2State) -> Dict[str, str]:
     learner_state = state.get("learner_state", {})
     latest_answer = learner_state.get("latestAnswer", {})
@@ -124,6 +146,7 @@ def generate_socratic_question_node(state: Agent2State) -> Dict[str, str]:
         "algorithm": "Ask about one next reasoning step in the process, without supplying it.",
         "plan_submission": "Ask the student to summarize their own established reasoning in the Plan section.",
         "coding_progress": "Ask about the student's current coding intention, expectation, or next small step. Never send them back to the Plan section.",
+        "reflection_learning": "Ask the student to explain one lesson, tradeoff, or transferable idea from the completed solution.",
         "syntax_error": "Ask what language rule the interpreter may be rejecting, without naming the exact line or correction.",
         "logical_error": "Ask the student to compare expected behavior with the relevant variable or condition behavior.",
         "conceptual_error": "Ask about the programming concept or assumption behind the observed error.",
@@ -171,6 +194,7 @@ natural, then target exactly one missing idea. Do not praise an incorrect answer
     user_content = (
         f"Problem:\n{state.get('problem', '')}\n\n"
         f"Student code:\n{state.get('student_code', '') or '(no code yet)'}\n\n"
+        f"Latest student answer:\n{state.get('student_answer', '') or '(none)'}\n\n"
         f"Conversation:\n{_history_text(state.get('conversation_history', []))}"
     )
     return {"final_question": _clean_question(base_llm_call(prompt, user_content))}
@@ -222,6 +246,12 @@ not repeat prior questions, and match the hint level. Do not output chain-of-tho
         if item.get("role") == "tutor"
     ]
     if _is_repeated_question(question, previous_questions):
+        failed_rules.append("repeated")
+    candidate_intent = _question_intent(question)
+    if candidate_intent and any(
+        _question_intent(previous) == candidate_intent
+        for previous in previous_questions[-2:]
+    ):
         failed_rules.append("repeated")
     if "```" in question or "the correct solution is" in lower_question:
         failed_rules.append("reveals_answer")
@@ -299,6 +329,11 @@ def safe_fallback_question_node(state: Agent2State) -> Dict[str, str]:
             "What part of your plan are you translating into code right now?",
             "What do you expect the next part of your code to accomplish?",
             "Which step are you trying to express in the program at the moment?",
+        ],
+        "reflection_learning": [
+            "What is one idea from this solution that you could reuse in a similar problem?",
+            "Why did your final approach work for this problem?",
+            "What would you do differently if you solved a similar problem again?",
         ],
         "syntax_error": [
             "What Python syntax rule might the interpreter be rejecting here?",

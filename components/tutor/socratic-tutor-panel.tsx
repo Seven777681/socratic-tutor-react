@@ -18,25 +18,23 @@ import { TutorHeader } from "@/components/tutor/tutor-header";
 import { useTutorConversation } from "@/hooks/use-tutor-conversation";
 
 function getGuidanceStage({
-  currentCode,
-  starterCode,
   latestRunResult,
   planningStatus,
 }: {
-  currentCode: string;
-  starterCode: string;
   latestRunResult?: CodeRunResult;
   planningStatus: string;
 }): GuidanceStage {
+  // Planning is a hard pedagogical gate. Restored editor drafts, whitespace,
+  // or accidental code edits must not move the tutor into coding guidance.
+  if (planningStatus !== "ready") {
+    return "plan";
+  }
+
   if (latestRunResult) {
     return latestRunResult.status === "success" ? "reflect" : "debug";
   }
 
-  if (planningStatus === "ready" || currentCode.trim() !== starterCode.trim()) {
-    return "code";
-  }
-
-  return "plan";
+  return "code";
 }
 
 export function SocraticTutorPanel({
@@ -59,8 +57,6 @@ export function SocraticTutorPanel({
   const [isGuidelinesOpen, setIsGuidelinesOpen] = useState(false);
   const [isClearOpen, setIsClearOpen] = useState(false);
   const stage = getGuidanceStage({
-    currentCode,
-    starterCode: task.starterCode,
     latestRunResult,
     planningStatus: learningContext.planningStatus,
   });

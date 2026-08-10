@@ -3,6 +3,7 @@ node_modules
 dev-server.log
 dev-server.err
 next-dev.log
+dev-server-current.*.log
 
 # Python backend
 socratic_backend/.venv

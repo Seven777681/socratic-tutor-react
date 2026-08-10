@@ -1,5 +1,6 @@
 from graph_state import TutorState
 from agent_services import (
+    evaluate_tutor_answer,
     run_agent1_personalized,
     run_agent3_diagnosis,
     run_agent4_monitor,
@@ -97,6 +98,31 @@ def code_analysis_agent(state: TutorState) -> TutorState:
     return state
 
 
+def answer_evaluation_agent(state: TutorState) -> TutorState:
+    latest_answer = state.get("student_answer", "") or ""
+    if not latest_answer.strip():
+        return state
+
+    learner_state = evaluate_tutor_answer(
+        problem=state.get("problem_content", ""),
+        code=state.get("student_code", ""),
+        stage=state.get("stage", "code"),
+        latest_question=state.get("latest_tutor_question", ""),
+        latest_answer=latest_answer,
+        previous_learner_state=state.get("learner_state", {}),
+    )
+    state["learner_state"] = learner_state
+    diagnosis = learner_state.get("latestAnswer", {})
+    state["misconception"] = diagnosis.get("misconception", "")
+    _append_trace(
+        state,
+        "Answer Evaluator",
+        "Learner answer evaluation",
+        f"quality={diagnosis.get('quality', 'uncertain')}, focus_resolved={diagnosis.get('focusResolved', False)}",
+    )
+    return state
+
+
 def monitor_agent(state: TutorState) -> TutorState:
     chat_history = "\n".join(
         f"{message.get('role', 'unknown')}: {message.get('content', '')}"
@@ -156,6 +182,9 @@ def socratic_agent(state: TutorState) -> TutorState:
         learner_state["currentFocus"] = "coding_progress"
         learner_state["attemptsOnFocus"] = 0
         state["learner_state"] = learner_state
+    elif state.get("stage") == "reflect":
+        learner_state["currentFocus"] = "reflection_learning"
+        state["learner_state"] = learner_state
 
     result = agent2_graph.invoke({
         "problem": state.get("problem_content", ""),
@@ -167,12 +196,19 @@ def socratic_agent(state: TutorState) -> TutorState:
         "student_state": state.get("student_state", "beginner"),
         "hint_level": state.get("hint_level", 0),
         "learner_state": learner_state,
+        "student_answer": state.get("student_answer", ""),
     })
     state["pedagogical_action"] = result.get("action", "ASK_METACOGNITIVE")
     state["final_question"] = result.get("final_question", "")
     state["question_validation"] = result.get("validation", {})
     state["tutor_message"] = state["final_question"]
-    state["question_type"] = "debugging" if state.get("stage") == "debug" else "understanding"
+    state["question_type"] = (
+        "debugging"
+        if state.get("stage") == "debug"
+        else "reflection"
+        if state.get("stage") == "reflect"
+        else "understanding"
+    )
     _append_trace(
         state,
         "Agent 2",

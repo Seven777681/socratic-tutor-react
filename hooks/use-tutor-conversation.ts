@@ -196,6 +196,17 @@ export function useTutorConversation({
       setErrorMessage("");
 
       try {
+        const requestConversation = [...conversation.messages];
+        if (
+          studentMessage.trim() &&
+          !(
+            requestConversation.at(-1)?.role === "student" &&
+            requestConversation.at(-1)?.content.trim() === studentMessage.trim()
+          )
+        ) {
+          requestConversation.push(createStudentMessage(studentMessage.trim(), stage));
+        }
+
         const response = await getTutorResponse({
           taskId,
           taskTitle,
@@ -212,7 +223,7 @@ export function useTutorConversation({
           hintLevel: learningContext.hintLevel,
           stage,
           conversationId: conversation.id,
-          conversation: conversation.messages.filter((message) => message.role !== "system"),
+          conversation: requestConversation.filter((message) => message.role !== "system"),
           action,
           mode: INTERNAL_TUTOR_MODE,
         });
@@ -238,10 +249,12 @@ export function useTutorConversation({
           taskId,
           metadata: { stage, action },
         });
-      } catch {
+      } catch (error) {
         setStatus("ready");
         setErrorMessage(
-          "The tutor could not respond just now. Your message has been kept. Please try again.",
+          error instanceof Error
+            ? `${error.message} Your message has been kept. Please try again.`
+            : "The tutor could not respond just now. Your message has been kept. Please try again.",
         );
       }
     },

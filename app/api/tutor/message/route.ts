@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       const errorText = await backendResponse.text().catch(() => "");
       console.error("Socratic backend error:", backendResponse.status, errorText);
       return NextResponse.json(
-        { error: "Tutor backend request failed." },
+        { error: "The AI model service could not complete the tutor response." },
         { status: 502 },
       );
     }
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Failed to reach socratic backend:", error);
     return NextResponse.json(
-      { error: "Tutor backend is unreachable." },
+      { error: "The AI tutor backend is not running." },
       { status: 503 },
     );
   } finally {

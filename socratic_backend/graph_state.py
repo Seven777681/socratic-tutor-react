@@ -17,6 +17,7 @@ class TutorState(TypedDict, total=False):
     student_reflection: str
     messages: List[Dict[str, str]]
     learner_state: Dict[str, Any]
+    latest_tutor_question: str
 
     understanding_score: int
     missing_steps: List[str]

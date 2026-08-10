@@ -7,180 +7,76 @@
 > next dev
 
   ▲ Next.js 14.2.35
-  - Local:        http://localhost:3001
+  - Local:        http://localhost:3000
 
  ✓ Starting...
- ✓ Ready in 1279m � ○ Compiling / .. � ✓ Compiled / in 5.5s (460 modules)  ✓ Compiled in 320ms (234 modules) ✓ Compiled in 48ms (220 modules)
-  GET / 307 in 100ms
- ✓ Compiled /login in 434ms (552 modules)
- GET /login 200 in 1014ms
- GET / 307 in 92ms
- GET /login 200 in 64ms
- ✓ Compiled in 331ms (279 modules)
- ✓ Compiled in 230ms (279 modules)
- ✓ Compiled in 174ms (279 modules)
- ✓ Compiled in 151ms (279 modules)
- ✓ Compiled in 191ms (279 modules)
- ✓ Compiled in 164ms (279 modules)
- ✓ Compiled in 166ms (279 modules)
- ✓ Compiled in 119ms (279 modules)
- ✓ Compiled in 136ms (279 modules)
- ✓ Compiled in 148ms (279 modules)
- ✓ Compiled in 193ms (279 modules)
- ✓ Compiled in 130ms (279 modules)
- ✓ Compiled in 158ms (279 modules)
- ✓ Compiled in 134ms (279 modules)
- ✓ Compiled in 263ms (279 modules)
- ✓ Compiled in 155ms (279 modules)
- ✓ Compiled in 294ms (279 modules)
- ✓ Compiled in 176ms (279 modules)
- ✓ Compiled in 200ms (279 modules)
-94ms
- GET /login 200 in 47ms
- POST /api/tutor/message 502 in 1317ms
- ✓ Compiled in 317ms (795 modules)
- ✓ Compiled in 239ms (373 modules)
- ✓ Compiled in 167ms (781 modules)
- POST /api/tutor/message 200 in 7818ms
- POST /api/tutor/message 200 in 6494ms
- ✓ Compiled /api/code/run in 109ms (424 modules)
- POST /api/code/run 200 in 241ms
- POST /api/code/run 200 in 96ms
- ✓ Compiled in 319ms (765 modules)
- ✓ Compiled /api/code/run in 97ms (422 modules)
- POST /api/code/run 200 in 880ms
- GET /tasks/qb-find-maximum 200 in 76ms
- ✓ Compiled /api/tutor/message in 86ms (424 modules)
- POST /api/tutor/message 200 in 7309ms
- POST /api/code/run 200 in 103ms
- ✓ Compiled in 292ms (795 modules)
- GET /tasks/qb-find-maximum 200 in 93ms
- ✓ Compiled in 290ms (763 modules)
- ✓ Compiled /api/code/run in 79ms (421 modules)
- POST /api/code/run 200 in 727ms
- POST /api/code/run 200 in 100ms
- ✓ Compiled in 209ms (749 modules)
- GET /tasks/qb-find-maximum 200 in 681ms
- ✓ Compiled in 173ms (749 modules)
- ✓ Compiled /api/tutor/message in 83ms (421 modules)
- POST /api/tutor/message 200 in 3431ms
- ✓ Compiled /api/code/run in 83ms (423 modules)
- POST /api/code/run 200 in 208ms
- ✓ Compiled in 178ms (779 modules)
- GET /tasks/qb-find-maximum 200 in 133ms
- POST /api/code/run 200 in 103ms
- ✓ Compiled /api/tutor/message in 83ms (423 modules)
- POST /api/tutor/message 200 in 2850ms
- ✓ Compiled in 273ms (763 modules)
- ✓ Compiled in 258ms (763 modules)
- ✓ Compiled in 234ms (763 modules)
- ✓ Compiled in 230ms (763 modules)
- ✓ Compiled in 228ms (763 modules)
- ✓ Compiled /api/tutor/message in 180ms (421 modules)
- POST /api/tutor/message 200 in 7430ms
- ✓ Compiled /api/code/run in 88ms (423 modules)
- POST /api/code/run 200 in 221ms
- POST /api/tutor/message 200 in 3591ms
- POST /api/code/run 200 in 87ms
- ✓ Compiled in 182ms (372 modules)
- ✓ Compiled in 172ms (749 modules)
- ✓ Compiled in 225ms (763 modules)
- ✓ Compiled in 264ms (763 modules)
- ✓ Compiled in 168ms (749 modules)
- ✓ Compiled in 255ms (763 modules)
- ✓ Compiled /api/tutor/message in 127ms (421 modules)
- POST /api/tutor/message 200 in 3751ms
- GET /tasks/qb-find-maximum 200 in 93ms
- POST /api/tutor/message 200 in 7066ms
- ✓ Compiled /api/code/run in 102ms (423 modules)
- POST /api/code/run 200 in 246ms
- POST /api/tutor/message 200 in 2711ms
- GET /tasks/qb-find-maximum 200 in 125ms
- POST /api/tutor/message 200 in 9070ms
- GET /tasks/qb-find-maximum 200 in 55ms
- POST /api/tutor/message 200 in 10035ms
- POST /api/tutor/message 200 in 7377ms
- POST /api/tutor/message 200 in 11462ms
- POST /api/tutor/message 200 in 8266ms
- POST /api/tutor/message 200 in 10493ms
- ✓ Compiled in 270ms (763 modules)
- GET /tasks/qb-find-maximum 200 in 115ms
- ✓ Compiled /api/tutor/message in 84ms (421 modules)
- POST /api/tutor/message 200 in 9125ms
- POST /api/tutor/message 200 in 8307ms
- POST /api/tutor/message 200 in 10102ms
- POST /api/tutor/message 200 in 9330ms
- POST /api/tutor/message 200 in 9930ms
- POST /api/tutor/message 200 in 8959ms
- POST /api/tutor/message 200 in 12855ms
- POST /api/tutor/message 200 in 10690ms
- POST /api/tutor/message 200 in 9321ms
- ✓ Compiled in 252ms (372 modules)
- ✓ Compiled in 171ms (372 modules)
- ✓ Compiled in 186ms (749 modules)
- GET /tasks/qb-find-maximum 200 in 92ms
- ✓ Compiled /api/tutor/message in 107ms (421 modules)
- POST /api/tutor/message 200 in 10154ms
- POST /api/tutor/message 200 in 9510ms
- POST /api/tutor/message 200 in 5881ms
- POST /api/tutor/message 200 in 5416ms
- POST /api/tutor/message 200 in 9336ms
- POST /api/tutor/message 200 in 9022ms
- POST /api/tutor/message 200 in 9215ms
- POST /api/tutor/message 200 in 9683ms
- POST /api/tutor/message 200 in 9929ms
- POST /api/tutor/message 200 in 10053ms
- GET /tasks/qb-find-maximum 200 in 86ms
- POST /api/tutor/message 200 in 9477ms
- POST /api/tutor/message 200 in 5827ms
- POST /api/tutor/message 200 in 8921ms
- POST /api/tutor/message 200 in 9773ms
- GET /tasks/qb-find-maximum 200 in 73ms
- POST /api/tutor/message 200 in 6749ms
- POST /api/tutor/message 200 in 5898ms
- POST /api/tutor/message 200 in 9165ms
- POST /api/tutor/message 200 in 5744ms
- POST /api/tutor/message 200 in 5773ms
- POST /api/tutor/message 200 in 9842ms
- POST /api/tutor/message 200 in 1934ms
- POST /api/tutor/message 200 in 6669ms
- POST /api/tutor/message 200 in 8227ms
- POST /api/tutor/message 200 in 7156ms
- POST /api/tutor/message 200 in 8790ms
- POST /api/tutor/message 200 in 16367ms
- ✓ Compiled in 476ms (763 modules)
- ✓ Compiled in 200ms (749 modules)
- GET /tasks/qb-find-maximum 200 in 83ms
- ✓ Compiled /api/tutor/message in 91ms (421 modules)
- POST /api/tutor/message 200 in 7355ms
- POST /api/tutor/message 200 in 6552ms
- POST /api/tutor/message 200 in 7399ms
- POST /api/tutor/message 200 in 7092ms
- POST /api/tutor/message 200 in 9705ms
- GET /tasks/qb-find-maximum 200 in 84ms
- POST /api/tutor/message 200 in 2302ms
- POST /api/tutor/message 200 in 3712ms
- POST /api/tutor/message 200 in 6359ms
- ✓ Compiled /api/code/run in 101ms (421 modules)
- POST /api/code/run 200 in 235ms
- POST /api/code/run 200 in 105ms
- ✓ Compiled /api/tutor/message in 110ms (423 modules)
- POST /api/tutor/message 200 in 8222ms
- POST /api/tutor/message 200 in 8755ms
- POST /api/tutor/message 200 in 9642ms
- POST /api/code/run 200 in 109ms
- POST /api/tutor/message 200 in 10476ms
- POST /api/code/run 200 in 97ms
- ✓ Compiled in 291ms (763 modules)
- ✓ Compiled in 369ms (763 modules)
- ✓ Compiled /api/code/run in 75ms (421 modules)
+ ✓ Ready in 7.7s
+ ○ Compiling / ...
+ ✓ Compiled / in 11.2s (460 modules)
+ GET / 307 in 11606ms
+ ✓ Compiled in 336ms (234 modules)
+ ○ Compiling /login ...
+ ✓ Compiled /login in 3.2s (552 modules)
+ GET / 307 in 145ms
+ GET /login 200 in 71ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 549ms (598 modules)
+ ○ Compiling /tasks ...
+ ✓ Compiled /tasks in 543ms (622 modules)
+ ○ Compiling /tasks/[taskId] ...
+ ✓ Compiled /tasks/[taskId] in 850ms (749 modules)
+ ✓ Compiled in 456ms (763 modules)
+ GET /tasks/qb-find-maximum 200 in 107ms
+ ✓ Compiled /_not-found in 451ms (766 modules)
+ GET /_next/static/css/app/layout.css?v=1786270420188 404 in 535ms
+ GET /_next/static/chunks/app/tasks/%5BtaskId%5D/page.js 404 in 521ms
+ GET /_next/static/chunks/webpack.js?v=1786270420188 404 in 535ms
+ GET /_next/static/chunks/main-app.js?v=1786270420188 404 in 520ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 520ms
  ○ Compiling /_error ...
- ✓ Compiled /_error in 1026ms (1020 modules)
- ✓ Compiled in 108ms (544 modules)
- POST /api/code/run 500 in 1764ms
- ✓ Compiled /api/tutor/message in 128ms (464 modules)
- POST /api/code/run 500 in 27ms
- POST /api/tutor/message 200 in 10043ms
- POST /api/tutor/message 200 in 9689ms
- POST /api/code/run 500 in 34ms
- POST /api/tutor/message 200 in 8151ms
+ ✓ Compiled /_error in 1262ms (976 modules)
+ GET /tasks/qb-find-maximum 500 in 1792ms
+ ✓ Compiled / in 130ms (440 modules)
+ GET / 307 in 395ms
+ GET /login 500 in 20ms
+ GET / 307 in 58ms
+ GET /login 500 in 19ms
+ GET / 307 in 92ms
+ GET /login 500 in 14ms
+ GET / 307 in 108ms
+ GET /login 500 in 12ms
+ GET / 307 in 109ms
+ GET /login 500 in 12ms
+ GET / 307 in 110ms
+ GET /login 500 in 13ms
+ GET / 307 in 96ms
+ GET /login 500 in 12ms
+ GET / 307 in 108ms
+ GET /login 500 in 12ms
+ GET / 307 in 93ms
+ GET /login 500 in 12ms
+ GET / 307 in 125ms
+ GET /login 500 in 12ms
+ GET / 307 in 109ms
+ GET /login 500 in 13ms
+ GET / 307 in 109ms
+ GET /login 500 in 12ms
+ GET / 307 in 125ms
+ GET /login 500 in 11ms
+ GET / 307 in 118ms
+ GET /login 500 in 11ms
+ GET / 307 in 110ms
+ GET /login 500 in 12ms
+ GET / 307 in 123ms
+ GET /login 500 in 12ms
+ GET / 307 in 109ms
+ GET /login 500 in 13ms
+ GET / 307 in 107ms
+ GET /login 500 in 12ms
+ GET / 307 in 108ms
+ GET /login 500 in 11ms
+ GET / 307 in 124ms
+ GET /login 500 in 11ms
+ GET / 307 in 123ms
+ GET /login 500 in 13ms
+[?25h

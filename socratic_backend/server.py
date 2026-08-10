@@ -3,7 +3,7 @@ FastAPI HTTP layer exposing the Socratic tutor agents to the Next.js frontend.
 
 Run locally with:
     cd socratic_backend
-    uvicorn server:app --reload --port 8000
+    uvicorn server:app --reload --port 8001
 
 The Next.js API route (app/api/tutor/message/route.ts) proxies requests to
 this service. Request/response field names intentionally mirror
@@ -180,6 +180,14 @@ def get_tutor_content(req: TutorRequest):
         ),
         {},
     )
+    latest_tutor_question = next(
+        (
+            message.content
+            for message in reversed(req.conversation)
+            if message.role == "tutor"
+        ),
+        "",
+    )
     initial_state = {
         "problem_content": problem,
         "action": req.action,
@@ -206,6 +214,7 @@ def get_tutor_content(req: TutorRequest):
         "student_reflection": req.studentMessage,
         "messages": [message.model_dump() for message in req.conversation],
         "learner_state": previous_learner_state,
+        "latest_tutor_question": latest_tutor_question,
         "hint_level": req.hintLevel or 0,
         "confusion_level": 0,
         "is_stuck": False,
