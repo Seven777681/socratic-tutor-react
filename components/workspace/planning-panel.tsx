@@ -12,7 +12,7 @@ import {
   TriangleAlertIcon,
 } from "@/components/dashboard/dashboard-icons";
 
-type PlanningErrors = Partial<Record<"approach" | "steps", string>>;
+type PlanningErrors = Partial<Record<"approach" | "steps" | "confidence", string>>;
 
 export function PlanningPanel({
   value,
@@ -160,6 +160,44 @@ export function PlanningPanel({
             </p>
           ) : null}
         </div>
+
+        <fieldset className="grid gap-2">
+          <legend className="text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500">
+            3. My Confidence
+          </legend>
+          <p className="text-sm font-semibold text-slate-600">
+            How confident are you that your plan will solve the problem?
+          </p>
+          <div className="flex flex-wrap gap-2" aria-describedby={errors.confidence ? "planning-confidence-error" : undefined}>
+            {[1, 2, 3, 4, 5].map((rating) => {
+              const selected = value.confidenceRating === rating;
+              return (
+                <button
+                  key={rating}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => onChange({ ...value, confidenceRating: rating })}
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl border text-sm font-extrabold transition focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 ${
+                    selected
+                      ? "border-[#6255f6] bg-[#6255f6] text-white"
+                      : "border-[#d9dce8] bg-white text-slate-600 hover:border-[#6255f6] hover:text-[#6255f6]"
+                  }`}
+                >
+                  {rating}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex max-w-[248px] justify-between text-xs font-bold text-slate-400">
+            <span>Not confident</span>
+            <span>Very confident</span>
+          </div>
+          {errors.confidence ? (
+            <p id="planning-confidence-error" className="text-xs font-bold text-rose-600">
+              {errors.confidence}
+            </p>
+          ) : null}
+        </fieldset>
       </div>
 
       {review ? (

@@ -12,22 +12,56 @@ import {
   type ProblemUnderstandingOutput,
   type SocraticResponseOutput,
 } from "@/lib/server/tutor-agent-schemas";
+import {
+  analyzeTutorLearningSignals,
+  calculateNextHintLevel,
+} from "@/lib/server/tutor-learning-signals";
+import {
+  calculateConfidenceAssessment,
+  type ConfidenceAssessment,
+} from "@/lib/server/tutor-understanding-assessment";
+import {
+  createSafeStrategyQuestion,
+  selectTutorQuestionStrategy,
+} from "@/lib/server/tutor-question-strategy";
+import { evaluateTutorResponse } from "@/lib/server/tutor-response-guard";
+import {
+  buildErrorPatternHistory,
+  collectRecentErrorPatterns,
+} from "@/lib/server/tutor-error-history";
+import { normalizeCodeAnalysisEvidence } from "@/lib/server/tutor-code-evidence";
 import type {
   TutorAgentTrace,
+  TutorCodeAnalysis,
+  TutorErrorLayer,
+  TutorErrorPatternHistory,
+  TutorQuestionStrategy,
   TutorQuestionType,
   TutorRequest,
+  TutorUnderstandingAssessment,
 } from "@/types/tutor";
 
 const TutorState = Annotation.Root({
   request: Annotation<TutorRequest>(),
   understandingScore: Annotation<number>(),
+  understandingDimensions: Annotation<ProblemUnderstandingOutput["dimensions"]>(),
+  misconceptions: Annotation<ProblemUnderstandingOutput["misconceptions"]>(),
+  confidenceAssessment: Annotation<ConfidenceAssessment>(),
   planStatus: Annotation<"missing" | "needs_revision" | "ready">(),
   missingPlanElement: Annotation<string>(),
   codeHasError: Annotation<boolean>(),
   codeErrorType: Annotation<string>(),
+  errorLayer: Annotation<TutorErrorLayer>(),
+  likelyErrorPattern: Annotation<CodeAnalysisOutput["likelyPattern"]>(),
+  suspectedLineNumbers: Annotation<number[]>(),
+  counterexample: Annotation<CodeAnalysisOutput["counterexample"]>(),
+  executionTrace: Annotation<CodeAnalysisOutput["executionTrace"]>(),
+  errorPatternHistory: Annotation<TutorErrorPatternHistory>(),
   predictionMismatch: Annotation<boolean>(),
   analysisSummary: Annotation<string>(),
   investigationFocus: Annotation<string>(),
+  codeAnalysisSummary: Annotation<string>(),
+  codeInvestigationFocus: Annotation<string>(),
   confusionLevel: Annotation<number>(),
   isStuck: Annotation<boolean>(),
   hintLevel: Annotation<number>(),
@@ -36,6 +70,7 @@ const TutorState = Annotation.Root({
   taskFinished: Annotation<boolean>(),
   finalContent: Annotation<string>(),
   questionType: Annotation<TutorQuestionType>(),
+  questionStrategy: Annotation<TutorQuestionStrategy>(),
   trace: Annotation<TutorAgentTrace[]>({
     reducer: (current, update) => [...current, ...update],
     default: () => [],
@@ -47,8 +82,11 @@ type TutorGraphState = typeof TutorState.State;
 export interface MultiAgentTutorResult {
   content: string;
   questionType: TutorQuestionType;
+  questionStrategy?: TutorQuestionStrategy;
   hintLevel: number;
   trace: TutorAgentTrace[];
+  understandingAssessment?: TutorUnderstandingAssessment;
+  codeAnalysis?: TutorCodeAnalysis;
 }
 
 const hintRules = [
@@ -77,6 +115,8 @@ function taskContext(request: TutorRequest) {
     currentCode: request.currentCode.slice(0, 6_000),
     prediction: request.latestPrediction ?? "",
     runResult: request.latestRunResult ?? null,
+    recentErrorPatterns: collectRecentErrorPatterns(request),
+    learningSignals: analyzeTutorLearningSignals(request),
     recentConversation: recentConversation(request),
   };
 }
@@ -91,33 +131,35 @@ function inferStoredHintLevel(request: TutorRequest) {
   );
 }
 
-function hasRepeatedStudentMessage(request: TutorRequest) {
-  const studentMessages = request.conversation
-    .filter((message) => message.role === "student")
-    .slice(-3)
-    .map((message) => message.content.trim().toLowerCase());
-  if (request.studentMessage.trim()) {
-    studentMessages.push(request.studentMessage.trim().toLowerCase());
-  }
-  return studentMessages.length >= 2 && new Set(studentMessages.slice(-2)).size === 1;
-}
-
 async function problemUnderstandingAgent(state: TutorGraphState) {
   const llm = createLlmClient();
   const output = await llm.generateJson<ProblemUnderstandingOutput>({
     schema: problemUnderstandingSchema,
     responseSchemaName: "problem_understanding",
     systemPrompt:
-      "You are the Problem Understanding Agent in a Socratic programming tutor. Evaluate whether the student understands the goal, inputs, outputs, and ordered approach. Do not solve the task and do not write code. Scores must be evidence-based: 0 means no demonstrated understanding and 10 means a complete, accurate plan.",
+      "You are the Problem Understanding Agent in a Socratic programming tutor. Evaluate the student's demonstrated understanding across five separate dimensions: goal, input, output, constraints, and step order. Detect only misconceptions supported by the student's own plan or messages and include a short evidence statement for each one. An omitted idea is not automatically a misconception. Do not solve the task and do not write code. Scores must be evidence-based: 0 means no demonstrated understanding and 10 means complete, accurate understanding.",
     userPrompt: JSON.stringify(taskContext(state.request)),
   });
+  const confidenceAssessment = calculateConfidenceAssessment({
+    confidenceRating: state.request.planningData?.confidenceRating,
+    dimensions: output.dimensions,
+  });
+  const misconceptionSummary = output.misconceptions.length
+    ? ` Misconceptions: ${output.misconceptions.map((item) => item.type).join(", ")}.`
+    : " No evidenced misconception was detected.";
   return {
-    understandingScore: output.understandingScore,
+    understandingScore: confidenceAssessment.assessedUnderstanding,
+    understandingDimensions: output.dimensions,
+    misconceptions: output.misconceptions,
+    confidenceAssessment,
     planStatus: output.planStatus,
     missingPlanElement: output.missingPlanElement,
     analysisSummary: output.summary,
     investigationFocus: output.nextQuestionFocus,
-    trace: [{ agent: "problem_understanding" as const, summary: output.summary }],
+    trace: [{
+      agent: "problem_understanding" as const,
+      summary: `${output.summary} Confidence calibration: ${confidenceAssessment.calibration}.${misconceptionSummary}`,
+    }],
   };
 }
 
@@ -127,25 +169,47 @@ async function codeAnalysisAgent(state: TutorGraphState) {
     schema: codeAnalysisSchema,
     responseSchemaName: "code_analysis",
     systemPrompt:
-      "You are the Code Analysis Agent. Analyze only the supplied code, prediction, and trusted run/test evidence. Classify the likely error and identify the first contradiction worth investigating. Do not execute code, invent test results, repair the code, or reveal a solution.",
+      "You are the Code Analysis Agent. Analyze only the supplied code, student prediction, and trusted run/test evidence. Classify the error layer: syntax, implementation, algorithm, task_misunderstanding, or testing; use none when no error is supported. Identify a likely reusable error pattern. When useful, propose the smallest counterexample input, but label it static_inference unless that exact input appears in trusted test evidence. Build at most 8 concise trace steps. Never present inferred variable values as actual execution: label each step run_evidence, static_inference, or student_prediction. If evidence is insufficient, return null counterexample or an empty trace. Do not execute code, invent test results, repair the code, or reveal a solution.",
     userPrompt: JSON.stringify(taskContext(state.request)),
   });
+  const errorPatternHistory = buildErrorPatternHistory({
+    request: state.request,
+    currentPattern: output.likelyPattern,
+  });
+  const normalizedEvidence = normalizeCodeAnalysisEvidence({
+    request: state.request,
+    counterexample: output.counterexample,
+    executionTrace: output.executionTrace,
+  });
+  const repeatedSummary = errorPatternHistory.isRepeated
+    ? ` Repeated ${errorPatternHistory.repeatedPattern} pattern (${errorPatternHistory.occurrenceCount} occurrences).`
+    : "";
   return {
     codeHasError: output.hasError,
     codeErrorType: output.errorType,
+    errorLayer: output.errorLayer,
+    likelyErrorPattern: output.likelyPattern,
+    suspectedLineNumbers: output.suspectedLineNumbers,
+    counterexample: normalizedEvidence.counterexample,
+    executionTrace: normalizedEvidence.executionTrace,
+    errorPatternHistory,
     predictionMismatch: output.predictionMismatch,
     analysisSummary: output.summary,
     investigationFocus: output.investigationFocus,
+    codeAnalysisSummary: output.summary,
+    codeInvestigationFocus: output.investigationFocus,
     taskFinished: state.request.latestRunResult?.status === "success" && !output.hasError,
-    trace: [{ agent: "code_analysis" as const, summary: output.summary }],
+    trace: [{
+      agent: "code_analysis" as const,
+      summary: `${output.summary} Error layer: ${output.errorLayer}.${repeatedSummary}`,
+    }],
   };
 }
 
 async function metacognitiveAgent(state: TutorGraphState) {
   const request = state.request;
   const currentHintLevel = inferStoredHintLevel(request);
-  const deterministicStuck =
-    (request.idleSeconds ?? 0) >= 60 || hasRepeatedStudentMessage(request);
+  const learningSignals = analyzeTutorLearningSignals(request);
   const llm = createLlmClient();
   const output = await llm.generateJson<MetacognitiveOutput>({
     schema: metacognitiveSchema,
@@ -154,72 +218,153 @@ async function metacognitiveAgent(state: TutorGraphState) {
       "You are the Metacognitive Monitoring Agent. Judge struggle from the supplied evidence: uncertainty, repeated attempts, repeated errors, prediction mismatch, or at least 60 seconds of inactivity. Do not diagnose personal traits. Recommend the smallest useful support increase and one reflection focus. Do not answer the programming task.",
     userPrompt: JSON.stringify({
       context: taskContext(request),
-      deterministicSignals: {
-        idleSeconds: request.idleSeconds ?? 0,
-        repeatedStudentMessage: hasRepeatedStudentMessage(request),
+      learningSignals: {
+        ...learningSignals,
         codeHasError: state.codeHasError,
         codeErrorType: state.codeErrorType,
         predictionMismatch: state.predictionMismatch,
+        errorLayer: state.errorLayer,
+        errorPatternHistory: state.errorPatternHistory,
       },
       currentHintLevel,
     }),
   });
   const shouldIncrease =
-    request.action === "smaller_hint" ||
-    deterministicStuck ||
+    learningSignals.shouldEscalateHint ||
     output.shouldIncreaseHint;
-  const hintLevel = Math.min(
-    3,
-    Math.max(
-      currentHintLevel,
-      output.confusionLevel,
-      shouldIncrease ? currentHintLevel + 1 : currentHintLevel,
-    ),
-  );
+  const hintLevel = calculateNextHintLevel({
+    currentHintLevel,
+    confusionLevel: output.confusionLevel,
+    shouldIncrease,
+  });
+  const evidenceSummary = learningSignals.reasons.length
+    ? ` Evidence: ${learningSignals.reasons.join("; ")}.`
+    : "";
   return {
     confusionLevel: output.confusionLevel,
-    isStuck: deterministicStuck || output.isStuck,
+    isStuck: learningSignals.isLikelyStuck || output.isStuck,
     hintLevel,
     metacognitiveReason: output.reason,
     reflectionFocus: output.reflectionFocus,
-    trace: [{ agent: "metacognitive_monitor" as const, summary: output.reason }],
+    trace: [{
+      agent: "metacognitive_monitor" as const,
+      summary: `${output.reason}${evidenceSummary}`,
+    }],
   };
 }
 
 async function socraticQuestioningAgent(state: TutorGraphState) {
   const llm = createLlmClient();
-  const output = await llm.generateJson<SocraticResponseOutput>({
+  const questionStrategy = selectTutorQuestionStrategy({
+    request: state.request,
+    codeHasError: state.codeHasError,
+    predictionMismatch: state.predictionMismatch,
+  });
+  const recentTutorQuestions = state.request.conversation
+    .filter((message) => message.role === "tutor")
+    .slice(-5)
+    .map((message) => message.content);
+  const generationContext = {
+    requiredQuestionStrategy: questionStrategy,
+    context: taskContext(state.request),
+    understanding: {
+      score: state.understandingScore,
+      dimensions: state.understandingDimensions,
+      misconceptions: state.misconceptions,
+      confidenceAssessment: state.confidenceAssessment,
+      planStatus: state.planStatus,
+      missingPlanElement: state.missingPlanElement,
+    },
+    codeAnalysis: {
+      hasError: state.codeHasError,
+      errorType: state.codeErrorType,
+      errorLayer: state.errorLayer,
+      likelyPattern: state.likelyErrorPattern,
+      suspectedLineNumbers: state.suspectedLineNumbers,
+      counterexample: state.counterexample,
+      executionTrace: state.executionTrace,
+      errorPatternHistory: state.errorPatternHistory,
+      predictionMismatch: state.predictionMismatch,
+      summary: state.codeAnalysisSummary,
+      investigationFocus: state.codeInvestigationFocus,
+    },
+    metacognition: {
+      confusionLevel: state.confusionLevel,
+      isStuck: state.isStuck,
+      reflectionFocus: state.reflectionFocus,
+    },
+    hintLevel: state.hintLevel,
+    recentTutorQuestions,
+  };
+  const systemPrompt = `You are the student-facing Socratic Questioning Agent. Use exactly the required question strategy and produce exactly one warm, concise, actionable primary question in the student's language when clear. optionalPrompt may contain one short supportive statement but no additional question; use an empty string when it is unnecessary. Never provide the full answer or task-specific solution code. Follow exactly this support boundary: ${hintRules[state.hintLevel]}. Set supportType truthfully to metacognitive, concept, syntax_direction, or pseudocode. Treat confidence as self-report, never as proof of correctness. If confidence is higher than demonstrated understanding, ask for evidence around the weakest dimension without labeling the student as overconfident. If confidence is lower, briefly acknowledge a demonstrated strength before the next focused question.`;
+
+  let output = await llm.generateJson<SocraticResponseOutput>({
     schema: socraticResponseSchema,
     responseSchemaName: "socratic_questioning",
-    systemPrompt: `You are the student-facing Socratic Questioning Agent. Produce one warm, concise, actionable question in the student's language when clear. Never provide the full answer or task-specific solution code. Follow exactly this support boundary: ${hintRules[state.hintLevel]}. Match the current learning stage and ask the student to explain or test one next idea.`,
-    userPrompt: JSON.stringify({
-      context: taskContext(state.request),
-      understanding: {
-        score: state.understandingScore,
-        planStatus: state.planStatus,
-        missingPlanElement: state.missingPlanElement,
-      },
-      codeAnalysis: {
-        hasError: state.codeHasError,
-        errorType: state.codeErrorType,
-        predictionMismatch: state.predictionMismatch,
-        summary: state.analysisSummary,
-        investigationFocus: state.investigationFocus,
-      },
-      metacognition: {
-        confusionLevel: state.confusionLevel,
-        isStuck: state.isStuck,
-        reflectionFocus: state.reflectionFocus,
-      },
-      hintLevel: state.hintLevel,
-    }),
+    systemPrompt,
+    userPrompt: JSON.stringify(generationContext),
   });
+  let guard = evaluateTutorResponse({
+    candidate: output,
+    hintLevel: state.hintLevel,
+    recentTutorQuestions,
+  });
+  let guardOutcome = "passed";
+
+  if (!guard.safe) {
+    const firstViolations = guard.violations;
+    output = await llm.generateJson<SocraticResponseOutput>({
+      schema: socraticResponseSchema,
+      responseSchemaName: "socratic_questioning_revision",
+      systemPrompt,
+      userPrompt: JSON.stringify({
+        ...generationContext,
+        rejectedCandidate: output,
+        guardViolations: firstViolations,
+        revisionInstruction:
+          "Rewrite the response once and remove every listed violation. Do not defend the rejected response.",
+      }),
+    });
+    guard = evaluateTutorResponse({
+      candidate: output,
+      hintLevel: state.hintLevel,
+      recentTutorQuestions,
+    });
+    guardOutcome = "rewritten";
+  }
+
+  if (!guard.safe) {
+    output = {
+      primaryQuestion: createSafeStrategyQuestion(
+        questionStrategy,
+        `${state.request.studentMessage} ${recentConversation(state.request).map((message) => message.content).join(" ")}`,
+      ),
+      optionalPrompt: "",
+      supportType: "metacognitive",
+      questionType:
+        questionStrategy === "comparison"
+          ? "strategy_comparison"
+          : questionStrategy === "transfer"
+            ? "transfer"
+            : questionStrategy === "counterexample" || questionStrategy === "trace_execution"
+              ? "debugging"
+              : questionStrategy === "decomposition"
+                ? "decomposition"
+                : "reflection",
+    };
+    guardOutcome = "local_safe_fallback";
+  }
+
+  const finalContent = output.optionalPrompt.trim()
+    ? `${output.primaryQuestion}\n\n${output.optionalPrompt}`
+    : output.primaryQuestion;
   return {
-    finalContent: output.content,
+    finalContent,
     questionType: output.questionType,
+    questionStrategy,
     trace: [{
       agent: "socratic_questioning" as const,
-      summary: `Generated a Level ${state.hintLevel} guiding question.`,
+      summary: `Used ${questionStrategy} at Hint Level ${state.hintLevel}; response guard ${guardOutcome}.`,
     }],
   };
 }
@@ -235,6 +380,7 @@ async function assessmentAgent(state: TutorGraphState) {
       context: taskContext(state.request),
       priorAnalysis: state.analysisSummary,
       metacognitiveReason: state.metacognitiveReason,
+      currentErrorPatternHistory: state.errorPatternHistory,
     }),
   });
   const summary = [
@@ -282,6 +428,16 @@ function routeAfterMetacognition(state: TutorGraphState) {
   return state.taskFinished ? "assessment_agent" : "socratic_questioning_agent";
 }
 
+export function routeAfterCodeAnalysisLayer(errorLayer: TutorErrorLayer) {
+  return errorLayer === "task_misunderstanding"
+    ? "problem_understanding_agent"
+    : "metacognitive_agent";
+}
+
+function routeAfterCodeAnalysis(state: TutorGraphState) {
+  return routeAfterCodeAnalysisLayer(state.errorLayer);
+}
+
 const tutorGraph = new StateGraph(TutorState)
   .addNode("problem_understanding_agent", problemUnderstandingAgent)
   .addNode("code_analysis_agent", codeAnalysisAgent)
@@ -290,7 +446,7 @@ const tutorGraph = new StateGraph(TutorState)
   .addNode("assessment_agent", assessmentAgent)
   .addConditionalEdges(START, routeTutorStart)
   .addEdge("problem_understanding_agent", "metacognitive_agent")
-  .addEdge("code_analysis_agent", "metacognitive_agent")
+  .addConditionalEdges("code_analysis_agent", routeAfterCodeAnalysis)
   .addConditionalEdges("metacognitive_agent", routeAfterMetacognition)
   .addEdge("socratic_questioning_agent", END)
   .addEdge("assessment_agent", END)
@@ -305,13 +461,40 @@ export async function runTutorMultiAgent(
   const result = await tutorGraph.invoke({
     request,
     understandingScore: 0,
+    understandingDimensions: {
+      goal: 0,
+      input: 0,
+      output: 0,
+      constraints: 0,
+      stepOrder: 0,
+    },
+    misconceptions: [],
+    confidenceAssessment: {
+      studentConfidence: request.planningData?.confidenceRating ?? 0,
+      normalizedConfidence: null,
+      assessedUnderstanding: 0,
+      gap: null,
+      calibration: "not_provided",
+    },
     planStatus: "missing",
     missingPlanElement: "",
     codeHasError: false,
     codeErrorType: "none",
+    errorLayer: "none",
+    likelyErrorPattern: "none",
+    suspectedLineNumbers: [],
+    counterexample: null,
+    executionTrace: [],
+    errorPatternHistory: {
+      repeatedPattern: "none",
+      occurrenceCount: 0,
+      isRepeated: false,
+    },
     predictionMismatch: false,
     analysisSummary: "",
     investigationFocus: "",
+    codeAnalysisSummary: "",
+    codeInvestigationFocus: "",
     confusionLevel: 0,
     isStuck: false,
     hintLevel: inferStoredHintLevel(request),
@@ -320,6 +503,7 @@ export async function runTutorMultiAgent(
     taskFinished: request.latestRunResult?.status === "success",
     finalContent: "",
     questionType: "understanding",
+    questionStrategy: "explain_reasoning",
     trace: [],
   });
   if (!result.finalContent.trim()) {
@@ -328,7 +512,32 @@ export async function runTutorMultiAgent(
   return {
     content: result.finalContent,
     questionType: result.questionType,
+    questionStrategy: result.questionStrategy,
     hintLevel: result.hintLevel,
     trace: result.trace,
+    understandingAssessment: result.trace.some(
+      (entry) => entry.agent === "problem_understanding",
+    )
+      ? {
+          dimensions: result.understandingDimensions,
+          misconceptions: result.misconceptions,
+          confidence: result.confidenceAssessment,
+        }
+      : undefined,
+    codeAnalysis: result.trace.some((entry) => entry.agent === "code_analysis")
+      ? {
+          hasError: result.codeHasError,
+          errorType: result.codeErrorType,
+          errorLayer: result.errorLayer,
+          likelyPattern: result.likelyErrorPattern,
+          suspectedLineNumbers: result.suspectedLineNumbers,
+          counterexample: result.counterexample,
+          executionTrace: result.executionTrace,
+          patternHistory: result.errorPatternHistory,
+          predictionMismatch: result.predictionMismatch,
+          summary: result.codeAnalysisSummary,
+          investigationFocus: result.codeInvestigationFocus,
+        }
+      : undefined,
   };
 }

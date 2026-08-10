@@ -10,7 +10,24 @@ export const tutorQuestionTypeSchema = z.enum([
 ]);
 
 export const problemUnderstandingSchema = z.object({
-  understandingScore: z.number().int().min(0).max(10),
+  dimensions: z.object({
+    goal: z.number().int().min(0).max(10),
+    input: z.number().int().min(0).max(10),
+    output: z.number().int().min(0).max(10),
+    constraints: z.number().int().min(0).max(10),
+    stepOrder: z.number().int().min(0).max(10),
+  }),
+  misconceptions: z.array(z.object({
+    type: z.enum([
+      "task_goal",
+      "input",
+      "output",
+      "constraint",
+      "step_order",
+      "algorithm",
+    ]),
+    evidence: z.string().min(1),
+  })),
   planStatus: z.enum(["missing", "needs_revision", "ready"]),
   missingPlanElement: z.string(),
   summary: z.string(),
@@ -20,6 +37,48 @@ export const problemUnderstandingSchema = z.object({
 export const codeAnalysisSchema = z.object({
   hasError: z.boolean(),
   errorType: z.enum(["none", "syntax", "runtime", "logic", "calculation", "loop", "timeout"]),
+  errorLayer: z.enum([
+    "none",
+    "syntax",
+    "implementation",
+    "algorithm",
+    "task_misunderstanding",
+    "testing",
+  ]),
+  likelyPattern: z.enum([
+    "none",
+    "off_by_one",
+    "wrong_initialization",
+    "incorrect_condition",
+    "state_update",
+    "input_parsing",
+    "output_format",
+    "type_mismatch",
+    "missing_case",
+    "infinite_loop",
+    "unknown",
+  ]),
+  suspectedLineNumbers: z.array(z.number().int().positive()),
+  counterexample: z.object({
+    input: z.string(),
+    expectedBehavior: z.string(),
+    investigationReason: z.string(),
+    evidence: z.enum(["run_evidence", "static_inference"]),
+  }).nullable(),
+  executionTrace: z.array(z.object({
+    step: z.number().int().positive(),
+    lineNumber: z.number().int().positive().nullable(),
+    variables: z.array(z.object({
+      name: z.string(),
+      value: z.string(),
+    })),
+    observation: z.string(),
+    evidence: z.enum([
+      "run_evidence",
+      "static_inference",
+      "student_prediction",
+    ]),
+  })).max(8),
   predictionMismatch: z.boolean(),
   summary: z.string(),
   investigationFocus: z.string(),
@@ -34,7 +93,14 @@ export const metacognitiveSchema = z.object({
 });
 
 export const socraticResponseSchema = z.object({
-  content: z.string().min(1),
+  primaryQuestion: z.string().min(1).max(240),
+  optionalPrompt: z.string().max(160),
+  supportType: z.enum([
+    "metacognitive",
+    "concept",
+    "syntax_direction",
+    "pseudocode",
+  ]),
   questionType: tutorQuestionTypeSchema,
 });
 

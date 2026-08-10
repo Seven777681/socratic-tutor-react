@@ -15,6 +15,15 @@ export type TutorQuestionType =
   | "transfer"
   | "strategy_comparison";
 
+export type TutorQuestionStrategy =
+  | "prediction"
+  | "counterexample"
+  | "decomposition"
+  | "comparison"
+  | "trace_execution"
+  | "explain_reasoning"
+  | "transfer";
+
 export type TutorActionType =
   | "message"
   | "rephrase"
@@ -35,11 +44,101 @@ export interface TutorMessage {
   content: string;
   timestamp: string;
   questionType?: TutorQuestionType;
+  questionStrategy?: TutorQuestionStrategy;
   stage?: GuidanceStage;
   actionType?: TutorActionType;
   mode?: TutorMode;
   hintLevel?: number;
   agentTrace?: TutorAgentTrace[];
+  understandingAssessment?: TutorUnderstandingAssessment;
+  codeAnalysis?: TutorCodeAnalysis;
+}
+
+export type TutorErrorLayer =
+  | "none"
+  | "syntax"
+  | "implementation"
+  | "algorithm"
+  | "task_misunderstanding"
+  | "testing";
+
+export type TutorErrorPattern =
+  | "none"
+  | "off_by_one"
+  | "wrong_initialization"
+  | "incorrect_condition"
+  | "state_update"
+  | "input_parsing"
+  | "output_format"
+  | "type_mismatch"
+  | "missing_case"
+  | "infinite_loop"
+  | "unknown";
+
+export interface TutorCounterexample {
+  input: string;
+  expectedBehavior: string;
+  investigationReason: string;
+  evidence: "run_evidence" | "static_inference";
+}
+
+export interface TutorExecutionTraceStep {
+  step: number;
+  lineNumber: number | null;
+  variables: Array<{ name: string; value: string }>;
+  observation: string;
+  evidence: "run_evidence" | "static_inference" | "student_prediction";
+}
+
+export interface TutorErrorPatternHistory {
+  repeatedPattern: TutorErrorPattern;
+  occurrenceCount: number;
+  isRepeated: boolean;
+}
+
+export interface TutorCodeAnalysis {
+  hasError: boolean;
+  errorType: string;
+  errorLayer: TutorErrorLayer;
+  likelyPattern: TutorErrorPattern;
+  suspectedLineNumbers: number[];
+  counterexample: TutorCounterexample | null;
+  executionTrace: TutorExecutionTraceStep[];
+  patternHistory: TutorErrorPatternHistory;
+  predictionMismatch: boolean;
+  summary: string;
+  investigationFocus: string;
+}
+
+export interface TutorUnderstandingAssessment {
+  dimensions: {
+    goal: number;
+    input: number;
+    output: number;
+    constraints: number;
+    stepOrder: number;
+  };
+  misconceptions: Array<{
+    type:
+      | "task_goal"
+      | "input"
+      | "output"
+      | "constraint"
+      | "step_order"
+      | "algorithm";
+    evidence: string;
+  }>;
+  confidence: {
+    studentConfidence: number;
+    normalizedConfidence: number | null;
+    assessedUnderstanding: number;
+    gap: number | null;
+    calibration:
+      | "not_provided"
+      | "well_calibrated"
+      | "overconfident"
+      | "underconfident";
+  };
 }
 
 export type TutorAgentName =
@@ -75,6 +174,7 @@ export interface TutorRequest {
     status: string;
     approach: string;
     steps: string[];
+    confidenceRating?: number;
   };
   latestPrediction?: string;
   hintLevel?: number;
@@ -109,6 +209,7 @@ export interface TutorLearningContext {
   planningStatus: string;
   planningApproach: string;
   planningSteps: string[];
+  confidenceRating: number;
   latestPrediction: string;
   hintLevel: number;
 }

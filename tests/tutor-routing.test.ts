@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { routeTutorRequest } from "@/lib/server/tutor-multi-agent";
+import {
+  routeAfterCodeAnalysisLayer,
+  routeTutorRequest,
+} from "@/lib/server/tutor-multi-agent";
 import type { TutorRequest } from "@/types/tutor";
 
 function request(overrides: Partial<TutorRequest>): TutorRequest {
@@ -64,6 +67,17 @@ test("routes run evidence to code analysis", () => {
 test("routes an ordinary conversation turn to metacognitive monitoring", () => {
   assert.equal(
     routeTutorRequest(request({ studentMessage: "I am not sure what to try." })),
+    "metacognitive_agent",
+  );
+});
+
+test("routes task misunderstandings back through problem understanding", () => {
+  assert.equal(
+    routeAfterCodeAnalysisLayer("task_misunderstanding"),
+    "problem_understanding_agent",
+  );
+  assert.equal(
+    routeAfterCodeAnalysisLayer("implementation"),
     "metacognitive_agent",
   );
 });

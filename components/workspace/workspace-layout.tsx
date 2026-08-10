@@ -16,6 +16,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
     planningStatus: "not_started",
     planningApproach: "",
     planningSteps: ["", "", ""],
+    confidenceRating: 0,
     latestPrediction: "",
     hintLevel: 0,
   });
@@ -27,6 +28,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
       planningStatus: "not_started",
       planningApproach: "",
       planningSteps: ["", "", ""],
+      confidenceRating: 0,
       latestPrediction: "",
       hintLevel: 0,
     });

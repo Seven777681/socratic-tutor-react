@@ -15,16 +15,22 @@ function createTutorMessage({
   action,
   mode,
   questionType = "debugging",
+  questionStrategy,
   hintLevel,
   agentTrace,
+  understandingAssessment,
+  codeAnalysis,
 }: {
   content: string;
   stage: GuidanceStage;
   action: TutorActionType;
   mode: TutorMode;
   questionType?: TutorQuestionType;
+  questionStrategy?: TutorMessage["questionStrategy"];
   hintLevel?: number;
   agentTrace?: TutorMessage["agentTrace"];
+  understandingAssessment?: TutorMessage["understandingAssessment"];
+  codeAnalysis?: TutorMessage["codeAnalysis"];
 }): TutorMessage {
   return {
     id: `tutor-${Date.now()}-${Math.round(Math.random() * 1000)}`,
@@ -35,8 +41,11 @@ function createTutorMessage({
     actionType: action,
     mode,
     questionType,
+    questionStrategy,
     hintLevel,
     agentTrace,
+    understandingAssessment,
+    codeAnalysis,
   };
 }
 
@@ -246,7 +255,10 @@ export async function POST(request: Request) {
     let content: string;
     let questionType: TutorQuestionType;
     let hintLevel: number | undefined;
+    let questionStrategy: TutorMessage["questionStrategy"];
     let agentTrace: TutorMessage["agentTrace"];
+    let understandingAssessment: TutorMessage["understandingAssessment"];
+    let codeAnalysis: TutorMessage["codeAnalysis"];
 
     try {
       const multiAgentResult = await runTutorMultiAgent(body);
@@ -254,7 +266,10 @@ export async function POST(request: Request) {
         content = multiAgentResult.content;
         questionType = multiAgentResult.questionType;
         hintLevel = multiAgentResult.hintLevel;
+        questionStrategy = multiAgentResult.questionStrategy;
         agentTrace = multiAgentResult.trace;
+        understandingAssessment = multiAgentResult.understandingAssessment;
+        codeAnalysis = multiAgentResult.codeAnalysis;
       } else {
         ({ content, questionType } = getTutorContent(body));
       }
@@ -270,8 +285,11 @@ export async function POST(request: Request) {
         action: body.action,
         mode: body.mode,
         questionType,
+        questionStrategy,
         hintLevel,
         agentTrace,
+        understandingAssessment,
+        codeAnalysis,
       }),
     });
   } catch (error) {

@@ -6,6 +6,7 @@ import type { CodeRunResult, RunStatus } from "@/types/code-run";
 export interface PlanningDraft {
   approach: string;
   steps: [string, string, string];
+  confidenceRating: number;
   status: PlanningStatus;
   tutorReview?: PlanningReview;
   reviewBypassed?: boolean;
@@ -47,6 +48,7 @@ export interface TaskLearningState {
 const emptyPlanningDraft: PlanningDraft = {
   approach: "",
   steps: ["", "", ""],
+  confidenceRating: 0,
   status: "not_started",
 };
 

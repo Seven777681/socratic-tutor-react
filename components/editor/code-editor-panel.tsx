@@ -26,6 +26,7 @@ import { ReflectionPanel } from "@/components/workspace/reflection-panel";
 import { useCodeAutosave } from "@/hooks/use-code-autosave";
 import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useTaskLearningState } from "@/hooks/use-task-learning-state";
+import { loadTutorConversation } from "@/hooks/use-tutor-storage";
 import type { PlanningDraft, PlanningReview } from "@/hooks/use-task-learning-state";
 import { runCode } from "@/services/code-runner-service";
 import {
@@ -87,7 +88,7 @@ export function CodeEditorPanel({
   const [isResultsOpen, setIsResultsOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [planningErrors, setPlanningErrors] = useState<
-    Partial<Record<"approach" | "steps", string>>
+    Partial<Record<"approach" | "steps" | "confidence", string>>
   >({});
   const [predictionWarning, setPredictionWarning] = useState("");
   const [isReviewingPlan, setIsReviewingPlan] = useState(false);
@@ -119,11 +120,13 @@ export function CodeEditorPanel({
       planningStatus: learningState.planningDraft.status,
       planningApproach: learningState.planningDraft.approach,
       planningSteps: learningState.planningDraft.steps,
+      confidenceRating: learningState.planningDraft.confidenceRating,
       latestPrediction: learningState.prediction,
       hintLevel: 0,
     });
   }, [
     learningState.planningDraft.approach,
+    learningState.planningDraft.confidenceRating,
     learningState.planningDraft.status,
     learningState.planningDraft.steps,
     learningState.prediction,
@@ -256,12 +259,15 @@ export function CodeEditorPanel({
   };
 
   const validatePlanningDraft = (draft: PlanningDraft) => {
-    const nextErrors: Partial<Record<"approach" | "steps", string>> = {};
+    const nextErrors: Partial<Record<"approach" | "steps" | "confidence", string>> = {};
     if (!draft.approach.trim()) {
       nextErrors.approach = "Add a short approach.";
     }
     if (!draft.steps[0].trim() || !draft.steps[1].trim()) {
       nextErrors.steps = "Add at least two steps.";
+    }
+    if (draft.confidenceRating < 1 || draft.confidenceRating > 5) {
+      nextErrors.confidence = "Choose how confident you feel before review.";
     }
     return nextErrors;
   };
@@ -425,6 +431,7 @@ export function CodeEditorPanel({
     setIsGeneratingReflection(true);
 
     try {
+      const storedTutorConversation = loadTutorConversation(taskId);
       const response = await fetch("/api/tutor/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -433,10 +440,20 @@ export function CodeEditorPanel({
           studentMessage: Object.values(learningState.reflectionAnswers).join("\n"),
           currentCode,
           latestRunResult: learningState.latestRunResult,
+          planningData: {
+            status: learningState.planningDraft.status,
+            approach: learningState.planningDraft.approach,
+            steps: learningState.planningDraft.steps,
+            confidenceRating: learningState.planningDraft.confidenceRating,
+          },
+          latestPrediction: learningState.prediction,
           conversationId: `reflection-${taskId}`,
           stage: "reflect",
           mode: "run_and_reflect",
-          conversation: [],
+          conversation:
+            storedTutorConversation?.messages.filter(
+              (message) => message.role !== "system",
+            ) ?? [],
           action: "generate_reflection_summary",
         }),
       });
