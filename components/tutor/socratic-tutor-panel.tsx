@@ -74,6 +74,7 @@ export function SocraticTutorPanel({
     taskId: task.id,
     taskTitle: task.title,
     taskDescription: task.description.join("\n"),
+    taskPedagogy: task.pedagogy,
     currentCode,
     latestRunResult,
     learningContext,

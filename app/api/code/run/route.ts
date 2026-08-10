@@ -12,6 +12,8 @@ interface CodeRunRequestBody {
     name?: string;
     input?: string;
     expectedOutput?: string;
+    visibility?: "public" | "hidden";
+    misconceptionTag?: string;
   }>;
 }
 

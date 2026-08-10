@@ -1,4 +1,5 @@
 import type { CodeRunResult } from "@/types/code-run";
+import type { TaskPedagogy } from "@/types/task";
 
 export type GuidanceStage = "understand" | "plan" | "code" | "debug" | "reflect";
 
@@ -106,6 +107,7 @@ export interface TutorRequest {
   taskId: string;
   taskTitle?: string;
   taskDescription?: string;
+  taskPedagogy?: TaskPedagogy;
   studentMessage: string;
   currentCode: string;
   latestRunResult?: CodeRunResult;

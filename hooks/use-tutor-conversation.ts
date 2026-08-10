@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CodeRunResult } from "@/types/code-run";
+import type { TaskPedagogy } from "@/types/task";
 import type {
   GuidanceStage,
   TutorActionType,
@@ -98,6 +99,7 @@ export function useTutorConversation({
   taskId,
   taskTitle,
   taskDescription,
+  taskPedagogy,
   currentCode,
   latestRunResult,
   learningContext,
@@ -108,6 +110,7 @@ export function useTutorConversation({
   taskId: string;
   taskTitle: string;
   taskDescription: string;
+  taskPedagogy?: TaskPedagogy;
   currentCode: string;
   latestRunResult?: CodeRunResult;
   learningContext: TutorLearningContext;
@@ -211,6 +214,7 @@ export function useTutorConversation({
           taskId,
           taskTitle,
           taskDescription,
+          taskPedagogy,
           studentMessage,
           currentCode,
           latestRunResult,
@@ -273,6 +277,7 @@ export function useTutorConversation({
       stage,
       taskId,
       taskDescription,
+      taskPedagogy,
       taskTitle,
     ],
   );

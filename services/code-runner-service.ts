@@ -5,6 +5,8 @@ export interface RunCodeTestCase {
   name?: string;
   input?: string;
   expectedOutput?: string;
+  visibility?: "public" | "hidden";
+  misconceptionTag?: string;
 }
 
 export interface RunCodeInput {

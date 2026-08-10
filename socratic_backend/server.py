@@ -52,6 +52,7 @@ class LatestRunResult(BaseModel):
     stdout: Optional[str] = None
     stderr: Optional[str] = None
     error: Optional[RunResultError] = None
+    tests: List[dict] = []
 
 
 class PlanningData(BaseModel):
@@ -73,6 +74,7 @@ class TutorRequest(BaseModel):
     taskId: str
     taskTitle: Optional[str] = None
     taskDescription: Optional[str] = None
+    taskPedagogy: Optional[dict] = None
     studentMessage: str = ""
     currentCode: str = ""
     latestRunResult: Optional[LatestRunResult] = None
@@ -115,6 +117,8 @@ class CodeRunTestCaseInput(BaseModel):
     name: Optional[str] = None
     input: Optional[str] = ""
     expectedOutput: Optional[str] = None
+    visibility: str = "public"
+    misconceptionTag: Optional[str] = None
 
 
 class CodeRunRequest(BaseModel):
@@ -133,6 +137,7 @@ class TestCaseResultOut(BaseModel):
     actualOutput: Optional[str] = None
     passed: bool
     feedback: str
+    diagnosticTag: Optional[str] = None
 
 
 class CodeErrorOut(BaseModel):
@@ -167,6 +172,15 @@ def _build_chat_history(conversation: List[ConversationMessage]) -> str:
 
 def get_tutor_content(req: TutorRequest):
     problem = req.taskDescription or req.taskTitle or "the current problem"
+    if req.taskPedagogy:
+        pedagogy = req.taskPedagogy
+        problem = (
+            f"{problem}\n\nInternal teaching guide (not student evidence):\n"
+            f"Primary concept: {pedagogy.get('primaryConcept', '')}\n"
+            f"Secondary concepts: {pedagogy.get('secondaryConcepts', [])}\n"
+            f"Expected plan elements: {pedagogy.get('expectedPlanElements', [])}\n"
+            f"Common misconceptions: {pedagogy.get('commonMisconceptions', [])}"
+        )
     plan_form = {
         "status": req.planningData.status if req.planningData else "",
         "approach": req.planningData.approach if req.planningData else "",
@@ -209,6 +223,14 @@ def get_tutor_content(req: TutorRequest):
                 f"stdout: {req.latestRunResult.stdout}" if req.latestRunResult and req.latestRunResult.stdout else "",
                 f"stderr: {req.latestRunResult.stderr}" if req.latestRunResult and req.latestRunResult.stderr else "",
                 f"error: {req.latestRunResult.error.message}" if req.latestRunResult and req.latestRunResult.error and req.latestRunResult.error.message else "",
+                (
+                    "failed diagnostic tags: "
+                    + ", ".join(
+                        str(test.get("diagnosticTag"))
+                        for test in req.latestRunResult.tests
+                        if not test.get("passed", False) and test.get("diagnosticTag")
+                    )
+                ) if req.latestRunResult and req.latestRunResult.tests else "",
             ] if part
         ),
         "student_reflection": req.studentMessage,
@@ -431,12 +453,13 @@ def run_code(req: CodeRunRequest):
             TestCaseResultOut(
                 id=case.id,
                 name=case.name or case.id,
-                visibility="public",
-                input=case.input,
-                expectedOutput=case.expectedOutput,
-                actualOutput=actual_output,
+                visibility=case.visibility,
+                input=case.input if case.visibility == "public" else None,
+                expectedOutput=case.expectedOutput if case.visibility == "public" else None,
+                actualOutput=actual_output if case.visibility == "public" else None,
                 passed=passed,
                 feedback=feedback,
+                diagnosticTag=case.misconceptionTag,
             )
         )
 

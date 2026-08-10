@@ -214,12 +214,22 @@ export function CodeEditorPanel({
       taskId,
       code: currentCode,
       stdin,
-      testCases: task.examples.map((example) => ({
-        id: example.id,
-        name: example.id,
-        input: example.input,
-        expectedOutput: example.output,
-      })),
+      testCases: task.testCases
+        ? task.testCases.map((testCase) => ({
+            id: testCase.id,
+            name: testCase.name,
+            input: testCase.input,
+            expectedOutput: testCase.output,
+            visibility: testCase.visibility,
+            misconceptionTag: testCase.misconceptionTag,
+          }))
+        : task.examples.map((example) => ({
+            id: example.id,
+            name: example.id,
+            input: example.input,
+            expectedOutput: example.output,
+            visibility: "public" as const,
+          })),
     });
 
 
@@ -265,6 +275,7 @@ export function CodeEditorPanel({
     saveNow,
     stdin,
     task.examples,
+    task.testCases,
     taskId,
     updateState,
   ]);
@@ -483,7 +494,7 @@ export function CodeEditorPanel({
               {task.title}
             </h2>
             <p className="mt-2 max-w-[840px] text-sm leading-6 text-slate-600">
-              {task.description[0]}
+              {task.description.join(" ")}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#eceaff] px-3 py-1 text-xs font-bold text-[#6255f6]">
