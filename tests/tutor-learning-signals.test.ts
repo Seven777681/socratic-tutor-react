@@ -100,3 +100,12 @@ test("hint level increases gradually and never decreases", () => {
     shouldIncrease: true,
   }), 3);
 });
+
+test("hint level decreases one step after recovery", () => {
+  assert.equal(calculateNextHintLevel({
+    currentHintLevel: 2,
+    confusionLevel: 1,
+    shouldIncrease: false,
+    shouldDecrease: true,
+  }), 1);
+});

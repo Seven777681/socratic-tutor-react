@@ -12,9 +12,11 @@ test("accepts one non-repeated question inside the hint boundary", () => {
       optionalPrompt: "Focus on the input before thinking about syntax.",
       supportType: "concept",
       questionType: "decomposition",
+      targetFocus: "input",
     },
     hintLevel: 1,
     recentTutorQuestions: [],
+    currentFocus: "input",
   });
 
   assert.equal(result.safe, true);
@@ -28,9 +30,11 @@ test("rejects multiple questions and a second optional question", () => {
       optionalPrompt: "Can you test both?",
       supportType: "metacognitive",
       questionType: "understanding",
+      targetFocus: "goal",
     },
     hintLevel: 0,
     recentTutorQuestions: [],
+    currentFocus: "goal",
   });
 
   assert.ok(result.violations.includes("missing_single_question"));
@@ -44,9 +48,11 @@ test("rejects code leakage, direct answers, and support above the hint level", (
       optionalPrompt: "The answer is:\n```python\nvalue = 3\n```",
       supportType: "syntax_direction",
       questionType: "debugging",
+      targetFocus: "debugging",
     },
     hintLevel: 1,
     recentTutorQuestions: [],
+    currentFocus: "debugging",
   });
 
   assert.ok(result.violations.includes("possible_code_leakage"));
@@ -63,13 +69,32 @@ test("rejects a question that closely repeats a recent tutor question", () => {
       optionalPrompt: "",
       supportType: "metacognitive",
       questionType: "debugging",
+      targetFocus: "debugging",
     },
     hintLevel: 0,
     recentTutorQuestions: [prior],
+    currentFocus: "debugging",
   });
 
   assert.equal(questionSimilarity(prior, current), 1);
   assert.ok(result.violations.includes("repeated_question"));
+});
+
+test("rejects a question that declares a different learning focus", () => {
+  const result = evaluateTutorResponse({
+    candidate: {
+      primaryQuestion: "What output should the program produce?",
+      optionalPrompt: "",
+      supportType: "metacognitive",
+      questionType: "understanding",
+      targetFocus: "output",
+    },
+    hintLevel: 0,
+    recentTutorQuestions: [],
+    currentFocus: "input",
+  });
+
+  assert.ok(result.violations.includes("off_focus_question"));
 });
 
 test("recognizes closely repeated Chinese questions", () => {

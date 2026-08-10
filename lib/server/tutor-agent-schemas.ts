@@ -84,12 +84,50 @@ export const codeAnalysisSchema = z.object({
   investigationFocus: z.string(),
 });
 
+export const tutorLearningFocusSchema = z.enum([
+  "goal",
+  "input",
+  "output",
+  "constraints",
+  "step_order",
+  "plan_complete",
+  "coding_progress",
+  "debugging",
+  "reflection_learning",
+]);
+
 export const metacognitiveSchema = z.object({
   confusionLevel: z.number().int().min(0).max(3),
   isStuck: z.boolean(),
   shouldIncreaseHint: z.boolean(),
+  shouldDecreaseHint: z.boolean(),
   reason: z.string(),
   reflectionFocus: z.string(),
+  learningState: z.enum([
+    "exploring",
+    "uncertain",
+    "stuck",
+    "recovering",
+    "independent",
+  ]),
+  productiveStruggle: z.boolean(),
+  intervention: z.enum([
+    "wait",
+    "encourage",
+    "ask_prediction",
+    "break_down_problem",
+    "show_counterexample",
+    "increase_hint",
+    "return_to_plan",
+  ]),
+  currentFocus: tutorLearningFocusSchema,
+  latestAnswer: z.object({
+    quality: z.enum(["correct", "partial", "off_target", "uncertain"]),
+    focusResolved: z.boolean(),
+    recognizedIdeas: z.array(z.string()).max(4),
+    missingIdeas: z.array(z.string()).max(4),
+    misconception: z.string(),
+  }),
 });
 
 export const socraticResponseSchema = z.object({
@@ -102,6 +140,7 @@ export const socraticResponseSchema = z.object({
     "pseudocode",
   ]),
   questionType: tutorQuestionTypeSchema,
+  targetFocus: tutorLearningFocusSchema,
 });
 
 export const assessmentSchema = z.object({
@@ -111,6 +150,58 @@ export const assessmentSchema = z.object({
   strengths: z.array(z.string()),
   growthArea: z.string(),
   transferableIdea: z.string(),
+  capabilities: z.object({
+    problemUnderstanding: z.number().int().min(0).max(5),
+    planning: z.number().int().min(0).max(5),
+    implementation: z.number().int().min(0).max(5),
+    debugging: z.number().int().min(0).max(5),
+    reflection: z.number().int().min(0).max(5),
+    independence: z.number().int().min(0).max(5),
+  }),
+  evidenceBasedEvaluation: z.array(z.object({
+    dimension: z.enum([
+      "problemUnderstanding",
+      "planning",
+      "implementation",
+      "debugging",
+      "reflection",
+      "independence",
+    ]),
+    judgment: z.string(),
+    evidenceIds: z.array(z.string()).min(1).max(4),
+  })).length(6),
+  timeline: z.array(z.object({
+    event: z.string(),
+    evidenceId: z.string(),
+  })).max(10),
+  transferTask: z.object({
+    title: z.string(),
+    objective: z.string(),
+    differenceFromCurrent: z.string(),
+    reason: z.string(),
+    evidenceIds: z.array(z.string()).min(1).max(4),
+    suggestedDifficulty: z.enum(["easier", "similar", "harder"]),
+  }),
+  teacherReport: z.object({
+    commonDifficulties: z.array(z.string()).max(5),
+    maxHintLevel: z.number().int().min(0).max(3),
+    aiReliance: z.enum(["low", "moderate", "high"]),
+    effectiveQuestionStrategies: z.array(z.enum([
+      "prediction",
+      "counterexample",
+      "decomposition",
+      "comparison",
+      "trace_execution",
+      "explain_reasoning",
+      "transfer",
+    ])).max(4),
+    understandingVerdict: z.enum([
+      "demonstrated",
+      "partial",
+      "insufficient_evidence",
+    ]),
+    understandingEvidenceIds: z.array(z.string()).min(1).max(4),
+  }),
 });
 
 export type ProblemUnderstandingOutput = z.infer<typeof problemUnderstandingSchema>;

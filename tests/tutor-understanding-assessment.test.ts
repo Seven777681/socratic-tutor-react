@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  assessmentSchema,
   codeAnalysisSchema,
+  metacognitiveSchema,
   problemUnderstandingSchema,
 } from "@/lib/server/tutor-agent-schemas";
 import { calculateConfidenceAssessment } from "@/lib/server/tutor-understanding-assessment";
@@ -21,6 +23,31 @@ test("accepts evidence-based understanding dimensions and misconception labels",
 
   assert.equal(result.dimensions.goal, 8);
   assert.equal(result.misconceptions[0]?.type, "constraint");
+});
+
+test("accepts monitoring output in the canonical learner-state vocabulary", () => {
+  const result = metacognitiveSchema.parse({
+    confusionLevel: 1,
+    isStuck: false,
+    shouldIncreaseHint: false,
+    shouldDecreaseHint: true,
+    reason: "The latest answer resolves the goal but not the input.",
+    reflectionFocus: "Explain the input before choosing syntax.",
+    learningState: "recovering",
+    productiveStruggle: false,
+    intervention: "encourage",
+    currentFocus: "input",
+    latestAnswer: {
+      quality: "correct",
+      focusResolved: true,
+      recognizedIdeas: ["program goal"],
+      missingIdeas: ["input source"],
+      misconception: "",
+    },
+  });
+
+  assert.equal(result.currentFocus, "input");
+  assert.equal(result.latestAnswer.focusResolved, true);
 });
 
 test("accepts layered code analysis with an inferred counterexample and trace", () => {
@@ -51,6 +78,57 @@ test("accepts layered code analysis with an inferred counterexample and trace", 
   assert.equal(result.errorLayer, "implementation");
   assert.equal(result.counterexample?.evidence, "static_inference");
   assert.equal(result.executionTrace[0]?.variables[0]?.name, "i");
+});
+
+test("accepts Agent 5's multidimensional evidence-based assessment", () => {
+  const result = assessmentSchema.parse({
+    content: "You improved your boundary-checking strategy.",
+    questionType: "reflection",
+    taskFinished: true,
+    strengths: ["Revised the loop boundary"],
+    growthArea: "Explain why the boundary is correct.",
+    transferableIdea: "Test the smallest boundary input.",
+    capabilities: {
+      problemUnderstanding: 4,
+      planning: 3,
+      implementation: 4,
+      debugging: 3,
+      reflection: 3,
+      independence: 2,
+    },
+    evidenceBasedEvaluation: [
+      "problemUnderstanding",
+      "planning",
+      "implementation",
+      "debugging",
+      "reflection",
+      "independence",
+    ].map((dimension) => ({
+      dimension,
+      judgment: "Evidence-based judgment.",
+      evidenceIds: ["student-1"],
+    })),
+    timeline: [{ event: "Identified a boundary issue", evidenceId: "diagnosis-2" }],
+    transferTask: {
+      title: "Find the first matching item",
+      objective: "Practice a different loop boundary.",
+      differenceFromCurrent: "Search rather than aggregate values.",
+      reason: "Reuses boundary reasoning in a new setting.",
+      evidenceIds: ["diagnosis-2"],
+      suggestedDifficulty: "similar",
+    },
+    teacherReport: {
+      commonDifficulties: ["off_by_one"],
+      maxHintLevel: 2,
+      aiReliance: "moderate",
+      effectiveQuestionStrategies: ["prediction"],
+      understandingVerdict: "partial",
+      understandingEvidenceIds: ["student-1"],
+    },
+  });
+
+  assert.equal(result.capabilities.debugging, 3);
+  assert.equal(result.transferTask.suggestedDifficulty, "similar");
 });
 
 test("identifies confidence that is higher than demonstrated understanding", () => {

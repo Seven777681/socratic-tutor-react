@@ -18,7 +18,9 @@ function createTutorMessage({
   questionStrategy,
   hintLevel,
   agentTrace,
+  learnerState,
   understandingAssessment,
+  learningAssessment,
   codeAnalysis,
   planReview,
   planInteraction,
@@ -31,7 +33,9 @@ function createTutorMessage({
   questionStrategy?: TutorMessage["questionStrategy"];
   hintLevel?: number;
   agentTrace?: TutorMessage["agentTrace"];
+  learnerState?: TutorMessage["learnerState"];
   understandingAssessment?: TutorMessage["understandingAssessment"];
+  learningAssessment?: TutorMessage["learningAssessment"];
   codeAnalysis?: TutorMessage["codeAnalysis"];
   planReview?: TutorMessage["planReview"];
   planInteraction?: TutorMessage["planInteraction"];
@@ -48,7 +52,9 @@ function createTutorMessage({
     questionStrategy,
     hintLevel,
     agentTrace,
+    learnerState,
     understandingAssessment,
+    learningAssessment,
     codeAnalysis,
     planReview,
     planInteraction,
@@ -93,6 +99,13 @@ function getTutorContent({
     Boolean(planningData?.approach.trim()) ||
     Boolean(planningData?.steps.some((step) => step.trim()));
   const codeLineCount = Math.max(1, currentCode.split("\n").length);
+
+  if (action === "idle_check_in") {
+    return {
+      content: "Have you hit a sticking point, or are you still exploring your next step?",
+      questionType: "reflection" as const,
+    };
+  }
 
   if (action === "rephrase") {
     return {
@@ -278,7 +291,9 @@ export async function POST(request: Request) {
     let hintLevel: number | undefined;
     let questionStrategy: TutorMessage["questionStrategy"];
     let agentTrace: TutorMessage["agentTrace"];
+    let learnerState: TutorMessage["learnerState"];
     let understandingAssessment: TutorMessage["understandingAssessment"];
+    let learningAssessment: TutorMessage["learningAssessment"];
     let codeAnalysis: TutorMessage["codeAnalysis"];
     let planReview: TutorMessage["planReview"];
     let planInteraction: TutorMessage["planInteraction"];
@@ -291,7 +306,9 @@ export async function POST(request: Request) {
         hintLevel = multiAgentResult.hintLevel;
         questionStrategy = multiAgentResult.questionStrategy;
         agentTrace = multiAgentResult.trace;
+        learnerState = multiAgentResult.learnerState;
         understandingAssessment = multiAgentResult.understandingAssessment;
+        learningAssessment = multiAgentResult.learningAssessment;
         codeAnalysis = multiAgentResult.codeAnalysis;
         planReview = multiAgentResult.planReview;
         planInteraction = multiAgentResult.planInteraction;
@@ -330,7 +347,9 @@ export async function POST(request: Request) {
         questionStrategy,
         hintLevel,
         agentTrace,
+        learnerState,
         understandingAssessment,
+        learningAssessment,
         codeAnalysis,
         planReview,
         planInteraction,

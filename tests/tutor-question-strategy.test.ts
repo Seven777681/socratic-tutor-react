@@ -28,6 +28,15 @@ test("selects decomposition for planning", () => {
   }), "decomposition");
 });
 
+test("uses a transition strategy after the plan is ready", () => {
+  assert.equal(selectTutorQuestionStrategy({
+    request: request({ stage: "plan" }),
+    codeHasError: false,
+    predictionMismatch: false,
+    planReady: true,
+  }), "explain_reasoning");
+});
+
 test("rotates away from a recently used strategy", () => {
   assert.equal(selectTutorQuestionStrategy({
     request: request({
@@ -51,6 +60,15 @@ test("uses execution tracing when code evidence shows an error", () => {
     codeHasError: true,
     predictionMismatch: false,
   }), "trace_execution");
+});
+
+test("honors Agent 4's preferred intervention strategy", () => {
+  assert.equal(selectTutorQuestionStrategy({
+    request: request(),
+    codeHasError: true,
+    predictionMismatch: false,
+    preferredStrategy: "counterexample",
+  }), "counterexample");
 });
 
 test("safe fallback question follows the student's language", () => {

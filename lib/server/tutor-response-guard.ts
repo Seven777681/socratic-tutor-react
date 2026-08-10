@@ -1,4 +1,5 @@
 import type { SocraticResponseOutput } from "@/lib/server/tutor-agent-schemas";
+import type { TutorLearningFocus } from "@/types/tutor";
 
 export type TutorResponseViolation =
   | "missing_single_question"
@@ -6,7 +7,8 @@ export type TutorResponseViolation =
   | "possible_code_leakage"
   | "possible_direct_answer"
   | "hint_level_exceeded"
-  | "repeated_question";
+  | "repeated_question"
+  | "off_focus_question";
 
 export interface TutorResponseGuardResult {
   safe: boolean;
@@ -58,10 +60,12 @@ export function evaluateTutorResponse({
   candidate,
   hintLevel,
   recentTutorQuestions,
+  currentFocus,
 }: {
   candidate: SocraticResponseOutput;
   hintLevel: number;
   recentTutorQuestions: string[];
+  currentFocus: TutorLearningFocus;
 }): TutorResponseGuardResult {
   const violations = new Set<TutorResponseViolation>();
   const primaryQuestionMarks = candidate.primaryQuestion.match(/[?？]/g)?.length ?? 0;
@@ -89,6 +93,9 @@ export function evaluateTutorResponse({
     )
   ) {
     violations.add("repeated_question");
+  }
+  if (candidate.targetFocus !== currentFocus) {
+    violations.add("off_focus_question");
   }
 
   return {

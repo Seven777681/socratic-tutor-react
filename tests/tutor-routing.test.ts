@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildTutorTaskContext,
   routeAfterCodeAnalysisLayer,
+  routeAfterMetacognitionResult,
   routeTutorRequest,
 } from "@/lib/server/tutor-multi-agent";
 import type { TutorRequest } from "@/types/tutor";
@@ -30,6 +32,21 @@ test("routes reflection summaries directly to assessment", () => {
   );
 });
 
+test("routes ordinary reflection dialogue through monitoring before questioning", () => {
+  assert.equal(
+    routeTutorRequest(request({
+      stage: "reflect",
+      action: "message",
+      studentMessage: "I learned to check the boundary first.",
+    })),
+    "metacognitive_agent",
+  );
+  assert.equal(
+    routeAfterMetacognitionResult({ taskFinished: true, stage: "reflect" }),
+    "socratic_questioning_agent",
+  );
+});
+
 test("routes planning before considering existing editor code", () => {
   assert.equal(
     routeTutorRequest(request({
@@ -39,6 +56,22 @@ test("routes planning before considering existing editor code", () => {
     })),
     "problem_understanding_agent",
   );
+});
+
+test("includes question-bank pedagogy as an assessment guide", () => {
+  const context = buildTutorTaskContext(request({
+    taskPedagogy: {
+      primaryConcept: "loop invariant",
+      secondaryConcepts: ["comparison"],
+      prerequisites: ["variables"],
+      commonMisconceptions: ["skips the final item"],
+      expectedPlanElements: ["inspect every item"],
+      reflectionPrompts: ["What stayed true?"],
+    },
+  }));
+
+  assert.equal(context.task.teachingGuide?.primaryConcept, "loop invariant");
+  assert.deepEqual(context.task.teachingGuide?.expectedPlanElements, ["inspect every item"]);
 });
 
 test("routes run evidence to code analysis", () => {

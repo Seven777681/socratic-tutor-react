@@ -73,6 +73,7 @@ function detectsUncertainty(request: TutorRequest) {
 
 export function analyzeTutorLearningSignals(
   request: TutorRequest,
+  preferredWaitTime = 90,
 ): TutorLearningSignals {
   const idleSeconds = Math.max(0, request.idleSeconds ?? 0);
   const repeatedStudentMessage = hasRepeatedStudentMessage(request);
@@ -85,7 +86,7 @@ export function analyzeTutorLearningSignals(
   const reasons: string[] = [];
   let struggleScore = 0;
 
-  if (idleSeconds >= 60) {
+  if (idleSeconds >= preferredWaitTime) {
     struggleScore += 2;
     reasons.push(`inactive for ${idleSeconds} seconds`);
   }
@@ -134,13 +135,18 @@ export function calculateNextHintLevel({
   currentHintLevel,
   confusionLevel,
   shouldIncrease,
+  shouldDecrease = false,
 }: {
   currentHintLevel: number;
   confusionLevel: number;
   shouldIncrease: boolean;
+  shouldDecrease?: boolean;
 }) {
   const storedLevel = Math.min(3, Math.max(0, currentHintLevel));
   const modelLevel = Math.min(3, Math.max(0, confusionLevel));
+  if (shouldDecrease && !shouldIncrease && confusionLevel <= 1) {
+    return Math.max(0, storedLevel - 1);
+  }
   return Math.min(
     3,
     Math.max(

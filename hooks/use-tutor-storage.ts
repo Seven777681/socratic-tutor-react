@@ -2,7 +2,7 @@
 
 import type { TutorConversation, TutorMode } from "@/types/tutor";
 
-const TUTOR_STORAGE_VERSION = 4;
+const TUTOR_STORAGE_VERSION = 5;
 
 export function getTutorStorageKey(taskId: string) {
   return `socratic-tutor-${taskId}`;
@@ -78,6 +78,7 @@ export function saveTutorConversation(conversation: TutorConversation) {
       planReview: message.planReview,
       planInteraction: message.planInteraction,
       understandingAssessment: message.understandingAssessment,
+      learningAssessment: message.learningAssessment,
       codeAnalysis: message.codeAnalysis,
     })),
   };

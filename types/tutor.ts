@@ -36,7 +36,8 @@ export type TutorActionType =
   | "review_plan"
   | "understand_problem"
   | "explain_success"
-  | "generate_reflection_summary";
+  | "generate_reflection_summary"
+  | "idle_check_in";
 
 export type TutorStatus = "ready" | "thinking" | "offline";
 
@@ -47,12 +48,57 @@ export type LearnerAnswerQuality =
   | "off_target"
   | "uncertain";
 
+export type TutorLearningFocus =
+  | "goal"
+  | "input"
+  | "output"
+  | "constraints"
+  | "step_order"
+  | "plan_complete"
+  | "coding_progress"
+  | "debugging"
+  | "reflection_learning";
+
+export type TutorCodeChangeQuality = "none" | "cosmetic" | "meaningful";
+
+export type TutorProgressState =
+  | "exploring"
+  | "uncertain"
+  | "stuck"
+  | "recovering"
+  | "independent";
+
+export type TutorIntervention =
+  | "wait"
+  | "encourage"
+  | "ask_prediction"
+  | "break_down_problem"
+  | "show_counterexample"
+  | "increase_hint"
+  | "return_to_plan";
+
+export type TutorQuestionStyle =
+  | "question_based"
+  | "example_based"
+  | "step_by_step"
+  | "comparison_based";
+
+export interface TutorSupportProfile {
+  preferredWaitTime: number;
+  typicalAttemptsBeforeHint: number;
+  preferredQuestionStyle: TutorQuestionStyle;
+}
+
 export interface TutorLearnerState {
-  currentFocus: string;
+  currentFocus: TutorLearningFocus;
   hintLevel: number;
   attemptsOnFocus: number;
   consecutiveOffTarget: number;
-  studentState: "beginner" | "confused" | "understanding";
+  learningState: TutorProgressState;
+  codeChangeQuality: TutorCodeChangeQuality;
+  productiveStruggle: boolean;
+  intervention: TutorIntervention;
+  supportProfile: TutorSupportProfile;
   concepts: Record<
     string,
     {
@@ -63,6 +109,7 @@ export interface TutorLearnerState {
   >;
   latestAnswer: {
     quality: LearnerAnswerQuality;
+    focusResolved: boolean;
     recognizedIdeas: string[];
     missingIdeas: string[];
     misconception?: string;
@@ -87,6 +134,7 @@ export interface TutorMessage {
   planInteraction?: TutorPlanInteraction;
   understandingAssessment?: TutorUnderstandingAssessment;
   codeAnalysis?: TutorCodeAnalysis;
+  learningAssessment?: TutorLearningAssessment;
 }
 
 export type TutorErrorLayer =
@@ -176,6 +224,44 @@ export interface TutorUnderstandingAssessment {
   };
 }
 
+export type TutorCapabilityDimension =
+  | "problemUnderstanding"
+  | "planning"
+  | "implementation"
+  | "debugging"
+  | "reflection"
+  | "independence";
+
+export interface TutorLearningAssessment {
+  capabilities: Record<TutorCapabilityDimension, number>;
+  evidenceBasedEvaluation: Array<{
+    dimension: TutorCapabilityDimension;
+    judgment: string;
+    evidence: string[];
+  }>;
+  timeline: Array<{
+    order: number;
+    event: string;
+    evidence: string;
+  }>;
+  transferTask: {
+    title: string;
+    objective: string;
+    differenceFromCurrent: string;
+    reason: string;
+    evidence: string[];
+    suggestedDifficulty: "easier" | "similar" | "harder";
+  };
+  teacherReport: {
+    commonDifficulties: string[];
+    maxHintLevel: number;
+    aiReliance: "low" | "moderate" | "high";
+    effectiveQuestionStrategies: TutorQuestionStrategy[];
+    understandingVerdict: "demonstrated" | "partial" | "insufficient_evidence";
+    understandingEvidence: string;
+  };
+}
+
 export type TutorAgentName =
   | "problem_understanding"
   | "socratic_questioning"
@@ -184,7 +270,7 @@ export type TutorAgentName =
   | "assessment";
 
 export interface TutorAgentTrace {
-  agent: string;
+  agent: TutorAgentName;
   label?: string;
   summary: string;
 }
@@ -218,6 +304,7 @@ export interface TutorRequest {
   taskPedagogy?: TaskPedagogy;
   studentMessage: string;
   currentCode: string;
+  previousCode?: string;
   latestRunResult?: CodeRunResult;
   planningData?: {
     status: string;

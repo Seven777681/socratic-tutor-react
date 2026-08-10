@@ -1,8 +1,0 @@
--r requirements.txt
-
-# Optional legacy Python-agent dependencies. The active tutor graph is the
-# TypeScript implementation in the Next.js application.
-langchain-openai>=1.4.1
-langgraph>=1.2.10
-openai>=2.52.0
-python-dotenv>=1.2.2

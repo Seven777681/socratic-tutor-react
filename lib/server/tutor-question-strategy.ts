@@ -14,11 +14,25 @@ function strategyCandidates({
   request,
   codeHasError,
   predictionMismatch,
+  planReady,
+  preferredStrategy,
 }: {
   request: TutorRequest;
   codeHasError: boolean;
   predictionMismatch: boolean;
+  planReady?: boolean;
+  preferredStrategy?: TutorQuestionStrategy | null;
 }): TutorQuestionStrategy[] {
+  if (planReady) {
+    return ["explain_reasoning", "prediction", "transfer"];
+  }
+  if (preferredStrategy) {
+    return [
+      preferredStrategy,
+      ...(["prediction", "counterexample", "decomposition", "comparison", "trace_execution", "explain_reasoning", "transfer"] as TutorQuestionStrategy[])
+        .filter((strategy) => strategy !== preferredStrategy),
+    ];
+  }
   if (request.action === "check_edge_cases") {
     return ["counterexample", "transfer", "prediction"];
   }
@@ -47,6 +61,8 @@ export function selectTutorQuestionStrategy(input: {
   request: TutorRequest;
   codeHasError: boolean;
   predictionMismatch: boolean;
+  planReady?: boolean;
+  preferredStrategy?: TutorQuestionStrategy | null;
 }): TutorQuestionStrategy {
   const candidates = strategyCandidates(input);
   const recent = recentStrategies(input.request);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CodeRunResult } from "@/types/code-run";
 import type { TaskPedagogy } from "@/types/task";
 import type {
@@ -123,8 +123,12 @@ export function useTutorConversation({
   );
   const [status, setStatus] = useState<TutorStatus>("ready");
   const [errorMessage, setErrorMessage] = useState("");
+  const lastSubmittedCodeRef = useRef(currentCode);
+  const idleCheckSignatureRef = useRef("");
   useEffect(() => {
     const initialStage = stage;
+    lastSubmittedCodeRef.current = currentCode;
+    idleCheckSignatureRef.current = "";
     if (latestRunResult?.id) {
       window.sessionStorage.setItem(
         handledRunStorageKey(taskId),
@@ -191,14 +195,18 @@ export function useTutorConversation({
     async ({
       studentMessage,
       action,
+      idleSeconds,
     }: {
       studentMessage: string;
       action: TutorActionType;
+      idleSeconds?: number;
     }) => {
       setStatus("thinking");
       setErrorMessage("");
 
       try {
+        const previousCode = lastSubmittedCodeRef.current;
+        lastSubmittedCodeRef.current = currentCode;
         const requestConversation = [...conversation.messages];
         if (
           studentMessage.trim() &&
@@ -217,6 +225,7 @@ export function useTutorConversation({
           taskPedagogy,
           studentMessage,
           currentCode,
+          previousCode,
           latestRunResult,
           planningData: {
             status: learningContext.planningStatus,
@@ -226,6 +235,7 @@ export function useTutorConversation({
           },
           latestPrediction: learningContext.latestPrediction,
           hintLevel: learningContext.hintLevel,
+          idleSeconds,
           stage,
           conversationId: conversation.id,
           conversation: requestConversation.filter((message) => message.role !== "system"),
@@ -283,6 +293,58 @@ export function useTutorConversation({
       taskTitle,
     ],
   );
+
+  const latestLearnerState = useMemo(
+    () => [...conversation.messages]
+      .reverse()
+      .find((message) => message.learnerState)
+      ?.learnerState,
+    [conversation.messages],
+  );
+  const latestStudentActivity = useMemo(
+    () => [...conversation.messages]
+      .reverse()
+      .find((message) => message.role === "student")
+      ?.timestamp ?? "none",
+    [conversation.messages],
+  );
+
+  useEffect(() => {
+    if (status !== "ready" || stage === "reflect") return;
+
+    const preferredWaitTime = Math.max(
+      60,
+      Math.min(120, latestLearnerState?.supportProfile.preferredWaitTime ?? 90),
+    );
+    const activitySignature = [
+      taskId,
+      stage,
+      currentCode,
+      latestRunResult?.id ?? "no-run",
+      latestStudentActivity,
+    ].join(":");
+    if (idleCheckSignatureRef.current === activitySignature) return;
+
+    const timeoutId = window.setTimeout(() => {
+      idleCheckSignatureRef.current = activitySignature;
+      void requestTutorResponse({
+        studentMessage: "",
+        action: "idle_check_in",
+        idleSeconds: preferredWaitTime,
+      });
+    }, preferredWaitTime * 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    currentCode,
+    latestLearnerState?.supportProfile.preferredWaitTime,
+    latestRunResult?.id,
+    latestStudentActivity,
+    requestTutorResponse,
+    stage,
+    status,
+    taskId,
+  ]);
 
   useEffect(() => {
     if (!latestRunResult) {

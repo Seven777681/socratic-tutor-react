@@ -5,13 +5,6 @@ export type TaskStatus =
 
 export type TaskDifficulty = "easy" | "medium" | "hard";
 
-export type AgentType =
-  | "socratic_guide"
-  | "strategy_coach"
-  | "debug_coach"
-  | "test_coach"
-  | "reflection_coach";
-
 export type TaskConcept =
   | "variables"
   | "conditionals"
@@ -64,7 +57,6 @@ export interface ProgrammingTaskSummary {
   moduleId?: QuestionBankModuleId;
   moduleTitle?: string;
   order?: number;
-  recommendedAgent: AgentType;
   concept: TaskConcept;
   thinkingDepth: TaskDifficulty;
   questionSetId?: string;
@@ -124,7 +116,6 @@ export interface ProgrammingTaskDetail {
   moduleId?: QuestionBankModuleId;
   moduleTitle?: string;
   order?: number;
-  recommendedAgent: AgentType;
   concept: TaskConcept;
   thinkingDepth: TaskDifficulty;
   questionSetId?: string;

@@ -164,7 +164,6 @@ export function toTaskSummary(
     progress: task.progress,
     estimatedMinutes: task.estimatedMinutes,
     sourceType: "custom_imported",
-    recommendedAgent: "socratic_guide",
     createdAt: task.createdAt,
     updatedAt: task.createdAt,
     href: `/tasks/${task.id}`,

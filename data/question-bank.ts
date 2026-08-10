@@ -1,5 +1,4 @@
 import type {
-  AgentType,
   ProgrammingTaskDetail,
   QuestionBankModuleId,
   TaskPedagogy,
@@ -14,7 +13,6 @@ export interface QuestionBankModule {
   description: string;
   order: number;
   difficultyRange: string;
-  recommendedAgent: AgentType;
 }
 
 export const questionBankModules: QuestionBankModule[] = [
@@ -24,7 +22,6 @@ export const questionBankModules: QuestionBankModule[] = [
     description: "Start with input, variables, strings, and basic expressions.",
     order: 1,
     difficultyRange: "Foundational",
-    recommendedAgent: "socratic_guide",
   },
   {
     id: "simple_logic",
@@ -32,7 +29,6 @@ export const questionBankModules: QuestionBankModule[] = [
     description: "Practice conditions, comparisons, loops, and careful tracing.",
     order: 2,
     difficultyRange: "Foundational - Intermediate",
-    recommendedAgent: "strategy_coach",
   },
   {
     id: "data_structures",
@@ -40,7 +36,6 @@ export const questionBankModules: QuestionBankModule[] = [
     description: "Work with lists, strings, dictionaries, and aggregate values.",
     order: 3,
     difficultyRange: "Intermediate",
-    recommendedAgent: "test_coach",
   },
   {
     id: "function_design",
@@ -48,7 +43,6 @@ export const questionBankModules: QuestionBankModule[] = [
     description: "Break programs into reusable functions with clear inputs and outputs.",
     order: 4,
     difficultyRange: "Intermediate - Deep Dive",
-    recommendedAgent: "socratic_guide",
   },
   {
     id: "integrated_challenges",
@@ -56,7 +50,6 @@ export const questionBankModules: QuestionBankModule[] = [
     description: "Combine logic, data structures, functions, and debugging.",
     order: 5,
     difficultyRange: "Deep Dive",
-    recommendedAgent: "debug_coach",
   },
 ];
 
@@ -68,7 +61,6 @@ interface TaskSeed {
   description: string;
   topic: TaskTopic;
   difficulty: TaskDifficulty;
-  recommendedAgent: AgentType;
   estimatedMinutes: number;
   problemDescription: string[];
   learningObjectives: string[];
@@ -88,7 +80,6 @@ const seeds: TaskSeed[] = [
     description: "Use variables to store user input and print a formatted message.",
     topic: "variables",
     difficulty: "easy",
-    recommendedAgent: "socratic_guide",
     estimatedMinutes: 15,
     problemDescription: [
       "Read a user's name on the first line and age on the second line.",
@@ -109,7 +100,6 @@ const seeds: TaskSeed[] = [
     description: "Convert text input into numbers and calculate a simple result.",
     topic: "variables",
     difficulty: "easy",
-    recommendedAgent: "socratic_guide",
     estimatedMinutes: 15,
     problemDescription: [
       "Read two space-separated integers from one line.",
@@ -130,7 +120,6 @@ const seeds: TaskSeed[] = [
     description: "Clean and format text input into a consistent message.",
     topic: "strings",
     difficulty: "easy",
-    recommendedAgent: "reflection_coach",
     estimatedMinutes: 20,
     problemDescription: [
       "Read one line of text that may contain leading or trailing spaces.",
@@ -151,7 +140,6 @@ const seeds: TaskSeed[] = [
     description: "Convert a numeric score into a letter grade using conditions.",
     topic: "conditionals",
     difficulty: "easy",
-    recommendedAgent: "strategy_coach",
     estimatedMinutes: 20,
     problemDescription: [
       "Read one integer score from 0 through 100 and convert it to a letter grade.",
@@ -173,7 +161,6 @@ const seeds: TaskSeed[] = [
     description: "Classify numbers with modulo logic and count each group.",
     topic: "conditionals",
     difficulty: "medium",
-    recommendedAgent: "test_coach",
     estimatedMinutes: 25,
     problemDescription: [
       "Read one non-empty line of space-separated integers; values may be positive, negative, or zero.",
@@ -194,7 +181,6 @@ const seeds: TaskSeed[] = [
     description: "Use a loop and accumulator to calculate the sum from 1 to n.",
     topic: "loops",
     difficulty: "medium",
-    recommendedAgent: "debug_coach",
     estimatedMinutes: 25,
     problemDescription: [
       "Read a positive integer n and calculate 1 + 2 + ... + n.",
@@ -216,7 +202,6 @@ const seeds: TaskSeed[] = [
     description: "Scan a list of numbers and keep track of the largest value.",
     topic: "lists",
     difficulty: "medium",
-    recommendedAgent: "strategy_coach",
     estimatedMinutes: 25,
     problemDescription: [
       "Read one non-empty line of space-separated integers and print the largest integer.",
@@ -244,7 +229,6 @@ const seeds: TaskSeed[] = [
     description: "Calculate count, total, and average for a list of numbers.",
     topic: "lists",
     difficulty: "medium",
-    recommendedAgent: "test_coach",
     estimatedMinutes: 30,
     problemDescription: [
       "Read one non-empty line of space-separated numbers.",
@@ -266,7 +250,6 @@ const seeds: TaskSeed[] = [
     description: "Use a dictionary to count repeated words.",
     topic: "strings",
     difficulty: "hard",
-    recommendedAgent: "debug_coach",
     estimatedMinutes: 35,
     problemDescription: [
       "Read one line containing space-separated words and count how many times each word occurs.",
@@ -288,7 +271,6 @@ const seeds: TaskSeed[] = [
     description: "Write a function that returns twice the sum of two integers.",
     topic: "functions",
     difficulty: "medium",
-    recommendedAgent: "socratic_guide",
     estimatedMinutes: 30,
     problemDescription: [
       "Complete calculate(a, b) so it returns twice the sum of the two integer arguments: 2 * (a + b).",
@@ -310,7 +292,6 @@ const seeds: TaskSeed[] = [
     description: "Encapsulate validation rules in a clear Boolean function.",
     topic: "functions",
     difficulty: "medium",
-    recommendedAgent: "test_coach",
     estimatedMinutes: 30,
     problemDescription: [
       "Complete is_valid_password(password) so it returns True only when both validation rules are satisfied.",
@@ -332,7 +313,6 @@ const seeds: TaskSeed[] = [
     description: "Turn repeated code into a reusable helper function.",
     topic: "functions",
     difficulty: "hard",
-    recommendedAgent: "reflection_coach",
     estimatedMinutes: 35,
     problemDescription: [
       "Complete format_record(name, score) so it returns one string formatted as name: score.",
@@ -354,7 +334,6 @@ const seeds: TaskSeed[] = [
     description: "Generate a table using nested loop thinking.",
     topic: "loops",
     difficulty: "medium",
-    recommendedAgent: "test_coach",
     estimatedMinutes: 30,
     problemDescription: [
       "Read an integer n from 1 through 12 and print an n-by-n multiplication table.",
@@ -376,7 +355,6 @@ const seeds: TaskSeed[] = [
     description: "Combine lists, loops, and functions to summarize grades.",
     topic: "lists",
     difficulty: "hard",
-    recommendedAgent: "strategy_coach",
     estimatedMinutes: 40,
     problemDescription: [
       "Read exactly three lines; each line contains a student name and an integer score separated by a space.",
@@ -398,7 +376,6 @@ const seeds: TaskSeed[] = [
     description: "Reason through a small checkout program and fix edge cases.",
     topic: "conditionals",
     difficulty: "hard",
-    recommendedAgent: "debug_coach",
     estimatedMinutes: 40,
     problemDescription: [
       "Read a non-negative subtotal as a decimal number.",
@@ -420,7 +397,6 @@ const seeds: TaskSeed[] = [
     description: "Convert a Celsius temperature to Fahrenheit with clear numeric formatting.",
     topic: "variables",
     difficulty: "easy",
-    recommendedAgent: "socratic_guide",
     estimatedMinutes: 15,
     problemDescription: [
       "Read one Celsius temperature as a decimal number.",
@@ -442,7 +418,6 @@ const seeds: TaskSeed[] = [
     description: "Calculate a rectangle's area and perimeter from two dimensions.",
     topic: "variables",
     difficulty: "easy",
-    recommendedAgent: "socratic_guide",
     estimatedMinutes: 20,
     problemDescription: [
       "Read the integer width and height of a rectangle from one space-separated line.",
@@ -464,7 +439,6 @@ const seeds: TaskSeed[] = [
     description: "Combine divisibility conditions to classify a calendar year.",
     topic: "conditionals",
     difficulty: "medium",
-    recommendedAgent: "strategy_coach",
     estimatedMinutes: 25,
     problemDescription: [
       "Read one positive integer year and determine whether it is a Gregorian leap year.",
@@ -489,7 +463,6 @@ const seeds: TaskSeed[] = [
     description: "Combine a loop with ordered divisibility conditions.",
     topic: "loops",
     difficulty: "medium",
-    recommendedAgent: "test_coach",
     estimatedMinutes: 25,
     problemDescription: [
       "Read a positive integer n and process every integer from 1 through n.",
@@ -511,7 +484,6 @@ const seeds: TaskSeed[] = [
     description: "Build a list of unique values while preserving their first-seen order.",
     topic: "lists",
     difficulty: "medium",
-    recommendedAgent: "strategy_coach",
     estimatedMinutes: 30,
     problemDescription: [
       "Read one line of space-separated integers and remove repeated values.",
@@ -533,7 +505,6 @@ const seeds: TaskSeed[] = [
     description: "Track the two largest distinct values without sorting.",
     topic: "lists",
     difficulty: "hard",
-    recommendedAgent: "strategy_coach",
     estimatedMinutes: 35,
     problemDescription: [
       "Read a line containing at least two distinct space-separated integers and print the second largest distinct value.",
@@ -555,7 +526,6 @@ const seeds: TaskSeed[] = [
     description: "Design a function that keeps a value within an inclusive range.",
     topic: "functions",
     difficulty: "medium",
-    recommendedAgent: "socratic_guide",
     estimatedMinutes: 25,
     problemDescription: [
       "Complete clamp(value, low, high) so it returns low when value is below the range, high when value is above the range, and value otherwise.",
@@ -577,7 +547,6 @@ const seeds: TaskSeed[] = [
     description: "Write a reusable function that counts vowels case-insensitively.",
     topic: "functions",
     difficulty: "medium",
-    recommendedAgent: "test_coach",
     estimatedMinutes: 30,
     problemDescription: [
       "Complete count_vowels(text) so it returns the number of a, e, i, o, and u characters in the supplied string.",
@@ -599,7 +568,6 @@ const seeds: TaskSeed[] = [
     description: "Combine structured input, a dictionary, and aggregate calculations.",
     topic: "lists",
     difficulty: "hard",
-    recommendedAgent: "strategy_coach",
     estimatedMinutes: 40,
     problemDescription: [
       "Read exactly four lines containing an item name and integer quantity separated by a space.",
@@ -621,7 +589,6 @@ const seeds: TaskSeed[] = [
     description: "Track current and best streaks while scanning a sequence.",
     topic: "loops",
     difficulty: "hard",
-    recommendedAgent: "debug_coach",
     estimatedMinutes: 40,
     problemDescription: [
       "Read one non-empty line of space-separated integers and find the longest consecutive streak of values greater than zero.",
@@ -907,7 +874,6 @@ export const questionBankTasks: ProgrammingTaskDetail[] = seeds.map((seed, index
     progress: seed.id === "qb-loop-sum" ? 60 : 0,
     estimatedMinutes: seed.estimatedMinutes,
     sourceType: "question_bank",
-    recommendedAgent: seed.recommendedAgent,
     questionSetId: module.id,
     questionSetTitle: module.title,
     createdAt: "2026-07-01T00:00:00Z",

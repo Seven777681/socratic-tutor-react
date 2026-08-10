@@ -2,6 +2,7 @@
 
 import type { TutorMessage as TutorMessageType } from "@/types/tutor";
 import { BotIcon } from "@/components/dashboard/dashboard-icons";
+import { TutorLearningReport } from "@/components/tutor/tutor-learning-report";
 
 function renderInlineCode(content: string) {
   const parts = content.split(/(`[^`]+`)/g);
@@ -57,11 +58,15 @@ export function TutorMessage({
   }
 
   return (
-    <article className="flex max-w-[92%] items-start gap-2">
+    <article
+      className={`flex items-start gap-2 ${
+        message.learningAssessment ? "w-full max-w-full" : "max-w-[92%]"
+      }`}
+    >
       <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#eceaff] text-[#6255f6]">
         <BotIcon className="h-4 w-4" />
       </span>
-      <div className="rounded-2xl border border-[#E4E7F0] bg-[#F7F8FF] px-3 py-2 text-sm leading-6 text-slate-700">
+      <div className="min-w-0 flex-1 rounded-2xl border border-[#E4E7F0] bg-[#F7F8FF] px-3 py-2 text-sm leading-6 text-slate-700">
         {message.questionType ? (
           <p className="mb-1 text-xs font-extrabold text-[#6255f6]">
             {questionTypeLabels[message.questionType]}
@@ -87,6 +92,9 @@ export function TutorMessage({
               No, help me understand
             </button>
           </div>
+        ) : null}
+        {message.learningAssessment ? (
+          <TutorLearningReport assessment={message.learningAssessment} />
         ) : null}
         <time className="sr-only" dateTime={message.timestamp}>
           {message.timestamp}
