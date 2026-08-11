@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CodeRunResult } from "@/types/code-run";
-import type { ProgrammingTaskDetail } from "@/types/task";
+import type { ProgrammingTaskDetail, TaskEntryPath } from "@/types/task";
 import type { TutorLearningContext, TutorPlanInteraction } from "@/types/tutor";
 import { CodeEditorPanel } from "@/components/editor/code-editor-panel";
 import { SocraticTutorPanel } from "@/components/tutor/socratic-tutor-panel";
 import { TutorPanelToggle } from "@/components/tutor/tutor-panel-toggle";
+import { getGeneratedTaskSummaries } from "@/lib/imported-tasks-storage";
+import { devDemoTasks } from "@/data/dev-demo-tasks";
+import { isDemoTasksEnabled } from "@/lib/imported-tasks-storage";
 
 export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
   const [isTutorCollapsed, setIsTutorCollapsed] = useState(false);
@@ -14,6 +17,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
   const [latestRunResult, setLatestRunResult] = useState<CodeRunResult | undefined>();
   const [planReviewRequestId, setPlanReviewRequestId] = useState(0);
   const [planInteraction, setPlanInteraction] = useState<TutorPlanInteraction | undefined>();
+  const [entryPath, setEntryPath] = useState<TaskEntryPath>("undecided");
   const [learningContext, setLearningContext] = useState<TutorLearningContext>({
     planningStatus: "not_started",
     planningApproach: "",
@@ -21,11 +25,32 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
     latestPrediction: "",
     hintLevel: 0,
   });
+  const nextTask = useMemo(() => {
+    const tasks = getGeneratedTaskSummaries();
+    const currentIndex = tasks.findIndex((candidate) => candidate.id === task.id);
+    const demoIndex = devDemoTasks.findIndex((candidate) => candidate.id === task.id);
+    const next =
+      currentIndex >= 0
+        ? tasks[currentIndex + 1]
+        : isDemoTasksEnabled() && demoIndex >= 0
+          ? devDemoTasks[demoIndex + 1]
+          : undefined;
+
+    return next ? { href: next.href, title: next.title } : undefined;
+  }, [task.id]);
 
   useEffect(() => {
     setCurrentCode(task.starterCode);
     setLatestRunResult(undefined);
     setPlanInteraction(undefined);
+    const storedEntryPath = window.localStorage.getItem(
+      `socratic-task-entry-path:${task.id}`,
+    );
+    setEntryPath(
+      storedEntryPath === "plan" || storedEntryPath === "code"
+        ? storedEntryPath
+        : "undecided",
+    );
     setLearningContext({
       planningStatus: "not_started",
       planningApproach: "",
@@ -34,6 +59,11 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
       hintLevel: 0,
     });
   }, [task.id, task.starterCode]);
+
+  const chooseEntryPath = (path: Exclude<TaskEntryPath, "undecided">) => {
+    window.localStorage.setItem(`socratic-task-entry-path:${task.id}`, path);
+    setEntryPath(path);
+  };
 
   return (
     <div className="min-h-[calc(100dvh-68px)] overflow-x-hidden bg-[linear-gradient(135deg,#f7f8ff_0%,#eef2ff_100%)]">
@@ -68,6 +98,9 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
                 hintLevel: current.hintLevel,
               }));
             }}
+            nextTask={nextTask}
+            entryPath={entryPath}
+            onEntryPathChange={chooseEntryPath}
           />
         </div>
 
@@ -100,6 +133,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
                 onHintLevelChange={(hintLevel) => {
                   setLearningContext((current) => ({ ...current, hintLevel }));
                 }}
+                entryPath={entryPath}
               />
             </div>
           )}

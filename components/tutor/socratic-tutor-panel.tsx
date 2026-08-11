@@ -8,7 +8,7 @@ import type {
   TutorPlanInteraction,
   TutorLearningContext,
 } from "@/types/tutor";
-import type { ProgrammingTaskDetail } from "@/types/task";
+import type { ProgrammingTaskDetail, TaskEntryPath } from "@/types/task";
 import { TutorClearDialog } from "@/components/tutor/tutor-clear-dialog";
 import { TutorComposer } from "@/components/tutor/tutor-composer";
 import { TutorContextSummary } from "@/components/tutor/tutor-context-summary";
@@ -45,6 +45,7 @@ export function SocraticTutorPanel({
   planReviewRequestId,
   onPlanInteraction,
   onHintLevelChange,
+  entryPath,
 }: {
   task: ProgrammingTaskDetail;
   currentCode: string;
@@ -53,6 +54,7 @@ export function SocraticTutorPanel({
   planReviewRequestId?: number;
   onPlanInteraction?: (review: TutorPlanInteraction) => void;
   onHintLevelChange?: (hintLevel: number) => void;
+  entryPath: TaskEntryPath;
 }) {
   const [isGuidelinesOpen, setIsGuidelinesOpen] = useState(false);
   const [isClearOpen, setIsClearOpen] = useState(false);
@@ -83,6 +85,24 @@ export function SocraticTutorPanel({
     onHintLevelChange,
   });
   const lastHandledPlanReviewId = useRef(planReviewRequestId ?? 0);
+  const planningHelpStartedRef = useRef(false);
+
+  useEffect(() => {
+    planningHelpStartedRef.current = false;
+  }, [task.id]);
+
+  useEffect(() => {
+    if (
+      entryPath !== "plan" ||
+      planningHelpStartedRef.current ||
+      conversation.messages.length > 0
+    ) {
+      return;
+    }
+
+    planningHelpStartedRef.current = true;
+    beginWithQuestion();
+  }, [beginWithQuestion, conversation.messages.length, entryPath]);
 
   useEffect(() => {
     if (!planReviewRequestId || planReviewRequestId === lastHandledPlanReviewId.current) {
@@ -139,22 +159,37 @@ export function SocraticTutorPanel({
         onGuidelines={() => setIsGuidelinesOpen(true)}
       />
       <TutorContextSummary context={context} />
-      <TutorConversation
-        messages={conversation.messages}
-        status={status}
-        onBegin={beginWithQuestion}
-        onHasIdea={beginWithPlan}
-      />
+      {entryPath === "undecided" ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center">
+          <div className="max-w-xs rounded-2xl border border-dashed border-[#D9DDF0] bg-[#FBFCFF] px-5 py-6">
+            <p className="text-sm font-extrabold text-[#101426]">
+              Read the problem first
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
+              Choose your learning path below the problem. The Tutor will join when you need guidance.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <TutorConversation
+          messages={conversation.messages}
+          status={status}
+          onBegin={beginWithQuestion}
+          onHasIdea={beginWithPlan}
+        />
+      )}
       {errorMessage ? (
         <div role="alert" className="mx-4 mb-3 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm font-semibold leading-6 text-rose-700">
           {errorMessage}
         </div>
       ) : null}
-      <TutorComposer
-        status={status}
-        placeholder={composerPlaceholder}
-        onSend={sendMessage}
-      />
+      {entryPath !== "undecided" ? (
+        <TutorComposer
+          status={status}
+          placeholder={composerPlaceholder}
+          onSend={sendMessage}
+        />
+      ) : null}
 
       {isGuidelinesOpen ? (
         <TutorGuidelinesDialog onClose={() => setIsGuidelinesOpen(false)} />

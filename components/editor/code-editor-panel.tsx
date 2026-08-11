@@ -8,7 +8,6 @@ import type {
 } from "@/types/task";
 import {
   BookOpenIcon,
-  ClockIcon,
   GaugeIcon,
   XIcon,
 } from "@/components/dashboard/dashboard-icons";
@@ -69,6 +68,9 @@ export function CodeEditorPanel({
   planInteraction,
   onReviewPlanInTutor,
   onLearningContextChange,
+  nextTask,
+  entryPath,
+  onEntryPathChange,
 }: CodeEditorPanelProps) {
   const [preferences, setPreferences] = useState<EditorPreferences>({
     fontSize: 16,
@@ -92,7 +94,6 @@ export function CodeEditorPanel({
   >({});
   const [isReviewingPlan, setIsReviewingPlan] = useState(false);
   const [isGeneratingReflection, setIsGeneratingReflection] = useState(false);
-  const lastReflectionSignatureRef = useRef("");
   const [recentRuns, setRecentRuns] = useState<CodeRunResult[]>([]);
   const [demoRunScenario, setDemoRunScenario] =
     useState<RunScenario>("failed");
@@ -106,6 +107,31 @@ export function CodeEditorPanel({
   const { state: learningState, updateState } = useTaskLearningState(taskId);
   const firstPlanningFieldRef = useRef<HTMLInputElement>(null);
   const runResultsRef = useRef<HTMLDivElement>(null);
+  const showPlan =
+    entryPath === "plan" && learningState.planningDraft.status !== "ready";
+
+  const chooseLearningPath = (path: "plan" | "code") => {
+    if (path === "code") {
+      updateState({
+        planningDraft: {
+          ...learningState.planningDraft,
+          status: "ready",
+          reviewBypassed: true,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+    } else if (learningState.planningDraft.status === "not_started") {
+      updateState({
+        planningDraft: {
+          ...learningState.planningDraft,
+          status: "editing",
+          reviewBypassed: false,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+    }
+    onEntryPathChange(path);
+  };
 
   const lineCount = useMemo(
     () => Math.max(1, currentCode.split("\n").length),
@@ -431,13 +457,6 @@ export function CodeEditorPanel({
     updateState,
   ]);
 
-  const reflectionSignature = useMemo(
-    () =>
-      Object.values(learningState.reflectionAnswers)
-        .map((answer) => answer.trim())
-        .join("\u001f"),
-    [learningState.reflectionAnswers],
-  );
   const isReflectionComplete = useMemo(
     () =>
       Object.values(learningState.reflectionAnswers).every(
@@ -446,37 +465,6 @@ export function CodeEditorPanel({
     [learningState.reflectionAnswers],
   );
 
-  useEffect(() => {
-    if (!isReflectionComplete || isGeneratingReflection) {
-      return;
-    }
-
-    if (
-      learningState.reflectionSummary.trim() &&
-      !lastReflectionSignatureRef.current
-    ) {
-      lastReflectionSignatureRef.current = reflectionSignature;
-      return;
-    }
-
-    if (lastReflectionSignatureRef.current === reflectionSignature) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      lastReflectionSignatureRef.current = reflectionSignature;
-      void generateReflectionSummary();
-    }, 800);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [
-    generateReflectionSummary,
-    isGeneratingReflection,
-    isReflectionComplete,
-    learningState.reflectionSummary,
-    reflectionSignature,
-  ]);
-
   const shouldShowReflection =
     runResult?.status === "success" ||
     learningState.latestRunResult?.status === "success";
@@ -484,44 +472,93 @@ export function CodeEditorPanel({
   return (
     <>
       <section className="flex min-h-[640px] min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-[22px] border border-[#E4E7F0] bg-white shadow-[0_16px_45px_rgba(78,91,130,0.08)] lg:h-[calc(100dvh-108px)] lg:min-h-0">
-      <div className="border-b border-[#E4E7F0] bg-white px-5 py-3.5">
+      <div className="border-b border-[#E4E7F0] bg-white px-5 py-4 sm:px-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-[#6255f6]">
               Problem
             </p>
-            <h2 className="mt-2 text-2xl font-extrabold tracking-normal text-[#101426]">
+            <h2 className="mt-2 text-xl font-extrabold tracking-tight text-[#101426] sm:text-2xl">
               {task.title}
             </h2>
-            <p className="mt-2 max-w-[840px] text-sm leading-6 text-slate-600">
-              {task.description.join(" ")}
-            </p>
+            <div className="mt-3 max-w-[1120px] border-l-[3px] border-[#8b7cf6] pl-4">
+              <p className="text-base font-medium leading-7 text-slate-700">
+                {task.description.join(" ")}
+              </p>
+            </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#eceaff] px-3 py-1 text-xs font-bold text-[#6255f6]">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#eceaff] px-2.5 py-0.5 text-[11px] font-bold text-[#6255f6]">
                 <BookOpenIcon className="h-3.5 w-3.5" />
                 {topicLabels[task.concept]}
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
                 <GaugeIcon className="h-3.5 w-3.5" />
                 {difficultyLabels[task.thinkingDepth]}
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                <ClockIcon className="h-3.5 w-3.5" />
-                {task.estimatedMinutes} min
               </span>
             </div>
           </div>
           <button
             type="button"
             onClick={() => setIsDetailsOpen(true)}
-            className="inline-flex h-10 w-fit shrink-0 items-center justify-center gap-2 rounded-lg border border-[#b9b2ff] bg-white px-3 text-sm font-bold text-[#6255f6] transition hover:border-[#6255f6] hover:bg-indigo-50/70 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 active:scale-[0.99]"
+            className="inline-flex h-8 w-fit shrink-0 items-center justify-center rounded-lg px-2.5 text-xs font-bold text-[#6255f6] transition hover:bg-indigo-50/70 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15"
           >
             View details
           </button>
         </div>
+
+        <section className="mt-4 max-w-[920px]">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-slate-500">
+            Examples
+          </p>
+          {task.examples.map((example, index) => (
+            <article
+              key={example.id}
+              className="grid gap-2 border-t border-[#E4E7F0] py-2.5 sm:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)] sm:items-start sm:gap-4"
+            >
+              <p className="text-xs font-extrabold text-[#6255f6]">
+                #{index + 1}
+              </p>
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold text-slate-500">Input</p>
+                <pre className="mt-0.5 overflow-x-auto whitespace-pre-wrap font-mono text-sm font-medium leading-5 text-[#20263a]"><code>{example.input}</code></pre>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold text-slate-500">Output</p>
+                <pre className="mt-0.5 overflow-x-auto whitespace-pre-wrap font-mono text-sm font-medium leading-5 text-[#20263a]"><code>{example.output}</code></pre>
+              </div>
+            </article>
+          ))}
+        </section>
+
+        {entryPath === "undecided" ? (
+          <section className="mt-4 w-full max-w-[760px] rounded-xl border border-[#d9d5ff] bg-[linear-gradient(135deg,#f8f7ff,#eef2ff)] px-4 py-3.5">
+            <h3 className="text-base font-extrabold text-slate-700 sm:text-lg">
+              Do you already have an approach for solving this task?
+            </h3>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 sm:text-sm">
+              Start coding if you know your approach, or build a short plan with help from the AI Tutor.
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => chooseLearningPath("code")}
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#6C4CF5,#536DFE)] px-4 text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(98,85,246,0.2)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/20"
+              >
+                Yes, start coding
+              </button>
+              <button
+                type="button"
+                onClick={() => chooseLearningPath("plan")}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-[#b9b2ff] bg-white px-4 text-sm font-extrabold text-[#6255f6] transition hover:border-[#6255f6] hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15"
+              >
+                No, help me make a plan
+              </button>
+            </div>
+          </section>
+        ) : null}
       </div>
 
-      <PlanningPanel
+      {showPlan ? <PlanningPanel
         value={learningState.planningDraft}
         errors={planningErrors}
         isReviewing={isReviewingPlan}
@@ -540,8 +577,9 @@ export function CodeEditorPanel({
           void reviewPlan();
         }}
         onEditPlan={editPlanning}
-      />
+      /> : null}
 
+      <>
       <EditorToolbar
         lineCount={lineCount}
         saveStatus={saveStatus}
@@ -612,6 +650,7 @@ export function CodeEditorPanel({
           />
         </div>
       ) : null}
+      </>
       </section>
 
       {shouldShowReflection ? (
@@ -619,9 +658,14 @@ export function CodeEditorPanel({
           answers={learningState.reflectionAnswers}
           summary={learningState.reflectionSummary}
           isGenerating={isGeneratingReflection}
+          isComplete={isReflectionComplete}
           onAnswersChange={(reflectionAnswers) =>
             updateState({ reflectionAnswers, reflectionSummary: "" })
           }
+          onSubmit={() => {
+            void generateReflectionSummary();
+          }}
+          nextTask={nextTask}
         />
       ) : null}
 

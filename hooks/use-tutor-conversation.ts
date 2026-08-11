@@ -26,19 +26,6 @@ function handledRunStorageKey(taskId: string) {
   return `socratic-tutor-handled-run:${taskId}`;
 }
 
-function createPlanningEntryMessage(stage: GuidanceStage): TutorMessage {
-  return {
-    id: `tutor-entry-${Date.now()}-${Math.round(Math.random() * 1000)}`,
-    role: "tutor",
-    content: "Before planning, do you already have an approach?",
-    timestamp: new Date().toISOString(),
-    questionType: "understanding",
-    stage,
-    mode: INTERNAL_TUTOR_MODE,
-    choicePrompt: "planning_entry",
-  };
-}
-
 function createConversation({
   taskId,
   stage,
@@ -52,7 +39,7 @@ function createConversation({
     taskId,
     stage,
     mode: INTERNAL_TUTOR_MODE,
-    messages: stage === "plan" ? [createPlanningEntryMessage(stage)] : [],
+    messages: [],
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -133,17 +120,15 @@ export function useTutorConversation({
     }
     const stored = loadTutorConversation(taskId);
     if (stored) {
-      const storedMessages = stored.messages.filter((message) => message.role !== "system");
+      const storedMessages = stored.messages.filter(
+        (message) =>
+          message.role !== "system" && message.choicePrompt !== "planning_entry",
+      );
       setConversation({
         ...stored,
         stage: initialStage,
         mode: INTERNAL_TUTOR_MODE,
-        messages:
-          storedMessages.length > 0
-            ? storedMessages
-            : initialStage === "plan"
-              ? [createPlanningEntryMessage(initialStage)]
-              : [],
+        messages: storedMessages,
       });
       setStatus("ready");
       setErrorMessage("");
@@ -377,7 +362,7 @@ export function useTutorConversation({
       taskId,
       stage,
       mode: INTERNAL_TUTOR_MODE,
-      messages: stage === "plan" ? [createPlanningEntryMessage(stage)] : [],
+      messages: [],
       createdAt: timestamp,
       updatedAt: timestamp,
     });

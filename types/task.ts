@@ -149,6 +149,7 @@ export interface ProgrammingTaskDetail {
 }
 
 export type SaveStatus = "saved" | "saving" | "unsaved";
+export type TaskEntryPath = "undecided" | "plan" | "code";
 
 export interface CodeEditorState {
   taskId: string;
@@ -178,4 +179,10 @@ export interface CodeEditorPanelProps {
   onLearningContextChange?: (
     context: import("@/types/tutor").TutorLearningContext,
   ) => void;
+  nextTask?: {
+    href: string;
+    title: string;
+  };
+  entryPath: TaskEntryPath;
+  onEntryPathChange: (path: Exclude<TaskEntryPath, "undecided">) => void;
 }
