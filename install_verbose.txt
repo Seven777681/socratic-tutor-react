@@ -1,0 +1,12 @@
+﻿Using pip 25.1.1 from C:\Users\Lenovo\Desktop\socratic-tutor-react\socratic_backend\.venv\Lib\site-packages\pip (python 3.14)
+python.exe : ERROR: Could not find a version that satisfies the requirement supabase (from versions: none)
+所在位置 行:1 字符: 1
++ & 'C:\Users\Lenovo\Desktop\socratic-tutor-react\socratic_backend\.ven ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ERROR: Could no...versions: none):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+[notice] A new release of pip is available: 25.1.1 -> 26.2.1
+[notice] To update, run: C:\Users\Lenovo\Desktop\socratic-tutor-react\socratic_backend\.venv\Scripts\python.exe -m pip install --upgrade pip
+ERROR: No matching distribution found for supabase
