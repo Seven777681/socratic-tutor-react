@@ -8,8 +8,6 @@ import { CodeEditorPanel } from "@/components/editor/code-editor-panel";
 import { SocraticTutorPanel } from "@/components/tutor/socratic-tutor-panel";
 import { TutorPanelToggle } from "@/components/tutor/tutor-panel-toggle";
 import { getGeneratedTaskSummaries } from "@/lib/imported-tasks-storage";
-import { devDemoTasks } from "@/data/dev-demo-tasks";
-import { isDemoTasksEnabled } from "@/lib/imported-tasks-storage";
 
 export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
   const [isTutorCollapsed, setIsTutorCollapsed] = useState(false);
@@ -28,13 +26,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
   const nextTask = useMemo(() => {
     const tasks = getGeneratedTaskSummaries();
     const currentIndex = tasks.findIndex((candidate) => candidate.id === task.id);
-    const demoIndex = devDemoTasks.findIndex((candidate) => candidate.id === task.id);
-    const next =
-      currentIndex >= 0
-        ? tasks[currentIndex + 1]
-        : isDemoTasksEnabled() && demoIndex >= 0
-          ? devDemoTasks[demoIndex + 1]
-          : undefined;
+    const next = currentIndex >= 0 ? tasks[currentIndex + 1] : undefined;
 
     return next ? { href: next.href, title: next.title } : undefined;
   }, [task.id]);

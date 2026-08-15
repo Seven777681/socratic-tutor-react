@@ -25,9 +25,12 @@ export function LearningPathTasksView({
   onSelectedModuleChange: (moduleId: QuestionBankModuleId) => void;
   onTaskContextMenu?: (event: MouseEvent, task: ProgrammingTaskSummary) => void;
 }) {
+  const visibleModules = questionModules.filter((module) =>
+    tasks.some((task) => task.moduleId === module.id),
+  );
   const selectedModule =
-    questionModules.find((module) => module.id === selectedModuleId) ??
-    questionModules[0];
+    visibleModules.find((module) => module.id === selectedModuleId) ??
+    visibleModules[0] ?? questionModules[0];
   const selectedTasks = tasks.filter((task) => task.moduleId === selectedModule.id);
 
   return (
@@ -46,7 +49,7 @@ export function LearningPathTasksView({
         </div>
 
         <div className="flex gap-3 overflow-x-auto pb-1 lg:grid lg:overflow-visible lg:pb-0">
-          {questionModules.map((module) => {
+          {visibleModules.map((module) => {
             const moduleTasks = tasks.filter((task) => task.moduleId === module.id);
             const progress = getModuleProgress(moduleTasks);
             const isActive = module.id === selectedModule.id;

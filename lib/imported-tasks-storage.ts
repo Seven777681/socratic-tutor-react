@@ -8,6 +8,7 @@ import {
   getQuestionBankSummaries,
   getQuestionBankTaskById,
 } from "@/data/question-bank";
+import { userStudyTaskIds } from "@/data/user-study-tasks";
 
 export const importedTasksStorageKey = "socratic-imported-tasks";
 export const importHistoryStorageKey = "socratic-import-history";
@@ -199,12 +200,10 @@ export function toTaskDetail(
 }
 
 export function getGeneratedTaskSummaries() {
-  const questionBankTasks = getQuestionBankSummaries();
-  const generated = getGeneratedTasks().map((task, index) =>
-    toTaskSummary(task, questionBankTasks.length + index + 1),
+  const questionBankTasks = getQuestionBankSummaries().filter((task) =>
+    userStudyTaskIds.has(task.id),
   );
-
-  return [...questionBankTasks, ...generated].sort(
+  return questionBankTasks.sort(
     (first, second) =>
       (first.sourceType === "question_bank" ? 0 : 1) -
         (second.sourceType === "question_bank" ? 0 : 1) ||
@@ -215,19 +214,7 @@ export function getGeneratedTaskSummaries() {
 }
 
 export function getGeneratedTaskById(taskId: string) {
-  const questionBankTask = getQuestionBankTaskById(taskId);
-
-  if (questionBankTask) {
-    return questionBankTask;
-  }
-
-  const generatedTasks = getGeneratedTasks();
-  const importedTask = generatedTasks.find((task) => task.id === taskId);
-
-  if (!importedTask) {
-    return undefined;
-  }
-
-  const importedIndex = generatedTasks.findIndex((task) => task.id === taskId);
-  return toTaskDetail(importedTask, importedIndex + 1);
+  return userStudyTaskIds.has(taskId)
+    ? getQuestionBankTaskById(taskId)
+    : undefined;
 }

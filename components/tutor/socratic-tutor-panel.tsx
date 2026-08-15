@@ -188,6 +188,9 @@ export function SocraticTutorPanel({
           status={status}
           placeholder={composerPlaceholder}
           onSend={sendMessage}
+          showHint={stage === "code" || stage === "debug"}
+          hintLevel={learningContext.hintLevel}
+          onHint={() => void triggerAction("smaller_hint")}
         />
       ) : null}
 

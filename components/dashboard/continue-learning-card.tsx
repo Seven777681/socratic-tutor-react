@@ -17,10 +17,10 @@ export function ContinueLearningCard({ task }: { task?: ContinueTask }) {
               Start Your First Guided Task
             </h2>
             <p className="mt-3 max-w-[620px] text-base leading-7 text-slate-600">
-              Begin with Variables and Input to learn how programs receive and store data.
+              Begin with Find the Maximum, the first fixed task in this study.
             </p>
             <Link
-              href="/tasks/qb-variables-input"
+              href="/tasks/task_1_maximum"
               className="mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-[linear-gradient(90deg,#6657f5,#4678ff)] px-5 text-sm font-bold text-white shadow-lg shadow-indigo-200/80 transition duration-300 motion-safe:hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-200 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 active:translate-y-0"
             >
               Start Task

@@ -7,6 +7,7 @@ import type {
   TaskDifficulty,
   TaskTopic,
 } from "@/types/task";
+import { userStudyTasks } from "@/data/user-study-tasks";
 
 export interface QuestionBankModule {
   id: QuestionBankModuleId;
@@ -885,7 +886,7 @@ function moduleFor(id: QuestionBankModuleId) {
   return module;
 }
 
-export const questionBankTasks: ProgrammingTaskDetail[] = seeds.map((seed, index) => {
+const generatedQuestionBankTasks: ProgrammingTaskDetail[] = seeds.map((seed, index) => {
   const module = moduleFor(seed.moduleId);
 
   return {
@@ -933,6 +934,10 @@ export const questionBankTasks: ProgrammingTaskDetail[] = seeds.map((seed, index
     lastSaved: "Question Bank",
   };
 });
+
+export const questionBankTasks: ProgrammingTaskDetail[] = [
+  ...userStudyTasks,
+];
 
 export function getQuestionBankSummaries() {
   return questionBankTasks.map(({ description, ...task }) => ({

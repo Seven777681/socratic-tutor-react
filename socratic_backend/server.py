@@ -18,13 +18,31 @@ import sys
 import tempfile
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List, Optional
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).with_name(".env"))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from study_logger import log_intervention
 
 from tutor_graph import graph
+
+from supabase import create_client, Client
+
+# 读取.env文件
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# 创建supabase客户端（拥有最高权限）
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+
+
 
 app = FastAPI(title="Socratic Tutor Backend")
 
@@ -203,6 +221,7 @@ def get_tutor_content(req: TutorRequest):
         "",
     )
     initial_state = {
+        "task_id": req.taskId,
         "problem_content": problem,
         "action": req.action,
         "stage": req.stage,
@@ -245,6 +264,12 @@ def get_tutor_content(req: TutorRequest):
     }
     result_state = graph.invoke(initial_state)
     content = result_state.get("tutor_message") or "What is your next thought?"
+    log_intervention(
+        session_id=req.conversationId,
+        task_id=req.taskId,
+        state=result_state,
+        tutor_question=content,
+    )
     question_type = result_state.get("question_type") or "understanding"
     agent_trace = result_state.get("agent_trace", [])
 
@@ -498,6 +523,16 @@ def run_code(req: CodeRunRequest):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/health/db")
+def database_health():
+    response = supabase.table("tasks").select("id", count="exact").limit(1).execute()
+    return {
+        "status": "ok",
+        "table": "tasks",
+        "count": response.count,
+    }
 
 
 @app.post("/api/tutor/message", response_model=TutorResponse)

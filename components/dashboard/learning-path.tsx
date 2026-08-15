@@ -7,6 +7,9 @@ export function LearningPath() {
   const tasks = getGeneratedTaskSummaries().filter(
     (task) => task.sourceType === "question_bank",
   );
+  const visibleModules = questionBankModules.filter((module) =>
+    tasks.some((task) => task.moduleId === module.id),
+  );
 
   return (
     <section>
@@ -28,7 +31,7 @@ export function LearningPath() {
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
-        {questionBankModules.map((module) => {
+        {visibleModules.map((module) => {
           const moduleTasks = tasks.filter((task) => task.moduleId === module.id);
           const completed = moduleTasks.filter((task) => task.status === "completed").length;
           const progress = moduleTasks.length

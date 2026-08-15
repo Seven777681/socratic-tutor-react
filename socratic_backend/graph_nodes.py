@@ -7,6 +7,7 @@ from agent_services import (
     run_agent5,
 )
 from agent2_graph import agent2_graph
+from user_study_config import get_intervention
 
 
 def _append_trace(state: TutorState, agent: str, label: str, summary: str):
@@ -52,6 +53,7 @@ def plan_agent(state: TutorState) -> TutorState:
     state["missing_steps"] = result.get("missing_steps", [])
     state["can_enter_coding"] = can_enter_coding
     state["current_state"] = result.get("current_state", {})
+    state["planning_state"] = result.get("planning_state", {})
     state["selected_action"] = result.get("action")
     state["reasoning_summary"] = result.get("reasoning_summary")
     state["learner_state"] = result.get("learner_state", {})
@@ -89,6 +91,13 @@ def code_analysis_agent(state: TutorState) -> TutorState:
     state["code_error_type"] = result.get("issue_type", "logical_error")
     state["issue_type"] = state["code_error_type"]
     state["misconception"] = result.get("misconception", "")
+    diagnostic_prefix = "failed diagnostic tags:"
+    for line in state.get("execution_result", "").splitlines():
+        if line.lower().startswith(diagnostic_prefix):
+            first_tag = line.split(":", 1)[1].split(",", 1)[0].strip()
+            if first_tag:
+                state["misconception"] = first_tag
+            break
     _append_trace(
         state,
         "Agent 3",
@@ -143,11 +152,15 @@ def monitor_agent(state: TutorState) -> TutorState:
     state["student_state"] = result.get("student_state", "beginner")
     state["confusion_level"] = result.get("confusion_level", 0)
     state["is_stuck"] = result.get("is_stuck", False)
-    state["hint_level"] = result.get("hint_level", state.get("hint_level", 0))
-    if learner_state:
-        learner_state["hintLevel"] = state["hint_level"]
-        learner_state["studentState"] = state["student_state"]
-        state["learner_state"] = learner_state
+    monitored_hint_level = result.get("hint_level", state.get("hint_level", 0))
+    state["hint_level"] = (
+        min(3, int(state.get("hint_level", 0) or 0) + 1)
+        if state.get("action") == "smaller_hint"
+        else monitored_hint_level
+    )
+    learner_state["hintLevel"] = state["hint_level"]
+    learner_state["studentState"] = state["student_state"]
+    state["learner_state"] = learner_state
     _append_trace(
         state,
         "Agent 4",
@@ -186,6 +199,16 @@ def socratic_agent(state: TutorState) -> TutorState:
         learner_state["currentFocus"] = "reflection_learning"
         state["learner_state"] = learner_state
 
+    previous_socratic = dict(learner_state.get("socraticState", {}))
+    current_misconception = state.get("misconception", "") or state.get("issue_type", "")
+    same_issue = previous_socratic.get("current_misconception") == current_misconception
+    question_rounds = int(previous_socratic.get("question_rounds_for_current_issue", 0) or 0) if same_issue else 0
+    misconception_id, intervention = get_intervention(state.get("task_id", ""), current_misconception)
+    fixed_question = None
+    if intervention:
+        level = max(0, min(3, int(state.get("hint_level", 0) or 0)))
+        fixed_question = intervention["levels"][level]
+
     result = agent2_graph.invoke({
         "problem": state.get("problem_content", ""),
         "student_code": state.get("student_code", ""),
@@ -195,12 +218,32 @@ def socratic_agent(state: TutorState) -> TutorState:
         "misconception": state.get("misconception", ""),
         "student_state": state.get("student_state", "beginner"),
         "hint_level": state.get("hint_level", 0),
+        "requested_action": state.get("action", "message"),
+        "fixed_question": fixed_question,
         "learner_state": learner_state,
         "student_answer": state.get("student_answer", ""),
     })
     state["pedagogical_action"] = result.get("action", "ASK_METACOGNITIVE")
+    state["intervention_path"] = result.get("intervention_path", "A")
     state["final_question"] = result.get("final_question", "")
     state["question_validation"] = result.get("validation", {})
+    previous_questions = list(previous_socratic.get("previous_questions", []))
+    if state["final_question"]:
+        previous_questions.append(state["final_question"])
+    previous_answers = list(previous_socratic.get("previous_student_answers", []))
+    if state.get("student_answer", "").strip():
+        previous_answers.append(state["student_answer"])
+    state["socratic_state"] = {
+        "current_misconception": misconception_id or current_misconception or None,
+        "hint_level": state.get("hint_level", 0),
+        "previous_questions": previous_questions[-8:],
+        "previous_student_answers": previous_answers[-8:],
+        "failed_attempts": int(learner_state.get("attemptsOnFocus", 0) or 0),
+        "question_rounds_for_current_issue": question_rounds + 1,
+        "issue_resolved": bool(learner_state.get("latestAnswer", {}).get("focusResolved", False)),
+    }
+    learner_state["socraticState"] = state["socratic_state"]
+    state["learner_state"] = learner_state
     state["tutor_message"] = state["final_question"]
     state["question_type"] = (
         "debugging"
@@ -213,7 +256,7 @@ def socratic_agent(state: TutorState) -> TutorState:
         state,
         "Agent 2",
         "Socratic dialogue",
-        f"stage={state['stage']}, action={state['pedagogical_action']}, hint_level={state['hint_level']}, validated={state['question_validation'].get('valid', False)}",
+        f"stage={state['stage']}, path={state['intervention_path']}, action={state['pedagogical_action']}, hint_level={state['hint_level']}, validated={state['question_validation'].get('valid', False)}",
     )
     return state
 

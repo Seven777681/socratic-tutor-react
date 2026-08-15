@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, TypedDict
 
 class TutorState(TypedDict, total=False):
     problem_content: str
+    task_id: str
     action: str
     stage: str
     mode: str
@@ -23,6 +24,8 @@ class TutorState(TypedDict, total=False):
     missing_steps: List[str]
     can_enter_coding: bool
     current_state: Dict[str, bool]
+    planning_state: Dict[str, Any]
+    socratic_state: Dict[str, Any]
     selected_action: Optional[str]
     reasoning_summary: Optional[str]
 
@@ -34,6 +37,7 @@ class TutorState(TypedDict, total=False):
     issue_type: str
     misconception: str
     pedagogical_action: str
+    intervention_path: str
     final_question: str
     question_validation: Dict[str, Any]
 

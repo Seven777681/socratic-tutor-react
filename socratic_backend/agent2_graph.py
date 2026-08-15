@@ -13,7 +13,11 @@ PedagogicalAction = Literal[
     "ASK_TECHNICAL",
     "PROVIDE_EXAMPLE",
     "ALLOW_NEXT_STEP",
+    "SUMMARIZE_RULE",
+    "PROVIDE_PSEUDOCODE",
 ]
+
+InterventionPath = Literal["A", "B", "C", "D", "FALLBACK"]
 
 
 class Agent2State(TypedDict, total=False):
@@ -26,6 +30,9 @@ class Agent2State(TypedDict, total=False):
     student_state: str
     hint_level: int
     action: PedagogicalAction
+    requested_action: str
+    fixed_question: str
+    intervention_path: InterventionPath
     final_question: str
     learner_state: Dict[str, Any]
     student_answer: str
@@ -44,19 +51,42 @@ def _history_text(history: List[Dict[str, Any]]) -> str:
 
 def select_question_strategy_node(
     state: Agent2State,
-) -> Dict[str, PedagogicalAction]:
+) -> Dict[str, Any]:
     hint_level = max(0, min(3, int(state.get("hint_level", 0))))
-    if hint_level >= 3:
-        action: PedagogicalAction = "PROVIDE_EXAMPLE"
-    elif hint_level == 2:
+    learner_state = state.get("learner_state", {})
+    latest_answer = learner_state.get("latestAnswer", {})
+    attempts = int(learner_state.get("attemptsOnFocus", 0) or 0)
+    off_target = int(learner_state.get("consecutiveOffTarget", 0) or 0)
+    quality = str(latest_answer.get("quality", "uncertain"))
+    focus_resolved = bool(latest_answer.get("focusResolved", False))
+    has_misconception = bool(
+        latest_answer.get("misconception") or state.get("misconception")
+    )
+
+    if attempts > 3:
+        path: InterventionPath = "FALLBACK"
+        action: PedagogicalAction = "PROVIDE_PSEUDOCODE"
+    elif state.get("requested_action") == "smaller_hint":
+        path = "C"
+        if hint_level <= 1:
+            action = "ASK_CONCEPTUAL"
+        elif hint_level == 2:
+            action = "ASK_TECHNICAL"
+        else:
+            action = "PROVIDE_EXAMPLE"
+    elif quality == "correct" and focus_resolved:
+        path = "D"
+        action = "SUMMARIZE_RULE"
+    elif off_target >= 2 or hint_level >= 2 or state.get("student_state") == "confused":
+        path = "C"
         action = "ASK_TECHNICAL"
-    elif hint_level == 1:
-        action = "ASK_CONCEPTUAL"
-    elif state.get("stage") in {"code", "coding"} and state.get("student_state") == "understanding":
-        action = "ALLOW_NEXT_STEP"
+    elif quality == "partial" or has_misconception:
+        path = "B"
+        action = "PROVIDE_EXAMPLE"
     else:
+        path = "A"
         action = "ASK_METACOGNITIVE"
-    return {"action": action}
+    return {"action": action, "intervention_path": path}
 
 
 def _clean_question(text: str) -> str:
@@ -131,6 +161,8 @@ def _question_intent(text: str) -> str:
 
 
 def generate_socratic_question_node(state: Agent2State) -> Dict[str, str]:
+    if state.get("fixed_question"):
+        return {"final_question": state["fixed_question"]}
     learner_state = state.get("learner_state", {})
     latest_answer = learner_state.get("latestAnswer", {})
     validation_feedback = state.get("validation", {}).get("failedRules", [])
@@ -165,6 +197,8 @@ Learner state from Agent 4:
 - student_state: {state.get('student_state', 'beginner')}
 - hint_level: {state.get('hint_level', 0)}
 Selected strategy: {state.get('action', 'ASK_METACOGNITIVE')}
+Student-requested action: {state.get('requested_action', 'message')}
+Intervention path: {state.get('intervention_path', 'A')}
 Current learning focus: {current_focus}
 Focus-specific constraint: {focus_instruction}
 Latest answer quality: {latest_answer.get('quality', 'uncertain')}
@@ -180,13 +214,25 @@ Strategy rules:
 - ASK_TECHNICAL: mention a relevant structure or language feature, but no code.
 - PROVIDE_EXAMPLE: place one tiny analogous, non-solution example inside a question.
 - ALLOW_NEXT_STEP: ask the student to explain or try their next step.
+- SUMMARIZE_RULE: state one general rule abstracted from the student's correct
+  reasoning, then ask one short transfer question.
+- PROVIDE_PSEUDOCODE: give a language-neutral outline of two to four conceptual
+  steps, then ask the student to explain why it works. Do not use code fences,
+  executable syntax, exact identifiers, or a complete task-specific answer.
 - If issue_type is REQUEST_PLAN, ask the student to summarize the reasoning they
   developed in the Plan section before coding.
 - In debugging, use Agent 3's issue_type and misconception as the sole diagnostic
   focus. Never ask about writing, reviewing, or translating the Plan.
+- For a student-requested smaller_hint, make level 1 conceptual and broad, level 2
+  focused on the relevant structure, and level 3 a tiny analogous example. Use the
+  learner's current code and misconception to choose the focus, but never reveal the
+  finished answer.
 
-Return exactly one concise question and nothing else. Never provide corrected code,
-the direct answer, a complete plan, or the exact bug location. Respond to the latest
+Return one or two concise sentences containing exactly one question mark. Normal
+paths should output only the question. SUMMARIZE_RULE may prefix its question with
+one general rule; PROVIDE_PSEUDOCODE may prefix its question with one abstract
+reasoning outline. Never provide corrected code, a complete plan, or the exact bug
+location. Respond to the latest
 student answer and do not repeat a question already present in the conversation.
 Briefly acknowledge a correct idea from the latest answer inside the question when
 natural, then target exactly one missing idea. Do not praise an incorrect answer.
@@ -202,21 +248,30 @@ natural, then target exactly one missing idea. Do not praise an incorrect answer
 
 def validate_question_node(state: Agent2State) -> Dict[str, Any]:
     question = state.get("final_question", "").strip()
+    if state.get("fixed_question") and question == state.get("fixed_question"):
+        return {
+            "validation": {"valid": question.count("?") == 1, "failedRules": []},
+            "retry_count": 0,
+        }
     history = _history_text(state.get("conversation_history", []))
     learner_state = state.get("learner_state", {})
     prompt = """
-You validate one Socratic tutoring question. Return only valid JSON:
+You validate one Socratic tutoring intervention. Return only valid JSON:
 {
   "valid": true,
   "failedRules": ["single_question|targets_focus|uses_student_context|reveals_answer|repeated|hint_mismatch|unclear"]
 }
 
-The question must contain exactly one question, target the current learning focus,
-respond to the student's latest reasoning, avoid giving the answer or corrected code,
-not repeat prior questions, and match the hint level. Do not output chain-of-thought.
+The intervention must contain exactly one question mark, target the current learning
+focus, respond to the student's latest reasoning, not repeat prior questions, and
+match the selected strategy. SUMMARIZE_RULE may include one general principle before
+the question. PROVIDE_PSEUDOCODE may include a short language-neutral reasoning
+outline, but never executable or corrected code. Do not output chain-of-thought.
 """
     user_content = (
         f"Candidate question: {question}\n"
+        f"Selected strategy: {state.get('action')}\n"
+        f"Intervention path: {state.get('intervention_path')}\n"
         f"Stage: {state.get('stage')}\n"
         f"Current focus: {learner_state.get('currentFocus', state.get('issue_type'))}\n"
         f"Hint level: {state.get('hint_level', 0)}\n"
@@ -299,6 +354,24 @@ def safe_fallback_question_node(state: Agent2State) -> Dict[str, str]:
         if state.get("stage") == "debug"
         else learner_state.get("currentFocus", "problem_goal")
     )
+    action = state.get("action", "ASK_METACOGNITIVE")
+    if action == "PROVIDE_PSEUDOCODE":
+        outlines = {
+            "syntax_error": "Use this checking outline: isolate one statement, compare its structure with the language rule, change one structural element, then rerun. How would you apply these steps to the current error?",
+            "logical_error": "Use this reasoning outline: identify the state to preserve, process one item at a time, update only when the target condition holds, then inspect the final state. Why should that preserve the intended result?",
+            "algorithm_error": "Use this reasoning outline: define the required state, process one input unit, update the state under a precise condition, then repeat to completion. Why does each step move toward the required result?",
+        }
+        return {
+            "final_question": outlines.get(
+                focus,
+                "Use this reasoning outline: identify the required information, describe one transformation at a time, then check the result against the task. How does each step address the current gap?",
+            )
+        }
+    if action == "SUMMARIZE_RULE":
+        idea = recognized[0] if recognized else "the reasoning you just established"
+        return {
+            "final_question": f"Your answer establishes this reusable idea: {idea}. Where could the same principle apply in a similar problem?"
+        }
     questions = {
         "problem_goal": [
             "What single result should the finished program produce?",

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { TutorStatus } from "@/types/tutor";
 import { SendIcon } from "@/components/dashboard/dashboard-icons";
+import { LightbulbIcon } from "@/components/dashboard/dashboard-icons";
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -10,10 +11,16 @@ export function TutorComposer({
   status,
   placeholder,
   onSend,
+  showHint = false,
+  hintLevel = 0,
+  onHint,
 }: {
   status: TutorStatus;
   placeholder: string;
   onSend: (message: string) => void;
+  showHint?: boolean;
+  hintLevel?: number;
+  onHint?: () => void;
 }) {
   const [draft, setDraft] = useState("");
   const trimmed = draft.trim();
@@ -29,6 +36,25 @@ export function TutorComposer({
 
   return (
     <div className="border-t border-[#E4E7F0] bg-white px-4 py-3">
+      {showHint ? (
+        <div className="mb-2 flex items-center justify-between">
+          <button
+            type="button"
+            disabled={status === "thinking"}
+            onClick={onHint}
+            aria-label="Ask the tutor for a hint"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50/70 px-3 text-xs font-bold text-amber-700 transition hover:border-amber-300 hover:bg-amber-50 focus:outline-none focus:ring-4 focus:ring-amber-100 disabled:cursor-wait disabled:opacity-55"
+          >
+            <LightbulbIcon className="h-4 w-4" />
+            Hint
+          </button>
+          {hintLevel > 0 ? (
+            <span className="text-[11px] font-semibold text-slate-400">
+              Guidance level {Math.min(3, hintLevel)} of 3
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       <label htmlFor="tutor-message" className="sr-only">
         Explain your current reasoning
       </label>

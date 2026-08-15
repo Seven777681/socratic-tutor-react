@@ -590,7 +590,15 @@ Rules:
     # reasoning. Once the combined score reaches 7, leave smaller omissions for
     # coding/debugging instead of prolonging the Planning conversation.
     score = min(10, concept_score + (2 if has_submitted_plan else 0))
-    can_enter_coding = has_submitted_plan and score >= 7
+    previous_question_count = int(previous_learner_state.get("planningQuestionCount", 0) or 0)
+    planning_question_count = previous_question_count + (1 if latest_answer.strip() else 0)
+    meaningful_attempt_ready = (
+        concepts["problem_goal"]["status"] == "understood"
+        and concepts["algorithm"]["status"] in {"partial", "understood"}
+    )
+    can_enter_coding = has_submitted_plan and (
+        score >= 7 or (planning_question_count >= 2 and meaningful_attempt_ready)
+    )
     if can_enter_coding:
         current_focus = "plan_complete"
 
@@ -615,6 +623,7 @@ Rules:
         "attemptsOnFocus": attempts,
         "consecutiveOffTarget": consecutive_off_target,
         "studentState": "understanding" if current_focus in {"plan_submission", "plan_complete"} else "beginner",
+        "planningQuestionCount": min(2, planning_question_count),
         "concepts": concepts,
         "latestAnswer": {
             "quality": quality,
@@ -637,6 +646,13 @@ Rules:
         "algorithm_idea": concepts["algorithm"]["status"] == "understood",
         "plan_complete": can_enter_coding,
     }
+    planning_state = {
+        "problem_goal_understood": current_state["problem_understanding"],
+        "input_output_understood": current_state["input_output_understanding"],
+        "reasonable_algorithm_idea": current_state["algorithm_idea"],
+        "plan_sufficient_for_coding": can_enter_coding,
+        "planning_question_count": min(2, planning_question_count),
+    }
     return {
         "reasoning_summary": (
             "The submitted plan reached the readiness threshold; smaller omissions can be addressed during coding."
@@ -644,6 +660,7 @@ Rules:
             else "Updated evidence-based Planning state and selected the next learning focus."
         ),
         "current_state": current_state,
+        "planning_state": planning_state,
         "learner_state": learner_state,
         "action": action_by_focus[current_focus],
         "message": (
