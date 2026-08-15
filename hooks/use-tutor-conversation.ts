@@ -242,8 +242,8 @@ export function useTutorConversation({
         setStatus("ready");
         setErrorMessage(
           error instanceof Error
-            ? `${error.message} Your message has been kept. Please try again.`
-            : "The tutor could not respond just now. Your message has been kept. Please try again.",
+            ? `${error.message} 你的消息已保留，请重试。`
+            : "AI 导师暂时无法回复。你的消息已保留，请重试。",
         );
       }
     },
@@ -375,11 +375,11 @@ export function useTutorConversation({
       updatedAt: new Date().toISOString(),
       messages: [
         ...current.messages,
-        createStudentMessage("No, help me understand.", stage),
+        createStudentMessage("我还不会，帮我梳理。", stage),
       ],
     }));
     void requestTutorResponse({
-      studentMessage: "I don't know how to start.",
+      studentMessage: "我不知道该怎么开始。",
       action: "understand_problem",
     });
   }, [requestTutorResponse, stage]);
@@ -390,11 +390,11 @@ export function useTutorConversation({
       updatedAt: new Date().toISOString(),
       messages: [
         ...current.messages,
-        createStudentMessage("Yes, I have an idea.", stage),
+        createStudentMessage("我有思路，开始写代码。", stage),
         {
           id: `tutor-${Date.now()}`,
           role: "tutor",
-          content: `Great. Write your approach and steps in the Plan section, then use Review My Plan when you want a quick check.`,
+          content: `请先写下你的解题思路和步骤，完成后可以让 AI 导师检查计划。`,
           timestamp: new Date().toISOString(),
           questionType: "understanding",
           stage,

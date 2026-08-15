@@ -31,7 +31,7 @@ class Agent2State(TypedDict, total=False):
     hint_level: int
     action: PedagogicalAction
     requested_action: str
-    fixed_question: str
+    intervention_guidance: Dict[str, Any]
     intervention_path: InterventionPath
     final_question: str
     learner_state: Dict[str, Any]
@@ -93,10 +93,14 @@ def _clean_question(text: str) -> str:
     text = text.strip().strip('"')
     if text.lower().startswith("question:"):
         text = text.split(":", 1)[1].strip()
-    first_question = re.search(r".*?\?", text, re.DOTALL)
+    first_question = re.search(r".*?[？?]", text, re.DOTALL)
     if first_question:
         return " ".join(first_question.group(0).split())
-    return "What do you expect this part of your reasoning to accomplish?"
+    return "你希望这部分思路完成什么任务？"
+
+
+def _question_mark_count(text: str) -> int:
+    return text.count("?") + text.count("？")
 
 
 def _question_core(text: str) -> str:
@@ -161,11 +165,10 @@ def _question_intent(text: str) -> str:
 
 
 def generate_socratic_question_node(state: Agent2State) -> Dict[str, str]:
-    if state.get("fixed_question"):
-        return {"final_question": state["fixed_question"]}
     learner_state = state.get("learner_state", {})
     latest_answer = learner_state.get("latestAnswer", {})
     validation_feedback = state.get("validation", {}).get("failedRules", [])
+    intervention_guidance = state.get("intervention_guidance", {})
     current_focus = (
         state.get("issue_type", "logical_error")
         if state.get("stage") == "debug"
@@ -189,6 +192,9 @@ def generate_socratic_question_node(state: Agent2State) -> Dict[str, str]:
 You are Agent 2, the Socratic Questioning Agent and the only student-facing
 question generator.
 
+Language requirement: Always respond in natural, concise Simplified Chinese.
+Keep Python identifiers, code, input examples, and error messages unchanged.
+
 Stage: {state.get('stage', 'coding')}
 Diagnosis from Agent 1 or Agent 3:
 - issue_type: {state.get('issue_type', 'none')}
@@ -207,6 +213,7 @@ Ideas still missing: {latest_answer.get('missingIdeas', [])}
 Possible misconception: {latest_answer.get('misconception', '')}
 Attempts on this focus: {learner_state.get('attemptsOnFocus', 0)}
 Previous validation failures to fix: {validation_feedback}
+Internal intervention guidance: {intervention_guidance}
 
 Strategy rules:
 - ASK_METACOGNITIVE: ask the student to inspect their expectation or assumption.
@@ -227,6 +234,13 @@ Strategy rules:
   focused on the relevant structure, and level 3 a tiny analogous example. Use the
   learner's current code and misconception to choose the focus, but never reveal the
   finished answer.
+- Treat Internal intervention guidance as teaching intent, not student-facing copy.
+  Never repeat its suggested wording verbatim. First interpret what the student's
+  latest message means in context, then write a fresh response that directly
+  addresses that meaning and advances only one small step.
+- If the student asks how to express an idea in Python, acknowledge that concrete
+  request and guide the relevant language concept instead of repeating the prior
+  conceptual question.
 
 Return one or two concise sentences containing exactly one question mark. Normal
 paths should output only the question. SUMMARIZE_RULE may prefix its question with
@@ -248,11 +262,6 @@ natural, then target exactly one missing idea. Do not praise an incorrect answer
 
 def validate_question_node(state: Agent2State) -> Dict[str, Any]:
     question = state.get("final_question", "").strip()
-    if state.get("fixed_question") and question == state.get("fixed_question"):
-        return {
-            "validation": {"valid": question.count("?") == 1, "failedRules": []},
-            "retry_count": 0,
-        }
     history = _history_text(state.get("conversation_history", []))
     learner_state = state.get("learner_state", {})
     prompt = """
@@ -288,7 +297,7 @@ outline, but never executable or corrected code. Do not output chain-of-thought.
             parsed = {}
 
     failed_rules = [str(item) for item in parsed.get("failedRules", [])]
-    if question.count("?") != 1:
+    if _question_mark_count(question) != 1:
         failed_rules.append("single_question")
     if re.search(r"\band what\b", question, re.IGNORECASE):
         failed_rules.append("single_question")
@@ -348,7 +357,7 @@ def safe_fallback_question_node(state: Agent2State) -> Dict[str, str]:
     learner_state = state.get("learner_state", {})
     latest = learner_state.get("latestAnswer", {})
     recognized = latest.get("recognizedIdeas", [])
-    prefix = f"You identified {recognized[0]}. " if recognized else ""
+    prefix = f"你已经明确了“{recognized[0]}”。" if recognized else ""
     focus = (
         state.get("issue_type", "logical_error")
         if state.get("stage") == "debug"
@@ -356,77 +365,35 @@ def safe_fallback_question_node(state: Agent2State) -> Dict[str, str]:
     )
     action = state.get("action", "ASK_METACOGNITIVE")
     if action == "PROVIDE_PSEUDOCODE":
-        outlines = {
-            "syntax_error": "Use this checking outline: isolate one statement, compare its structure with the language rule, change one structural element, then rerun. How would you apply these steps to the current error?",
-            "logical_error": "Use this reasoning outline: identify the state to preserve, process one item at a time, update only when the target condition holds, then inspect the final state. Why should that preserve the intended result?",
-            "algorithm_error": "Use this reasoning outline: define the required state, process one input unit, update the state under a precise condition, then repeat to completion. Why does each step move toward the required result?",
-        }
         return {
-            "final_question": outlines.get(
-                focus,
-                "Use this reasoning outline: identify the required information, describe one transformation at a time, then check the result against the task. How does each step address the current gap?",
-            )
+            "final_question": "我们先缩小范围：结合刚才的运行结果，你认为代码下一步最需要检查哪一项信息？"
         }
     if action == "SUMMARIZE_RULE":
-        idea = recognized[0] if recognized else "the reasoning you just established"
+        idea = recognized[0] if recognized else "你刚刚确认的思路"
         return {
-            "final_question": f"Your answer establishes this reusable idea: {idea}. Where could the same principle apply in a similar problem?"
+            "final_question": f"你已经得出了一个可复用的思路：{idea}。它还能用于哪类相似问题？"
         }
     questions = {
         "problem_goal": [
-            "What single result should the finished program produce?",
-            "How would you describe the program's goal in your own words?",
-            "When the program finishes, what should it have accomplished?",
+            "程序最终需要得到哪一个结果？", "请用自己的话描述程序要完成的目标？", "程序运行结束时应该完成什么？",
         ],
         "input": [
-            "What data will the program receive before it begins processing?",
-            "How would you describe the information given to the program?",
-            "What values are available to the program at the start?",
+            "程序开始处理前会接收哪些数据？", "你会怎样描述题目提供给程序的信息？", "程序一开始可以使用哪些值？",
         ],
         "output": [
-            "What value should the program produce after processing is complete?",
-            "What should the user see when the program finishes?",
-            "How would you describe the expected final result?",
+            "处理完成后，程序应该输出什么值？", "程序结束时，用户应该看到什么？", "你会怎样描述预期的最终结果？",
         ],
         "algorithm": [
-            "What decision should the program make as it examines each value?",
-            "How could the program use each value to move closer to the result?",
-            "What should change while the program processes the values one by one?",
+            "程序检查每个值时需要做出什么判断？", "程序可以怎样利用当前值逐步接近答案？", "逐个处理这些值时，哪个状态需要随之变化？",
         ],
         "plan_submission": [
-            "How would you summarize your reasoning in the Plan section before coding?",
-            "What approach and steps will you now record in the Plan section?",
-            "How can you turn the reasoning you developed into a short written Plan?",
+            "开始编码前，你会怎样把当前思路总结到计划中？", "你准备在计划中写下哪些方法和步骤？", "怎样把刚才形成的思路整理成一份简短计划？",
         ],
         "coding_progress": [
-            "What part of your plan are you translating into code right now?",
-            "What do you expect the next part of your code to accomplish?",
-            "Which step are you trying to express in the program at the moment?",
+            "你现在准备让代码先完成哪一件小事？", "你希望下一部分代码实现什么效果？", "你目前正尝试在程序中表达哪个步骤？",
         ],
         "reflection_learning": [
-            "What is one idea from this solution that you could reuse in a similar problem?",
-            "Why did your final approach work for this problem?",
-            "What would you do differently if you solved a similar problem again?",
-        ],
-        "syntax_error": [
-            "What Python syntax rule might the interpreter be rejecting here?",
-            "Which expression would you inspect first for invalid Python structure?",
-            "How could you check whether each statement follows Python's required form?",
-        ],
-        "logical_error": [
-            "What value do you expect the relevant variable to hold when the result first becomes incorrect?",
-            "Which assumption in the current logic would you test against the failing result?",
-            "Where does the observed behavior first differ from what you expected?",
-        ],
-        "conceptual_error": [
-            "What does the operation involved in this error expect from the values it receives?",
-            "Which programming concept could explain why this operation behaves differently than expected?",
-            "What assumption are you making about the value or name involved in the error?",
-        ],
-        "algorithm_error": [
-            "At which step does the program's behavior first differ from your intended process?",
-            "Which part of the overall procedure would you test with a small example first?",
-            "What invariant should remain true while your algorithm processes each value?",
+            "这个解法中，哪一个思路可以复用到相似问题？", "你的最终方法为什么能解决这道题？", "再次解决类似问题时，你会做出什么调整？",
         ],
     }
     previous_questions = [
@@ -434,7 +401,7 @@ def safe_fallback_question_node(state: Agent2State) -> Dict[str, str]:
         for item in state.get("conversation_history", [])
         if item.get("role") == "tutor"
     ]
-    candidates = questions.get(focus, ["What part of your reasoning would you examine next?"])
+    candidates = questions.get(focus, ["你接下来准备检查思路中的哪一部分？"])
     unused_candidates = [
         candidate
         for candidate in candidates

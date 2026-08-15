@@ -22,12 +22,12 @@ function renderInlineCode(content: string) {
 }
 
 const questionTypeLabels = {
-  understanding: "Guiding Question",
-  decomposition: "Guiding Question",
-  debugging: "Debugging Question",
-  reflection: "Reflection Prompt",
-  transfer: "Edge Case Prompt",
-  strategy_comparison: "Guiding Question",
+  understanding: "AI 导师",
+  decomposition: "AI 导师",
+  debugging: "调试提示",
+  reflection: "学习反思",
+  transfer: "边界情况提示",
+  strategy_comparison: "AI 导师",
 };
 
 export function TutorMessage({
@@ -77,14 +77,14 @@ export function TutorMessage({
               onClick={onHasPlanningIdea}
               className="rounded-lg border border-[#b9b2ff] bg-white px-3 py-2 text-xs font-extrabold text-[#6255f6] transition hover:bg-indigo-50/70 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 active:scale-[0.99]"
             >
-              Yes, I have an idea
+              我有思路，开始写代码
             </button>
             <button
               type="button"
               onClick={onBeginPlanningHelp}
               className="rounded-lg bg-[linear-gradient(90deg,#6657f5,#4678ff)] px-3 py-2 text-xs font-extrabold text-white shadow-sm shadow-indigo-200/70 transition hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 active:scale-[0.99]"
             >
-              No, help me understand
+              我还不会，帮我梳理
             </button>
           </div>
         ) : null}

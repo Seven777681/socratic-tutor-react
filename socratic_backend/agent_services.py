@@ -270,14 +270,14 @@ def _parse_agent1_final(text: str):
 def _choose_agent1_action(state_info: dict):
     state = state_info["current_state"]
     if state["plan_complete"]:
-        return "ALLOW_CODING", "Your plan shows enough understanding to start coding."
+        return "ALLOW_CODING", "你的计划已经体现出足够的理解，可以开始编码了。"
     if not state["problem_understanding"]:
-        return "ASK_PROBLEM_GOAL", "What do you think this problem is asking your program to achieve?"
+        return "ASK_PROBLEM_GOAL", "你认为这道题要求程序最终完成什么？"
     if not state["input_output_understanding"]:
-        return "ASK_INPUT_OUTPUT", "What information does your program need, and what should it produce?"
+        return "ASK_INPUT_OUTPUT", "程序会接收什么信息，最终需要输出什么？"
     if not state["algorithm_idea"]:
-        return "ASK_ALGORITHM", "What process could help you solve this problem step by step?"
-    return "REQUEST_PLAN", "Please describe your approach and possible steps before coding."
+        return "ASK_ALGORITHM", "你准备通过哪些步骤逐步解决这道题？"
+    return "REQUEST_PLAN", "请在编码前简要写下你的方法和步骤。"
 
 def _agent1_json_to_legacy(result: dict, state_info: dict | None = None):
     state = (
@@ -399,7 +399,7 @@ def run_agent1(problem: str, approach: str, steps: str, student_answer: str = ""
         result = {**fallback, **react_result}
         result["can_enter_coding"] = result.get("action") == "ALLOW_CODING" or result.get("can_enter_coding", False)
         if result["can_enter_coding"]:
-            result["guide_question"] = result.get("message", "Your plan shows enough understanding to start coding.")
+            result["guide_question"] = result.get("message", "你的计划已经体现出足够的理解，可以开始编码了。")
         return result
 
     return _infer_agent1_fallback(problem, approach, steps, student_answer)

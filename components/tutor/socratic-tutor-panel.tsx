@@ -143,12 +143,12 @@ export function SocraticTutorPanel({
   );
   const composerPlaceholder =
     stage === "plan"
-      ? "Describe the part of the plan you are unsure about..."
+      ? "说说你对计划中哪一部分还不确定……"
       : stage === "debug"
-        ? "Explain what you expected your code to do..."
+        ? "说说你原本希望代码实现什么效果……"
         : stage === "reflect"
-          ? "Describe what you learned from this solution..."
-          : "Ask about the task, your code, or the next small step...";
+          ? "说说你从这个解法中学到了什么……"
+          : "可以询问题目、代码或下一步怎么做……";
 
   return (
     <section className="flex min-h-[620px] w-full min-w-0 flex-col overflow-hidden rounded-[18px] border border-[#E4E7F0] bg-white shadow-[0_14px_40px_rgba(78,91,130,0.07)] lg:h-full lg:min-h-0">

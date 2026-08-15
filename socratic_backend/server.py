@@ -188,7 +188,37 @@ def _build_chat_history(conversation: List[ConversationMessage]) -> str:
     return "\n".join(f"{m.role}: {m.content}" for m in conversation) or "(no messages yet)"
 
 
+def _is_dialogue_reset_request(message: str) -> bool:
+    text = (message or "").lower()
+    return any(
+        term in text
+        for term in (
+            "\u91cd\u65b0\u5bf9\u8bdd",
+            "\u91cd\u65b0\u8fdb\u884c\u5bf9\u8bdd",
+            "\u91cd\u65b0\u5f00\u59cb",
+            "\u6362\u4e2a\u95ee\u6cd5",
+            "\u522b\u4e00\u76f4",
+            "\u4e0d\u8981\u4e00\u76f4",
+            "start over",
+            "restart",
+            "reset",
+            "rephrase",
+        )
+    )
+
+
 def get_tutor_content(req: TutorRequest):
+    if _is_dialogue_reset_request(req.studentMessage):
+        return (
+            "可以，我们先换一种方式。你现在先不用追踪例子，只看代码：你想先完成“保存第一个数”，还是“比较后面的数”？",
+            "understanding",
+            [],
+            None,
+            None,
+            max(0, min(2, req.hintLevel or 0)),
+            {"currentFocus": "coding_progress", "attemptsOnFocus": 0, "consecutiveOffTarget": 0},
+        )
+
     problem = req.taskDescription or req.taskTitle or "the current problem"
     if req.taskPedagogy:
         pedagogy = req.taskPedagogy
@@ -260,10 +290,11 @@ def get_tutor_content(req: TutorRequest):
         "confusion_level": 0,
         "is_stuck": False,
         "code_error_type": "No Error",
+        "issue_type": previous_learner_state.get("currentFocus", "logical_error"),
         "agent_trace": [],
     }
     result_state = graph.invoke(initial_state)
-    content = result_state.get("tutor_message") or "What is your next thought?"
+    content = result_state.get("tutor_message") or "你接下来准备怎么做？"
     log_intervention(
         session_id=req.conversationId,
         task_id=req.taskId,

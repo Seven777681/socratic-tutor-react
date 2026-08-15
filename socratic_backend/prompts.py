@@ -180,5 +180,4 @@ Debugging: How did you find and fix errors/bugs in your program during coding?
 Transfer: What other programming problems can reuse the logic you learned from this task?
 """
 
-# 计划表单模板（可以留空，后续补充）
-PLAN_FORM_TEMPLATE = ""
+

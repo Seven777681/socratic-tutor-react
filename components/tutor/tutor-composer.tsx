@@ -42,21 +42,21 @@ export function TutorComposer({
             type="button"
             disabled={status === "thinking"}
             onClick={onHint}
-            aria-label="Ask the tutor for a hint"
+            aria-label="向 AI 导师请求提示"
             className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50/70 px-3 text-xs font-bold text-amber-700 transition hover:border-amber-300 hover:bg-amber-50 focus:outline-none focus:ring-4 focus:ring-amber-100 disabled:cursor-wait disabled:opacity-55"
           >
             <LightbulbIcon className="h-4 w-4" />
-            Hint
+            提示
           </button>
           {hintLevel > 0 ? (
             <span className="text-[11px] font-semibold text-slate-400">
-              Guidance level {Math.min(3, hintLevel)} of 3
+              提示等级 {Math.min(3, hintLevel)}/3
             </span>
           ) : null}
         </div>
       ) : null}
       <label htmlFor="tutor-message" className="sr-only">
-        Explain your current reasoning
+        输入你当前的想法
       </label>
       <div className="flex items-end gap-2">
         <textarea
@@ -83,7 +83,7 @@ export function TutorComposer({
           type="button"
           onClick={send}
           disabled={isDisabled}
-          aria-label="Send message to tutor"
+          aria-label="发送消息给 AI 导师"
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(90deg,#6657f5,#4678ff)] text-white shadow-md shadow-indigo-200/70 transition hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55"
         >
           <SendIcon className="h-5 w-5" />

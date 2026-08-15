@@ -10,6 +10,38 @@ from agent2_graph import agent2_graph
 from user_study_config import get_intervention
 
 
+def _normalize_question(text: str) -> str:
+    return " ".join((text or "").strip().lower().split())
+
+
+def _was_question_already_asked(question: str, messages: list[dict]) -> bool:
+    normalized = _normalize_question(question)
+    if not normalized:
+        return False
+    return any(
+        message.get("role") == "tutor"
+        and _normalize_question(str(message.get("content", ""))) == normalized
+        for message in messages
+    )
+
+
+def _is_python_implementation_request(answer: str) -> bool:
+    text = (answer or "").lower()
+    implementation_terms = ("python", "\u4ee3\u7801", "code")
+    setup_terms = (
+        "\u600e\u4e48",
+        "how",
+        "set",
+        "\u8bbe",
+        "\u8d4b\u503c",
+        "first",
+        "\u7b2c\u4e00\u4e2a",
+    )
+    return any(term in text for term in implementation_terms) and any(
+        term in text for term in setup_terms
+    )
+
+
 def _append_trace(state: TutorState, agent: str, label: str, summary: str):
     state.setdefault("agent_trace", []).append({
         "agent": agent,
@@ -46,7 +78,7 @@ def plan_agent(state: TutorState) -> TutorState:
     message = (
         result.get("message")
         or result.get("guide_question")
-        or "What is your next thought about the plan?"
+        or "关于这份计划，你接下来准备补充什么？"
     )
 
     state["understanding_score"] = result.get("understanding_score", 0)
@@ -173,7 +205,7 @@ def monitor_agent(state: TutorState) -> TutorState:
 def socratic_agent(state: TutorState) -> TutorState:
     learner_state = dict(state.get("learner_state", {}))
     if state.get("stage") == "debug":
-        diagnostic_focus = state.get("issue_type", "logical_error")
+        diagnostic_focus = state.get("issue_type") or learner_state.get("currentFocus") or "logical_error"
         previous_focus = learner_state.get("currentFocus")
         learner_state["currentFocus"] = diagnostic_focus
         learner_state["attemptsOnFocus"] = (
@@ -181,12 +213,13 @@ def socratic_agent(state: TutorState) -> TutorState:
             if previous_focus == diagnostic_focus
             else 0
         )
-        learner_state["latestAnswer"] = {
-            "quality": "uncertain",
-            "recognizedIdeas": [],
-            "missingIdeas": [state.get("misconception", "")],
-            "misconception": state.get("misconception", ""),
-        }
+        if not state.get("student_answer", "").strip():
+            learner_state["latestAnswer"] = {
+                "quality": "uncertain",
+                "recognizedIdeas": [],
+                "missingIdeas": [state.get("misconception", "")],
+                "misconception": state.get("misconception", ""),
+            }
         state["learner_state"] = learner_state
     elif (
         state.get("stage") in {"code", "coding"}
@@ -204,10 +237,25 @@ def socratic_agent(state: TutorState) -> TutorState:
     same_issue = previous_socratic.get("current_misconception") == current_misconception
     question_rounds = int(previous_socratic.get("question_rounds_for_current_issue", 0) or 0) if same_issue else 0
     misconception_id, intervention = get_intervention(state.get("task_id", ""), current_misconception)
-    fixed_question = None
+    intervention_guidance = {}
     if intervention:
         level = max(0, min(3, int(state.get("hint_level", 0) or 0)))
-        fixed_question = intervention["levels"][level]
+        intervention_guidance = {
+            "misconception_id": misconception_id,
+            "teaching_goal": intervention.get(
+                "coding_goal" if state.get("stage") in {"code", "coding", "debug"} else "planning_goal",
+                "",
+            ),
+            "hint_level": level,
+            "instruction": "Infer a suitable hint from the teaching goal, code, error evidence, and student's latest meaning.",
+        }
+
+    if _is_python_implementation_request(state.get("student_answer", "")):
+        intervention_guidance = {
+            **intervention_guidance,
+            "student_intent": "The student wants to express initialization from the first list item in Python.",
+            "instruction": "Respond to the Python implementation request directly with a small conceptual hint, then ask one focused question.",
+        }
 
     result = agent2_graph.invoke({
         "problem": state.get("problem_content", ""),
@@ -219,7 +267,7 @@ def socratic_agent(state: TutorState) -> TutorState:
         "student_state": state.get("student_state", "beginner"),
         "hint_level": state.get("hint_level", 0),
         "requested_action": state.get("action", "message"),
-        "fixed_question": fixed_question,
+        "intervention_guidance": intervention_guidance,
         "learner_state": learner_state,
         "student_answer": state.get("student_answer", ""),
     })

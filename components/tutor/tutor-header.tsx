@@ -15,7 +15,7 @@ function TutorStatusView({ status }: { status: TutorStatus }) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-[#eceaff] px-2 py-1 text-xs font-extrabold text-[#6255f6]">
         <LoaderCircleIcon className="h-3.5 w-3.5 motion-safe:animate-spin" />
-        Thinking...
+        思考中……
       </span>
     );
   }
@@ -24,7 +24,7 @@ function TutorStatusView({ status }: { status: TutorStatus }) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2 py-1 text-xs font-extrabold text-slate-600">
         <CircleIcon className="h-3.5 w-3.5" />
-        Offline
+        离线
       </span>
     );
   }
@@ -32,7 +32,7 @@ function TutorStatusView({ status }: { status: TutorStatus }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-1 text-xs font-extrabold text-emerald-700">
       <CheckCircleIcon className="h-3.5 w-3.5" />
-      Ready
+      就绪
     </span>
   );
 }
@@ -70,10 +70,10 @@ export function TutorHeader({
         </span>
         <div className="min-w-0">
           <h2 className="truncate text-base font-extrabold text-[#101426]">
-            Socratic AI Tutor
+            苏格拉底式 AI 导师
           </h2>
           <p className="hidden truncate text-xs font-semibold text-slate-500 2xl:block">
-            One tutor, multiple agents working behind the scenes.
+            多智能体协作，引导你独立解决问题
           </p>
         </div>
       </div>
@@ -83,7 +83,7 @@ export function TutorHeader({
         <div ref={menuRef} className="relative">
           <button
             type="button"
-            aria-label="Tutor menu"
+            aria-label="AI 导师菜单"
             aria-expanded={isMenuOpen}
             onClick={() => setIsMenuOpen((current) => !current)}
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E4E7F0] bg-white text-slate-600 transition hover:bg-indigo-50/70 hover:text-[#6255f6] focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15"
@@ -93,9 +93,9 @@ export function TutorHeader({
           {isMenuOpen ? (
             <div className="absolute right-0 top-11 z-30 w-56 rounded-2xl border border-[#E4E7F0] bg-white p-2 shadow-[0_18px_45px_rgba(78,91,130,0.14)]">
               {[
-                ["Start New Conversation", onStartNew],
-                ["Clear Conversation", onClear],
-                ["Tutor Guidelines", onGuidelines],
+                ["开始新对话", onStartNew],
+                ["清空对话", onClear],
+                ["导师使用说明", onGuidelines],
               ].map(([label, action]) => (
                 <button
                   key={label as string}

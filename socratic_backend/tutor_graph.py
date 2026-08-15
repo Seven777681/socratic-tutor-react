@@ -18,7 +18,7 @@ def route_entry(state: TutorState):
         return "assessment_agent"
     if action in {"review_plan", "understand_problem"} or stage == "plan":
         return "plan_agent"
-    if action == "debug" or stage == "debug":
+    if (action == "debug" or stage == "debug") and not state.get("student_answer", "").strip():
         return "code_analysis_agent"
     return "answer_evaluation_agent"
 
