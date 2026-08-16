@@ -1,5 +1,11 @@
 node_modules
 .next
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
 dev-server.log
 dev-server.err
 next-dev.log
