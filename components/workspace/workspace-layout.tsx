@@ -10,6 +10,10 @@ import { TutorPanelToggle } from "@/components/tutor/tutor-panel-toggle";
 import { getGeneratedTaskSummaries } from "@/lib/imported-tasks-storage";
 
 export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
+  const aiTutorEnabled = ![
+    "task_1_maximum",
+    "task_5_below_limit",
+  ].includes(task.id);
   const [isTutorCollapsed, setIsTutorCollapsed] = useState(false);
   const [currentCode, setCurrentCode] = useState(task.starterCode);
   const [latestRunResult, setLatestRunResult] = useState<CodeRunResult | undefined>();
@@ -39,7 +43,9 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
       `socratic-task-entry-path:${task.id}`,
     );
     setEntryPath(
-      storedEntryPath === "plan" || storedEntryPath === "code"
+      !aiTutorEnabled
+        ? "undecided"
+        : storedEntryPath === "plan" || storedEntryPath === "code"
         ? storedEntryPath
         : "undecided",
     );
@@ -50,7 +56,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
       latestPrediction: "",
       hintLevel: 0,
     });
-  }, [task.id, task.starterCode]);
+  }, [aiTutorEnabled, task.id, task.starterCode]);
 
   const chooseEntryPath = (path: Exclude<TaskEntryPath, "undecided">) => {
     window.localStorage.setItem(`socratic-task-entry-path:${task.id}`, path);
@@ -61,7 +67,9 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
     <div className="min-h-[calc(100dvh-68px)] overflow-x-hidden bg-[linear-gradient(135deg,#f7f8ff_0%,#eef2ff_100%)]">
       <div
         className={`grid min-h-[calc(100dvh-68px)] items-start gap-5 p-4 transition-[grid-template-columns] duration-300 lg:items-stretch xl:p-5 ${
-          isTutorCollapsed
+          !aiTutorEnabled
+            ? "lg:grid-cols-1"
+            : isTutorCollapsed
             ? "lg:grid-cols-[minmax(0,1fr)_56px]"
             : "lg:grid-cols-[minmax(0,1fr)_minmax(320px,32vw)] 2xl:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]"
         }`}
@@ -72,10 +80,11 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
             taskId={task.id}
             starterCode={task.starterCode}
             language={task.language}
+            aiTutorEnabled={aiTutorEnabled}
             onCodeChange={setCurrentCode}
             onRunResultChange={setLatestRunResult}
             planInteraction={planInteraction}
-            onReviewPlanInTutor={(context) => {
+            onReviewPlanInTutor={aiTutorEnabled ? (context) => {
               setIsTutorCollapsed(false);
               setPlanInteraction(undefined);
               setLearningContext((current) => ({
@@ -83,7 +92,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
                 hintLevel: current.hintLevel,
               }));
               setPlanReviewRequestId((requestId) => requestId + 1);
-            }}
+            } : undefined}
             onLearningContextChange={(context) => {
               setLearningContext((current) => ({
                 ...context,
@@ -96,7 +105,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
           />
         </div>
 
-        <div className="min-w-0 lg:flex lg:h-[calc(100dvh-108px)] lg:min-h-0">
+        {aiTutorEnabled ? <div className="min-w-0 lg:flex lg:h-[calc(100dvh-108px)] lg:min-h-0">
           {isTutorCollapsed ? (
             <div className="hidden h-full flex-col items-center rounded-[20px] border border-[#E4E7F0] bg-white py-3 shadow-[0_14px_40px_rgba(78,91,130,0.06)] lg:flex">
               <TutorPanelToggle
@@ -129,7 +138,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
               />
             </div>
           )}
-        </div>
+        </div> : null}
       </div>
     </div>
   );

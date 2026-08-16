@@ -144,34 +144,6 @@ summary: [your complete personalized reflection summary paragraph]
 """
 
 
-HINT_LEVEL0 = [
-    "What result do you want your program to produce in the end?",
-    "Could you walk me through your current thinking for solving this problem?",
-    "Which part of this task feels confusing to you right now?",
-    "What key information does the problem ask you to process?"
-]
-
-HINT_LEVEL1 = [
-    "Think about operations you need to repeat many times—what general programming idea fits this need?",
-    "When calculating an average value, what two mathematical steps must you complete first?",
-    "How can a program store multiple separate sets of numeric data?",
-    "To judge different score ranges, what logical thinking pattern can you use?"
-]
-
-HINT_LEVEL2 = [
-    "You may use a for-loop structure to handle repeated execution logic.",
-    "Try if/elif/else conditional structures to judge different value ranges.",
-    "You can define independent variables to store each input score separately.",
-    "Pay attention to the division operator when calculating average results."
-]
-
-HINT_LEVEL3 = [
-    # 这里你可以补充极简代码示例，比如：
-    "for i in range(5): print(i)",
-    "if score >= 60: print('Pass') else: print('Fail')",
-    "total = a + b + c; avg = total / 3"
-]
-
 # 课后反思问卷英文模板
 REFLECTION_FORM_TEMPLATE = """
 Understanding: What was the most confusing or challenging part of this programming task?

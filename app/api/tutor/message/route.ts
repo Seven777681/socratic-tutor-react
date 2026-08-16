@@ -4,6 +4,11 @@ import type { TutorRequest } from "@/types/tutor";
 const BACKEND_URL =
   process.env.SOCRATIC_BACKEND_URL || "http://127.0.0.1:8001";
 
+const ASSESSMENT_ONLY_TASKS = new Set([
+  "task_1_maximum",
+  "task_5_below_limit",
+]);
+
 export async function POST(request: Request) {
   let body: TutorRequest;
 
@@ -20,6 +25,13 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Invalid tutor request." },
       { status: 400 },
+    );
+  }
+
+  if (ASSESSMENT_ONLY_TASKS.has(body.taskId)) {
+    return NextResponse.json(
+      { error: "AI Tutor is disabled for this assessment task." },
+      { status: 403 },
     );
   }
 

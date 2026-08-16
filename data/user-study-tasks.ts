@@ -28,7 +28,10 @@ export const userStudyTasks: ProgrammingTaskDetail[] = [
     title: "Find the Maximum", difficulty: "easy", thinkingDepth: "easy",
     description: ["Write a Python function that finds the largest value in a non-empty list of integers."],
     constraints: ["Do not use max()", "Do not use sort()", "Do not use sorted()"],
-    examples: [{ id: "example-1", input: "[3, 7, 2, 5]", output: "7" }],
+    examples: [
+      { id: "example-1", input: "[3, 7, 2, 5]", output: "7" },
+      { id: "example-2", input: "[-8, -3, -10]", output: "-3" },
+    ],
     testCases: [
       { id: "t1-1", name: "Mixed values", input: "3 7 2 5", output: "7", visibility: "hidden" },
       { id: "t1-2", name: "Negative values", input: "-8 -3 -10", output: "-3", visibility: "hidden", misconceptionTag: "initialized_to_zero" },
@@ -45,7 +48,10 @@ export const userStudyTasks: ProgrammingTaskDetail[] = [
     ...base, id: "task_2_above_average", taskNumber: 2, order: 2,
     title: "Count Values Above Average", difficulty: "medium", thinkingDepth: "medium",
     description: ["Write a Python function that returns how many numbers in a non-empty list are greater than the average of the list."],
-    constraints: ["Do not use sum()"], examples: [{ id: "example-1", input: "[2, 4, 6, 8]", output: "2" }],
+    constraints: ["Do not use sum()"], examples: [
+      { id: "example-1", input: "[2, 4, 6, 8]", output: "2" },
+      { id: "example-2", input: "[10, 10, 10]", output: "0" },
+    ],
     testCases: [
       { id: "t2-1", name: "Mixed values", input: "2 4 6 8", output: "2", visibility: "hidden" },
       { id: "t2-2", name: "Equal values", input: "10 10 10", output: "0", visibility: "hidden" },
@@ -61,7 +67,10 @@ export const userStudyTasks: ProgrammingTaskDetail[] = [
     ...base, id: "task_3_remove_duplicates", taskNumber: 3, order: 3,
     title: "Remove Duplicates While Preserving Order", difficulty: "medium", thinkingDepth: "medium",
     description: ["Write a Python function that removes duplicate values from a list while preserving the order in which values first appear."],
-    constraints: ["Do not use set()"], examples: [{ id: "example-1", input: "[3, 1, 3, 2, 1, 4]", output: "[3, 1, 2, 4]" }],
+    constraints: ["Do not use set()"], examples: [
+      { id: "example-1", input: "[3, 1, 3, 2, 1, 4]", output: "[3, 1, 2, 4]" },
+      { id: "example-2", input: "[1, 1, 1]", output: "[1]" },
+    ],
     testCases: [
       { id: "t3-1", name: "Separated duplicates", input: "3 1 3 2 1 4", output: "3 1 2 4", visibility: "hidden", misconceptionTag: "append_every_value" },
       { id: "t3-2", name: "All duplicates", input: "1 1 1", output: "1", visibility: "hidden" },
@@ -78,7 +87,10 @@ export const userStudyTasks: ProgrammingTaskDetail[] = [
     title: "Second Largest Distinct Value", difficulty: "medium", thinkingDepth: "medium",
     description: ["Write a Python function that finds the second largest distinct value in a list."],
     constraints: ["Do not use max()", "Do not use sort()", "Do not use sorted()", "The list contains at least two distinct values"],
-    examples: [{ id: "example-1", input: "[4, 7, 2, 9, 7]", output: "7" }],
+    examples: [
+      { id: "example-1", input: "[4, 7, 2, 9, 7]", output: "7" },
+      { id: "example-2", input: "[-2, -8, -4]", output: "-4" },
+    ],
     testCases: [
       { id: "t4-1", name: "Mixed values", input: "4 7 2 9 7", output: "7", visibility: "hidden", misconceptionTag: "lost_previous_largest" },
       { id: "t4-2", name: "Two values", input: "10 5", output: "5", visibility: "hidden" },
@@ -89,6 +101,38 @@ export const userStudyTasks: ProgrammingTaskDetail[] = [
     inputDescription: "One line of space-separated integers containing at least two distinct values.", outputDescription: "The second largest distinct integer.",
     pedagogy: { primaryConcept: "two-value invariant", secondaryConcepts: ["distinctness", "ordered state updates"], prerequisites: ["lists", "loops", "conditionals"], commonMisconceptions: ["losing the previous largest", "treating duplicates as second largest", "incorrect initialization", "updating in the wrong order", "using prohibited built-ins"], expectedPlanElements: ["track largest and second largest", "preserve the old largest", "ignore duplicates", "update in the correct order"], reflectionPrompts: ["What must remain true about both tracked values?"] },
     starterCode: "numbers = [int(value) for value in input().split()]\n\n# TODO: Print the second largest distinct value\n", href: "/tasks/task_4_second_largest",
+  },
+  {
+    ...base, id: "task_5_below_limit", taskNumber: 5, order: 5,
+    title: "Highest Score Below a Limit", difficulty: "medium", thinkingDepth: "medium",
+    description: [
+      "Write a Python function that finds the largest value that is smaller than a given limit in a list of integers.",
+      "You may assume that there is at least one value in the list that is smaller than the limit.",
+    ],
+    constraints: ["Do not use max()", "Do not use sort()", "Do not use sorted()"],
+    examples: [
+      { id: "example-1", input: "numbers = [45, 72, 88, 91, 67]\nlimit = 90", output: "88" },
+      { id: "example-2", input: "numbers = [-12, -5, -2, 3]\nlimit = -3", output: "-5" },
+    ],
+    testCases: [
+      { id: "t5-1", name: "Mixed scores", input: "45 72 88 91 67\n90", output: "88", visibility: "hidden" },
+      { id: "t5-2", name: "Limit is present", input: "40 75 90 82\n90", output: "82", visibility: "hidden", misconceptionTag: "inclusive_limit" },
+      { id: "t5-3", name: "Negative values", input: "-12 -5 -2 3\n-3", output: "-5", visibility: "hidden", misconceptionTag: "initialized_to_zero" },
+      { id: "t5-4", name: "Best value first", input: "9 2 12 4\n10", output: "9", visibility: "hidden", misconceptionTag: "unconditional_overwrite" },
+    ],
+    learningObjectives: ["Filter values using a strict limit", "Maintain a running candidate", "Choose a valid initialization", "Update state conditionally"],
+    inputDescription: "The first line contains space-separated integers. The second line contains the integer limit.",
+    outputDescription: "The largest integer that is strictly smaller than the limit.",
+    pedagogy: {
+      primaryConcept: "conditional maximum-tracking invariant",
+      secondaryConcepts: ["strict comparison", "candidate initialization", "list traversal"],
+      prerequisites: ["lists", "loops", "conditionals"],
+      commonMisconceptions: ["accepting a value equal to the limit", "initializing the candidate to zero", "updating with values above the limit", "using prohibited built-ins"],
+      expectedPlanElements: ["identify a valid value below the limit", "inspect every list value", "consider only values strictly below the limit", "update only when a larger valid value is found", "print the final candidate"],
+      reflectionPrompts: ["What must be true about the candidate after each value is examined?"],
+    },
+    starterCode: "numbers = [int(value) for value in input().split()]\nlimit = int(input())\n\n# TODO: Print the largest value that is strictly below the limit\n",
+    href: "/tasks/task_5_below_limit",
   },
 ];
 

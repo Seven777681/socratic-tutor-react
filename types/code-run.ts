@@ -50,6 +50,7 @@ export interface CodeRunResult {
   summary: string;
   tests: TestCaseResult[];
   error?: CodeExecutionError;
+  codeSnapshot?: string;
 }
 
 export interface MockRunCodeInput {

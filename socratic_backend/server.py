@@ -13,10 +13,12 @@ this service. Request/response field names intentionally mirror
 import os
 import random
 import re
+import json
 import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -25,10 +27,11 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).with_name(".env"))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from study_logger import log_intervention
+from study_logger import log_intervention, save_assessment_plan, save_assessment_score, save_code_run
+from llm_base import base_llm_call, model as scoring_model
 
 from tutor_graph import graph
 
@@ -66,9 +69,11 @@ class RunResultError(BaseModel):
 
 
 class LatestRunResult(BaseModel):
+    id: Optional[str] = None
     status: Optional[str] = None
     stdout: Optional[str] = None
     stderr: Optional[str] = None
+    elapsedMs: Optional[int] = None
     error: Optional[RunResultError] = None
     tests: List[dict] = []
 
@@ -104,6 +109,7 @@ class TutorRequest(BaseModel):
     mode: str
     conversation: List[ConversationMessage] = []
     action: str
+    studySessionId: Optional[str] = None
 
 
 # ---------- Response models (mirrors types/tutor.ts::TutorResponse) ----------
@@ -128,6 +134,45 @@ class TutorResponse(BaseModel):
     message: TutorMessage
 
 
+class AssessmentScoreRequest(BaseModel):
+    taskId: str
+    taskTitle: str
+    taskDescription: List[str] = []
+    plan: dict
+    code: str
+    runs: List[dict] = []
+    reflection: dict = {}
+    studySessionId: Optional[str] = None
+
+
+class AssessmentScoreResponse(BaseModel):
+    submitted: bool
+    total: int
+
+
+class AssessmentPlanRequest(BaseModel):
+    taskId: str
+    studySessionId: str
+    plan: dict
+
+
+class StudySessionStartRequest(BaseModel):
+    userCode: str
+
+
+class StudySessionStartResponse(BaseModel):
+    userId: str
+    userCode: str
+    studySessionId: str
+
+
+class StudyRunRecordRequest(BaseModel):
+    taskId: str
+    studySessionId: str
+    code: str
+    result: dict
+
+
 # ---------- Code execution models (mirrors types/code-run.ts) ----------
 
 class CodeRunTestCaseInput(BaseModel):
@@ -144,6 +189,7 @@ class CodeRunRequest(BaseModel):
     code: str
     stdin: str = ""
     testCases: List[CodeRunTestCaseInput] = []
+    studySessionId: Optional[str] = None
 
 
 class TestCaseResultOut(BaseModel):
@@ -261,6 +307,16 @@ def get_tutor_content(req: TutorRequest):
         "student_code": req.currentCode or "",
         "code_prediction": req.latestPrediction or "",
         "latest_run_status": req.latestRunResult.status if req.latestRunResult else None,
+        "latest_run_id": req.latestRunResult.id if req.latestRunResult else None,
+        "latest_run_stdout": req.latestRunResult.stdout if req.latestRunResult else None,
+        "latest_run_stderr": req.latestRunResult.stderr if req.latestRunResult else None,
+        "latest_run_duration_ms": req.latestRunResult.elapsedMs if req.latestRunResult else None,
+        "latest_run_tests": req.latestRunResult.tests if req.latestRunResult else [],
+        "latest_error_type": (
+            req.latestRunResult.error.type
+            if req.latestRunResult and req.latestRunResult.error
+            else None
+        ),
         "latest_error_message": (
             req.latestRunResult.error.message
             if req.latestRunResult and req.latestRunResult.error
@@ -300,6 +356,7 @@ def get_tutor_content(req: TutorRequest):
         task_id=req.taskId,
         state=result_state,
         tutor_question=content,
+        study_session_id=req.studySessionId,
     )
     question_type = result_state.get("question_type") or "understanding"
     agent_trace = result_state.get("agent_trace", [])
@@ -568,6 +625,114 @@ def database_health():
 
 @app.post("/api/tutor/message", response_model=TutorResponse)
 def tutor_message(req: TutorRequest):
+    if req.taskId in {"task_1_maximum", "task_5_below_limit"}:
+        raise HTTPException(
+            status_code=403,
+            detail="AI Tutor is disabled for this assessment task.",
+        )
     content, question_type, agent_trace, plan_review, plan_interaction, hint_level, learner_state = get_tutor_content(req)
     message = _make_tutor_message(content, question_type, agent_trace, plan_review, plan_interaction, hint_level, learner_state, req)
     return TutorResponse(message=message)
+
+
+def _extract_json_object(text: str) -> dict:
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+    start, end = cleaned.find("{"), cleaned.rfind("}")
+    if start < 0 or end < start:
+        raise ValueError("Scoring model did not return a JSON object")
+    return json.loads(cleaned[start:end + 1])
+
+
+@app.post("/api/assessment/score", response_model=AssessmentScoreResponse)
+def score_assessment(req: AssessmentScoreRequest):
+    if req.taskId not in {"task_1_maximum", "task_5_below_limit"}:
+        raise HTTPException(status_code=403, detail="Scoring is limited to pre/post assessment tasks.")
+
+    rubric = """You are a blind computational-thinking assessment rater. You do not know whether this is a pre-test or post-test. Score only the supplied artifacts. Never reward polish without evidence. Evaluate five dimensions at integer level 0-4: decomposition, algorithmic_thinking, abstraction, pattern_recognition, evaluation_debugging. Return JSON only. For every dimension return: level, summary, observations (specific behaviors), plan_evidence (short exact excerpts or precise absence), code_evidence (specific variables/conditions/lines described), run_evidence (test outcomes and changes), deductions (each with reason and level impact), missing_for_next_level, and confidence (low/medium/high). Detailed evidence must explain both awarded credit and deductions, distinguish observed evidence from inference, and state when evidence is unavailable. Pattern recognition means identifying and applying the general traverse-filter/compare-update pattern, not claiming knowledge of another task. Evaluation/debugging must use run history and reflection rather than final correctness alone. Do not include chain-of-thought."""
+    artifacts = json.dumps({
+        "task_id": req.taskId,
+        "title": req.taskTitle,
+        "description": req.taskDescription,
+        "plan": req.plan,
+        "final_code": req.code,
+        "run_history": req.runs,
+        "student_reflection": req.reflection,
+        "required_output_schema": {
+            "dimensions": {
+                "decomposition": {}, "algorithmic_thinking": {}, "abstraction": {},
+                "pattern_recognition": {}, "evaluation_debugging": {}
+            },
+            "overall_strengths": [], "overall_limitations": [], "cross_artifact_consistency": "",
+        },
+    }, ensure_ascii=False)
+    raw = _extract_json_object(base_llm_call(rubric, artifacts))
+    dimensions = raw.get("dimensions") or {}
+    required = ["decomposition", "algorithmic_thinking", "abstraction", "pattern_recognition", "evaluation_debugging"]
+    normalized = {}
+    for name in required:
+        detail = dimensions.get(name) if isinstance(dimensions.get(name), dict) else {}
+        level = max(0, min(4, int(detail.get("level", 0))))
+        normalized[name] = {**detail, "level": level, "score": level * 5}
+    total = sum(item["score"] for item in normalized.values())
+    score = {
+        "rubric_version": "ct-rubric-v1",
+        "scoring_model": scoring_model,
+        "dimensions": normalized,
+        "total": total,
+        "overall_strengths": raw.get("overall_strengths") or [],
+        "overall_limitations": raw.get("overall_limitations") or [],
+        "cross_artifact_consistency": raw.get("cross_artifact_consistency") or "",
+        "evidence_policy": "blind_artifact_only",
+    }
+
+
+@app.post("/api/study/session/start", response_model=StudySessionStartResponse)
+def start_study_session(req: StudySessionStartRequest):
+    user_code = req.userCode.strip().upper()
+    if not re.fullmatch(r"U\d{3}", user_code):
+        raise HTTPException(status_code=400, detail="Participant code must use the format U001.")
+    existing = supabase.table("users").select("id,user_code").eq("user_code", user_code).limit(1).execute().data
+    if existing:
+        user_id = existing[0]["id"]
+    else:
+        user_id = str(uuid.uuid4())
+        supabase.table("users").insert({
+            "id": user_id,
+            "user_code": user_code,
+            "study_group": "pilot",
+            "consented_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+    session_id = str(uuid.uuid4())
+    supabase.table("study_sessions").insert({
+        "id": session_id,
+        "user_id": user_id,
+        "status": "active",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "client_version": "study-v1",
+        "consent_version": "study-v1",
+    }).execute()
+    return StudySessionStartResponse(userId=user_id, userCode=user_code, studySessionId=session_id)
+
+
+@app.post("/api/study/run")
+def record_study_run(req: StudyRunRecordRequest):
+    save_code_run(task_id=req.taskId, code=req.code, result=req.result, study_session_id=req.studySessionId)
+    return {"saved": True}
+    save_assessment_score(
+        task_id=req.taskId, plan=req.plan, code=req.code, runs=req.runs,
+        score=score, study_session_id=req.studySessionId,
+    )
+    return AssessmentScoreResponse(submitted=True, total=total)
+
+
+@app.post("/api/assessment/plan")
+def submit_assessment_plan(req: AssessmentPlanRequest):
+    if req.taskId not in {"task_1_maximum", "task_5_below_limit"}:
+        raise HTTPException(status_code=403, detail="Plan locking is limited to assessment tasks.")
+    locked = save_assessment_plan(
+        task_id=req.taskId, plan=req.plan, study_session_id=req.studySessionId,
+    )
+    return {"saved": True, "lockedAt": locked["lockedAt"]}

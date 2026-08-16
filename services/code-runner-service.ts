@@ -43,7 +43,13 @@ export async function runCode({
     const response = await fetch("/api/code/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, code, stdin, testCases }),
+      body: JSON.stringify({
+        taskId,
+        code,
+        stdin,
+        testCases,
+        studySessionId: window.sessionStorage.getItem("socratic-study-session-id"),
+      }),
       signal: controller.signal,
     });
 

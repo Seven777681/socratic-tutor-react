@@ -4,7 +4,6 @@ import type { ProgrammingTaskSummary, TaskDifficulty } from "@/types/task";
 import {
   ArrowRightIcon,
   BookOpenIcon,
-  ClockIcon,
   GaugeIcon,
 } from "@/components/dashboard/dashboard-icons";
 import {
@@ -80,10 +79,6 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
         >
           <GaugeIcon className="h-3.5 w-3.5" />
           {difficultyLabels[task.thinkingDepth]}
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-          <ClockIcon className="h-3.5 w-3.5" />
-          {task.estimatedMinutes} min
         </span>
       </div>
 

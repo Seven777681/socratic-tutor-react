@@ -182,11 +182,12 @@ def generate_socratic_question_node(state: Agent2State) -> Dict[str, str]:
         "plan_submission": "Ask the student to summarize their own established reasoning in the Plan section.",
         "coding_progress": "Ask about the student's current coding intention, expectation, or next small step. Never send them back to the Plan section.",
         "reflection_learning": "Ask the student to explain one lesson, tradeoff, or transferable idea from the completed solution.",
-        "syntax_error": "Ask what language rule the interpreter may be rejecting, without naming the exact line or correction.",
-        "logical_error": "Ask the student to compare expected behavior with the relevant variable or condition behavior.",
-        "conceptual_error": "Ask about the programming concept or assumption behind the observed error.",
-        "algorithm_error": "Ask where the implemented process first differs from the intended behavior.",
-    }.get(current_focus, "Target exactly one missing idea.")
+    }.get(
+        current_focus,
+        "Use the code, execution evidence, and latest student message to choose one missing idea without relying on an error-type question template."
+        if state.get("stage") == "debug"
+        else "Target exactly one missing idea.",
+    )
 
     prompt = f"""
 You are Agent 2, the Socratic Questioning Agent and the only student-facing

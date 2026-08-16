@@ -15,6 +15,7 @@ interface CodeRunRequestBody {
     visibility?: "public" | "hidden";
     misconceptionTag?: string;
   }>;
+  studySessionId?: string;
 }
 
 export async function POST(request: Request) {
@@ -61,6 +62,22 @@ export async function POST(request: Request) {
     }
 
     const data = await backendResponse.json();
+    if (body.studySessionId) {
+      const saveResponse = await fetch(`${BACKEND_URL}/api/study/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: body.taskId,
+          studySessionId: body.studySessionId,
+          code: body.code,
+          result: data,
+        }),
+        cache: "no-store",
+      }).catch(() => null);
+      if (!saveResponse?.ok) {
+        console.error("Study run could not be persisted.");
+      }
+    }
     return NextResponse.json(data);
   } catch (error) {
     console.error("Failed to reach code execution backend:", error);

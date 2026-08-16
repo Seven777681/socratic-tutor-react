@@ -19,6 +19,7 @@ export function PlanningPanel({
   onChange,
   onReviewPlan,
   onEditPlan,
+  submitLabel = "Review My Plan",
 }: {
   value: PlanningDraft;
   errors: PlanningErrors;
@@ -29,6 +30,7 @@ export function PlanningPanel({
   onChange: (value: PlanningDraft) => void;
   onReviewPlan: () => void;
   onEditPlan: () => void;
+  submitLabel?: string;
 }) {
   const updateStep = (index: number, step: string) => {
     const steps: [string, string, string] = [...value.steps];
@@ -157,7 +159,7 @@ export function PlanningPanel({
           className="inline-flex h-10 w-fit items-center justify-center gap-2 rounded-lg bg-[#6255f6] px-4 text-sm font-bold text-white shadow-sm shadow-indigo-200 transition hover:bg-[#5146d8] focus:outline-none focus:ring-4 focus:ring-[#6255f6]/20 disabled:cursor-wait disabled:opacity-70"
         >
           <BrainIcon className="h-4 w-4" />
-          {isReviewing ? "Reviewing..." : "Review My Plan"}
+          {isReviewing ? "Reviewing..." : submitLabel}
         </button>
       </div>
     </section>

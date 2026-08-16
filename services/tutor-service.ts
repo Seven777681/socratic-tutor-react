@@ -12,7 +12,10 @@ export async function getTutorResponse(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        studySessionId: window.sessionStorage.getItem("socratic-study-session-id"),
+      }),
       signal: controller.signal,
     });
 

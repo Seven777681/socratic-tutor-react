@@ -169,6 +169,7 @@ export interface CodeEditorPanelProps {
   taskId: string;
   starterCode: string;
   language: "python";
+  aiTutorEnabled?: boolean;
   onRun?: (code: string) => void;
   onCodeChange?: (code: string) => void;
   onRunResultChange?: (result: import("@/types/code-run").CodeRunResult) => void;

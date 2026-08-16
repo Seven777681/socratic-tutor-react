@@ -39,6 +39,7 @@ export function ReflectionPanel({
   onAnswersChange,
   onSubmit,
   nextTask,
+  assessmentOnly = false,
 }: {
   answers: ReflectionAnswers;
   summary: string;
@@ -50,7 +51,32 @@ export function ReflectionPanel({
     href: string;
     title: string;
   };
+  assessmentOnly?: boolean;
 }) {
+  if (assessmentOnly) {
+    return (
+      <section className="rounded-[18px] border border-[#E4E7F0] bg-white p-5 shadow-[0_14px_40px_rgba(78,91,130,0.07)]">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-extrabold text-[#101426]">Task Complete</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              Your plan, code, and run history will be saved before you continue.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={isGenerating}
+            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#6C4CF5,#536DFE)] px-5 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(98,85,246,0.24)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/20 disabled:cursor-wait disabled:opacity-60"
+          >
+            {isGenerating ? "Saving..." : nextTask ? "Next Task" : "Back to Tasks"}
+            {!isGenerating ? <ArrowRightIcon className="h-4 w-4" /> : null}
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-[18px] border border-[#E4E7F0] bg-white p-5 shadow-[0_14px_40px_rgba(78,91,130,0.07)]">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

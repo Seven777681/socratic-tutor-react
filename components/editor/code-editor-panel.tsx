@@ -62,6 +62,7 @@ export function CodeEditorPanel({
   taskId,
   starterCode,
   language,
+  aiTutorEnabled = true,
   onRun,
   onCodeChange,
   onRunResultChange,
@@ -109,8 +110,22 @@ export function CodeEditorPanel({
   const runResultsRef = useRef<HTMLDivElement>(null);
   const showPlan =
     entryPath === "plan" && learningState.planningDraft.status !== "ready";
+  const canEnterCoding = learningState.planningDraft.status === "ready";
 
   const chooseLearningPath = (path: "plan" | "code") => {
+    if (
+      path === "plan" &&
+      !aiTutorEnabled &&
+      learningState.planningDraft.status === "ready"
+    ) {
+      updateState({
+        planningDraft: {
+          ...learningState.planningDraft,
+          status: "editing",
+          updatedAt: new Date().toISOString(),
+        },
+      });
+    }
     if (path === "code") {
       updateState({
         planningDraft: {
@@ -141,6 +156,29 @@ export function CodeEditorPanel({
   useEffect(() => {
     onCodeChange?.(currentCode);
   }, [currentCode, onCodeChange]);
+
+  useEffect(() => {
+    if (
+      aiTutorEnabled &&
+      learningState.planningDraft.status === "ready" &&
+      learningState.planningDraft.reviewBypassed
+    ) {
+      updateState({
+        planningDraft: {
+          ...learningState.planningDraft,
+          status: "editing",
+          reviewBypassed: false,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      onEntryPathChange("plan");
+    }
+  }, [
+    aiTutorEnabled,
+    learningState.planningDraft,
+    onEntryPathChange,
+    updateState,
+  ]);
 
   useEffect(() => {
     if (!planInteraction) {
@@ -259,15 +297,16 @@ export function CodeEditorPanel({
     });
 
 
-    setRunResult(result);
+    const recordedResult = { ...result, codeSnapshot: currentCode };
+    setRunResult(recordedResult);
     setRunStatus(result.status);
     updateState({
       hasRunCode: true,
       runStatus: result.status,
-      latestRunResult: result,
+      latestRunResult: recordedResult,
     });
-    onRunResultChange?.(result);
-    setRecentRuns((runs) => [result, ...runs].slice(0, 5));
+    onRunResultChange?.(recordedResult);
+    setRecentRuns((runs) => [recordedResult, ...runs].slice(0, 20));
 
     if (result.status === "error" || result.status === "timeout" || result.status === "system_error") {
       setActiveResultTab("errors");
@@ -345,6 +384,41 @@ export function CodeEditorPanel({
       return;
     }
 
+    if (!aiTutorEnabled) {
+      const studySessionId = window.sessionStorage.getItem("socratic-study-session-id");
+      if (!studySessionId) {
+        window.alert("No participant session was found. Please return to the login page.");
+        return;
+      }
+      const response = await fetch("/api/assessment/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId,
+          studySessionId,
+          plan: {
+            approach: learningState.planningDraft.approach,
+            steps: learningState.planningDraft.steps,
+          },
+        }),
+      });
+      if (!response.ok) {
+        window.alert("Your plan could not be saved. Please try again.");
+        return;
+      }
+      const saved = await response.json();
+      updateState({
+        planningDraft: {
+          ...learningState.planningDraft,
+          status: "ready",
+          reviewBypassed: true,
+          updatedAt: saved.lockedAt ?? new Date().toISOString(),
+        },
+      });
+      onEntryPathChange("code");
+      return;
+    }
+
     setIsReviewingPlan(true);
     updateState({
       planningDraft: {
@@ -411,12 +485,45 @@ export function CodeEditorPanel({
 
     setIsGeneratingReflection(true);
 
+    if (!aiTutorEnabled) {
+      try {
+        const response = await fetch("/api/assessment/score", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            taskId,
+            studySessionId: window.sessionStorage.getItem("socratic-study-session-id"),
+            taskTitle: task.title,
+            taskDescription: task.description,
+            plan: {
+              approach: learningState.planningDraft.approach,
+              steps: learningState.planningDraft.steps,
+              lockedAt: learningState.planningDraft.updatedAt,
+            },
+            code: currentCode,
+            runs: recentRuns,
+            reflection: {},
+          }),
+        });
+        if (!response.ok) {
+          throw new Error("Assessment submission failed");
+        }
+        window.location.assign(nextTask?.href ?? "/tasks");
+      } catch {
+        window.alert("Your assessment could not be saved. Please keep this page open and try again.");
+      } finally {
+        setIsGeneratingReflection(false);
+      }
+      return;
+    }
+
     try {
       const response = await fetch("/api/tutor/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           taskId,
+          studySessionId: window.sessionStorage.getItem("socratic-study-session-id"),
           studentMessage: Object.values(learningState.reflectionAnswers).join("\n"),
           currentCode,
           latestRunResult: learningState.latestRunResult,
@@ -449,10 +556,18 @@ export function CodeEditorPanel({
       setIsGeneratingReflection(false);
     }
   }, [
+    aiTutorEnabled,
     currentCode,
     isGeneratingReflection,
     learningState.latestRunResult,
     learningState.reflectionAnswers,
+    learningState.planningDraft.approach,
+    learningState.planningDraft.steps,
+    learningState.planningDraft.updatedAt,
+    recentRuns,
+    nextTask,
+    task.description,
+    task.title,
     taskId,
     updateState,
   ]);
@@ -465,9 +580,10 @@ export function CodeEditorPanel({
     [learningState.reflectionAnswers],
   );
 
-  const shouldShowReflection =
-    runResult?.status === "success" ||
-    learningState.latestRunResult?.status === "success";
+  const shouldShowReflection = !aiTutorEnabled
+    ? hasRunCode || learningState.hasRunCode
+    : runResult?.status === "success" ||
+      learningState.latestRunResult?.status === "success";
 
   return (
     <>
@@ -531,28 +647,42 @@ export function CodeEditorPanel({
         </section>
 
         {entryPath === "undecided" ? (
-          <section className="mt-4 w-full max-w-[760px] rounded-xl border border-[#d9d5ff] bg-[linear-gradient(135deg,#f8f7ff,#eef2ff)] px-4 py-3.5">
+          <section className="mt-5 w-full max-w-[920px] rounded-xl border border-[#d9d5ff] bg-[linear-gradient(135deg,#f8f7ff,#eef2ff)] px-4 py-4">
             <h3 className="text-base font-extrabold text-slate-700 sm:text-lg">
-              Do you already have an approach for solving this task?
+              {aiTutorEnabled
+                ? "Do you already have an approach for solving this task?"
+                : "Ready to plan your solution?"}
             </h3>
             <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 sm:text-sm">
-              Start coding if you know your approach, or build a short plan with help from the AI Tutor.
+              {aiTutorEnabled
+                ? "Either way, write your plan first. The AI Tutor can help when you need it."
+                : "Write your plan independently before you begin coding. No AI feedback is provided for this assessment task."}
             </p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              {!aiTutorEnabled ? (
+                <button
+                  type="button"
+                  onClick={() => chooseLearningPath("plan")}
+                  className="inline-flex h-10 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#6C4CF5,#536DFE)] px-5 text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(98,85,246,0.2)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/20"
+                >
+                  Start Planning
+                </button>
+              ) : <>
               <button
                 type="button"
-                onClick={() => chooseLearningPath("code")}
+                onClick={() => chooseLearningPath("plan")}
                 className="inline-flex h-9 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#6C4CF5,#536DFE)] px-4 text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(98,85,246,0.2)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/20"
               >
-                Yes, start coding
+                Yes, write my plan
               </button>
               <button
                 type="button"
                 onClick={() => chooseLearningPath("plan")}
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-[#b9b2ff] bg-white px-4 text-sm font-extrabold text-[#6255f6] transition hover:border-[#6255f6] hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15"
               >
-                No, help me make a plan
+                {aiTutorEnabled ? "No, help me make a plan" : "No, I will plan step by step"}
               </button>
+              </>}
             </div>
           </section>
         ) : null}
@@ -576,10 +706,11 @@ export function CodeEditorPanel({
         onReviewPlan={() => {
           void reviewPlan();
         }}
+        submitLabel={aiTutorEnabled ? "Review My Plan" : "Start Coding"}
         onEditPlan={editPlanning}
       /> : null}
 
-      <>
+      {canEnterCoding ? <>
       <EditorToolbar
         lineCount={lineCount}
         saveStatus={saveStatus}
@@ -650,7 +781,7 @@ export function CodeEditorPanel({
           />
         </div>
       ) : null}
-      </>
+      </> : null}
       </section>
 
       {shouldShowReflection ? (
@@ -666,6 +797,7 @@ export function CodeEditorPanel({
             void generateReflectionSummary();
           }}
           nextTask={nextTask}
+          assessmentOnly={!aiTutorEnabled}
         />
       ) : null}
 
