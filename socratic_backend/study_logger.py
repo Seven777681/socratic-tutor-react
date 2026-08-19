@@ -289,6 +289,56 @@ def save_task_draft(*, task_id: str, plan: dict, code: str, entry_path: str | No
         }).execute()
 
 
+def save_tutor_conversation_snapshot(*, task_id: str, messages: list[dict],
+                                     stage: str, entry_path: str | None,
+                                     study_session_id: str):
+    """Backfill the browser's durable conversation snapshot into Supabase."""
+    client = _get_supabase()
+    attempt_id = _get_attempt_id(client, study_session_id, task_id)
+    existing = (client.table("task_attempts").select("id,entry_path")
+                .eq("id", attempt_id).limit(1).execute().data)
+    if not existing:
+        now = datetime.now(timezone.utc).isoformat()
+        client.table("task_attempts").insert({
+            "id": attempt_id, "session_id": study_session_id, "task_id": task_id,
+            "entry_path": entry_path, "current_stage": stage, "status": "active",
+            "student_plan": {}, "final_code": "", "planning_revision_count": 0,
+            "code_attempt_count": 0, "started_at": now,
+        }).execute()
+    elif not existing[0].get("entry_path") and entry_path:
+        client.table("task_attempts").update({"entry_path": entry_path}).eq("id", attempt_id).execute()
+
+    conversation_messages = [
+        message for message in messages if message.get("role") in {"student", "tutor"}
+    ]
+    for sequence, message in enumerate(conversation_messages, start=1):
+        row = _message_row(
+            attempt_id=attempt_id,
+            sequence=sequence,
+            message=message,
+            fallback_stage=stage,
+        )
+        # Do not replace richer server-side analytics with null snapshot values.
+        compact_row = {key: value for key, value in row.items() if value is not None}
+        existing_message = (
+            client.table("tutor_messages").select("id")
+            .eq("attempt_id", attempt_id)
+            .eq("sequence_number", sequence)
+            .limit(1).execute().data
+        )
+        if existing_message:
+            update = {
+                key: value
+                for key, value in compact_row.items()
+                if key not in {"id", "attempt_id", "sequence_number"}
+            }
+            client.table("tutor_messages").update(update).eq(
+                "id", existing_message[0]["id"]
+            ).execute()
+        else:
+            client.table("tutor_messages").insert(compact_row).execute()
+
+
 def save_code_run(*, task_id: str, code: str, result: dict, study_session_id: str):
     client = _get_supabase()
     attempt_id = _get_attempt_id(client, study_session_id, task_id)

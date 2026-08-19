@@ -27,6 +27,7 @@ import {
   deleteImportedTask,
   getGeneratedTaskSummaries,
 } from "@/lib/imported-tasks-storage";
+import { getStudyProgress } from "@/services/study-progress";
 
 const topicValues: TaskTopic[] = [
   "variables",
@@ -244,6 +245,22 @@ export function TasksPageContent({
     const storedTasks = getGeneratedTaskSummaries();
     setGeneratedTasks(storedTasks);
     setSelectedModuleId(getRecommendedModuleId(storedTasks));
+
+    void getStudyProgress().then((attempts) => {
+      const progressByTask = new Map(attempts.map((attempt) => [attempt.task_id, attempt]));
+      const restoredTasks = storedTasks.map((task) => {
+        const attempt = progressByTask.get(task.id);
+        if (!attempt) return task;
+        const completed = attempt.status === "completed";
+        return {
+          ...task,
+          status: completed ? "completed" as const : "in_progress" as const,
+          progress: completed ? 100 : Math.max(task.progress, 25),
+        };
+      });
+      setGeneratedTasks(restoredTasks);
+      setSelectedModuleId(getRecommendedModuleId(restoredTasks));
+    });
   }, []);
 
   useEffect(() => {

@@ -9,6 +9,7 @@ import { SocraticTutorPanel } from "@/components/tutor/socratic-tutor-panel";
 import { TutorPanelToggle } from "@/components/tutor/tutor-panel-toggle";
 import { getGeneratedTaskSummaries } from "@/lib/imported-tasks-storage";
 import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
+import { getStudyTaskAttempt } from "@/services/study-progress";
 
 export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
   const aiTutorEnabled = ![
@@ -57,15 +58,9 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
     const storedEntryPath = window.localStorage.getItem(
       getParticipantTaskStorageKey("socratic-task-entry-path", task.id),
     );
-    setEntryPath(
-      !aiTutorEnabled
-        ? "undecided"
-        : storedEntryPath === "understand" ||
-            storedEntryPath === "plan" ||
-            storedEntryPath === "code"
-        ? storedEntryPath
-        : "undecided",
-    );
+    const validStoredPath = storedEntryPath === "understand" ||
+      storedEntryPath === "plan" || storedEntryPath === "code";
+    setEntryPath(validStoredPath ? storedEntryPath : "undecided");
     setLearningContext({
       planningStatus: "not_started",
       planningApproach: "",
@@ -73,6 +68,19 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
       latestPrediction: "",
       hintLevel: 0,
     });
+    if (!validStoredPath) {
+      void getStudyTaskAttempt(task.id).then((attempt) => {
+        if (!attempt) return;
+        const restoredPath = attempt.entry_path === "understand" ||
+          attempt.entry_path === "plan" || attempt.entry_path === "code"
+          ? attempt.entry_path
+          : ["code", "debug", "reflect"].includes(attempt.current_stage ?? "") ||
+              attempt.status === "completed"
+            ? "code"
+            : attempt.current_stage === "plan" ? "plan" : "undecided";
+        setEntryPath(restoredPath);
+      });
+    }
   }, [aiTutorEnabled, task.id, task.starterCode]);
 
   useEffect(() => {

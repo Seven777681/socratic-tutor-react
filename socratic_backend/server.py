@@ -30,7 +30,7 @@ load_dotenv(Path(__file__).with_name(".env"))
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from study_logger import log_intervention, save_assessment_plan, save_assessment_score, save_code_run, save_task_draft
+from study_logger import log_intervention, save_assessment_plan, save_assessment_score, save_code_run, save_task_draft, save_tutor_conversation_snapshot
 from llm_base import base_llm_call, model as scoring_model
 
 from tutor_graph import graph
@@ -148,7 +148,8 @@ class AssessmentScoreRequest(BaseModel):
 
 class AssessmentScoreResponse(BaseModel):
     submitted: bool
-    total: int
+    total: Optional[int] = None
+    scoringStatus: str
 
 
 class AssessmentPlanRequest(BaseModel):
@@ -182,6 +183,14 @@ class StudyDraftRequest(BaseModel):
     code: str = ""
     entryPath: Optional[str] = None
     currentStage: str = "plan"
+
+
+class StudyConversationRequest(BaseModel):
+    taskId: str
+    studySessionId: str
+    messages: List[dict] = []
+    stage: str = "plan"
+    entryPath: Optional[str] = None
 
 
 # ---------- Code execution models (mirrors types/code-run.ts) ----------
@@ -704,7 +713,32 @@ Return JSON only. For every dimension return: score, summary, observations (spec
             "overall_strengths": [], "overall_limitations": [], "cross_artifact_consistency": "",
         },
     }, ensure_ascii=False)
-    raw = _extract_json_object(base_llm_call(rubric, artifacts))
+    try:
+        raw = _extract_json_object(base_llm_call(rubric, artifacts))
+    except Exception as error:
+        pending_score = {
+            "rubric_version": "ct-rubric-v2-six-dimensions",
+            "scoring_model": scoring_model,
+            "scoring_status": "pending_model",
+            "scoring_error_type": type(error).__name__,
+            "dimensions": {},
+            "total": None,
+            "total_max": 30,
+            "evidence_policy": "blind_artifact_only",
+        }
+        save_assessment_score(
+            task_id=req.taskId,
+            plan=req.plan,
+            code=req.code,
+            runs=req.runs,
+            score=pending_score,
+            study_session_id=req.studySessionId,
+        )
+        return AssessmentScoreResponse(
+            submitted=True,
+            total=None,
+            scoringStatus="pending_model",
+        )
     dimensions = raw.get("dimensions") or {}
     required = ["decomposition", "algorithmic_thinking", "abstraction", "pattern_recognition", "evaluation", "debugging"]
     normalized = {}
@@ -716,6 +750,7 @@ Return JSON only. For every dimension return: score, summary, observations (spec
     score = {
         "rubric_version": "ct-rubric-v2-six-dimensions",
         "scoring_model": scoring_model,
+        "scoring_status": "scored",
         "dimensions": normalized,
         "total": total,
         "total_max": 30,
@@ -728,7 +763,11 @@ Return JSON only. For every dimension return: score, summary, observations (spec
         task_id=req.taskId, plan=req.plan, code=req.code, runs=req.runs,
         score=score, study_session_id=req.studySessionId,
     )
-    return AssessmentScoreResponse(submitted=True, total=total)
+    return AssessmentScoreResponse(
+        submitted=True,
+        total=total,
+        scoringStatus="scored",
+    )
 
 
 @app.post("/api/study/session/start", response_model=StudySessionStartResponse)
@@ -797,6 +836,32 @@ def sync_study_draft(req: StudyDraftRequest):
         study_session_id=req.studySessionId,
     )
     return {"saved": True}
+
+
+@app.get("/api/study/progress")
+def get_study_progress(studySessionId: str):
+    response = (
+        supabase.table("task_attempts")
+        .select(
+            "task_id,status,current_stage,entry_path,student_plan,final_code,"
+            "planning_revision_count,code_attempt_count,completed_at"
+        )
+        .eq("session_id", studySessionId)
+        .execute()
+    )
+    return {"attempts": response.data or []}
+
+
+@app.post("/api/study/conversation")
+def sync_study_conversation(req: StudyConversationRequest):
+    save_tutor_conversation_snapshot(
+        task_id=req.taskId,
+        messages=req.messages,
+        stage=req.stage,
+        entry_path=req.entryPath,
+        study_session_id=req.studySessionId,
+    )
+    return {"saved": True, "messageCount": len(req.messages)}
 
 
 @app.post("/api/assessment/plan")

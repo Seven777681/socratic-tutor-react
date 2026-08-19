@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CodeRunResult } from "@/types/code-run";
 import type { TaskPedagogy } from "@/types/task";
 import type { TaskEntryPath } from "@/types/task";
@@ -23,6 +23,38 @@ import {
 import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
 
 const INTERNAL_TUTOR_MODE: TutorMode = "run_and_reflect";
+
+interface ConversationSyncPayload {
+  taskId: string;
+  studySessionId: string;
+  messages: TutorMessage[];
+  stage: GuidanceStage;
+  entryPath: Exclude<TaskEntryPath, "undecided">;
+}
+
+async function syncConversationSnapshot(
+  payload: ConversationSyncPayload,
+  retriesRemaining = 2,
+) {
+  try {
+    const response = await fetch("/api/study/conversation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    });
+    if (!response.ok) throw new Error(`Conversation sync failed (${response.status}).`);
+  } catch (error) {
+    if (retriesRemaining > 0) {
+      window.setTimeout(
+        () => void syncConversationSnapshot(payload, retriesRemaining - 1),
+        750,
+      );
+      return;
+    }
+    console.error("Tutor conversation could not be saved.", error);
+  }
+}
 
 function handledRunStorageKey(taskId: string) {
   return getParticipantTaskStorageKey("socratic-tutor-handled-run", taskId);
@@ -114,6 +146,8 @@ export function useTutorConversation({
   );
   const [status, setStatus] = useState<TutorStatus>("ready");
   const [errorMessage, setErrorMessage] = useState("");
+  const [hydratedTaskId, setHydratedTaskId] = useState<string | null>(null);
+  const latestSyncPayloadRef = useRef<ConversationSyncPayload | null>(null);
   useEffect(() => {
     const initialStage = stage;
     if (latestRunResult?.id) {
@@ -136,19 +170,49 @@ export function useTutorConversation({
       });
       setStatus("ready");
       setErrorMessage("");
+      setHydratedTaskId(taskId);
       return;
     }
 
     setConversation(createConversation({ taskId, stage: initialStage }));
     setStatus("ready");
     setErrorMessage("");
+    setHydratedTaskId(taskId);
     // Initialization belongs to a task change. Stage/run changes are handled below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
   useEffect(() => {
+    if (hydratedTaskId !== taskId || conversation.taskId !== taskId) return;
+
     saveTutorConversation(conversation);
-  }, [conversation]);
+    const studySessionId = window.sessionStorage.getItem("socratic-study-session-id");
+    if (!studySessionId || conversation.messages.length === 0) return;
+
+    const payload: ConversationSyncPayload = {
+      taskId,
+      studySessionId,
+      messages: conversation.messages.filter((message) => message.role !== "system"),
+      stage: conversation.stage,
+      entryPath,
+    };
+    latestSyncPayloadRef.current = payload;
+    void syncConversationSnapshot(payload);
+  }, [conversation, entryPath, hydratedTaskId, taskId]);
+
+  useEffect(() => {
+    const flushLatestConversation = () => {
+      const payload = latestSyncPayloadRef.current;
+      if (payload?.taskId === taskId && payload.messages.length > 0) {
+        void syncConversationSnapshot(payload);
+      }
+    };
+    window.addEventListener("pagehide", flushLatestConversation);
+    return () => {
+      window.removeEventListener("pagehide", flushLatestConversation);
+      flushLatestConversation();
+    };
+  }, [taskId]);
 
   useEffect(() => {
     setConversation((current) =>
@@ -289,14 +353,7 @@ export function useTutorConversation({
       stage,
       updatedAt: new Date().toISOString(),
     }));
-
-    if (latestRunResult.status !== "success") {
-      void requestTutorResponse({
-        studentMessage: "",
-        action: "debug",
-      });
-    }
-  }, [latestRunResult, requestTutorResponse, stage, taskId]);
+  }, [latestRunResult, stage, taskId]);
 
   const sendMessage = useCallback(
     async (message: string) => {
@@ -376,19 +433,24 @@ export function useTutorConversation({
   }, [stage, taskId]);
 
   const beginWithQuestion = useCallback(() => {
+    const timestamp = new Date().toISOString();
     setConversation((current) => ({
       ...current,
-      updatedAt: new Date().toISOString(),
+      updatedAt: timestamp,
       messages: [
         ...current.messages,
-        createStudentMessage("我还不会，帮我梳理。", stage),
+        {
+          id: `tutor-local-understanding-${Date.now()}`,
+          role: "tutor",
+          content: "先不用写代码。请用自己的话说一说：这道题要求你从输入中找出或计算什么？",
+          timestamp,
+          questionType: "understanding",
+          stage,
+          actionType: "understand_problem",
+        },
       ],
     }));
-    void requestTutorResponse({
-      studentMessage: "我不知道该怎么开始。",
-      action: "understand_problem",
-    });
-  }, [requestTutorResponse, stage]);
+  }, [stage]);
 
   const beginWithPlan = useCallback(() => {
     setConversation((current) => ({

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SaveStatus } from "@/types/task";
 import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
+import { getStudyTaskAttempt } from "@/services/study-progress";
 
 const autosaveDelayMs = 800;
 
@@ -21,14 +22,24 @@ export function useCodeAutosave({
   const saveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     const storedCode = window.localStorage.getItem(storageKey);
-    const initialCode = storedCode ?? starterCode;
+    const restore = async () => {
+      const attempt = storedCode ? undefined : await getStudyTaskAttempt(taskId);
+      if (cancelled) return;
+      const databaseCode = attempt?.final_code?.trim() ? attempt.final_code : null;
+      const initialCode = storedCode ?? databaseCode ?? starterCode;
 
-    setCurrentCode(initialCode);
-    setSavedCode(initialCode);
-    setSaveStatus("saved");
-    setLastSavedLabel(storedCode ? "Draft restored locally" : "Saved locally");
-  }, [starterCode, storageKey]);
+      setCurrentCode(initialCode);
+      setSavedCode(initialCode);
+      setSaveStatus("saved");
+      setLastSavedLabel(
+        storedCode ? "Draft restored locally" : databaseCode ? "Draft restored" : "Saved locally",
+      );
+    };
+    void restore();
+    return () => { cancelled = true; };
+  }, [starterCode, storageKey, taskId]);
 
   const persistCode = useCallback(
     (code: string) => {

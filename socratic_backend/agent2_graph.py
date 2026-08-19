@@ -138,6 +138,8 @@ def _is_repeated_question(question: str, previous_questions: List[str]) -> bool:
     core = _question_core(question)
     return any(
         core == _question_core(previous)
+        or " ".join(question.split()) in " ".join(previous.split())
+        or " ".join(previous.split()) in " ".join(question.split())
         or _question_similarity(question, previous) >= 0.68
         for previous in previous_questions
     )
@@ -359,16 +361,19 @@ def safe_fallback_question_node(state: Agent2State) -> Dict[str, str]:
     latest = learner_state.get("latestAnswer", {})
     recognized = latest.get("recognizedIdeas", [])
     prefix = f"你已经明确了“{recognized[0]}”。" if recognized else ""
-    focus = (
-        state.get("issue_type", "logical_error")
-        if state.get("stage") == "debug"
-        else learner_state.get("currentFocus", "problem_goal")
-    )
+    student_answer = " ".join(str(state.get("student_answer", "")).split())
+    if not prefix and student_answer:
+        excerpt = student_answer[:80].rstrip("?？。！!")
+        prefix = f"你刚才提到“{excerpt}”。"
+    focus = learner_state.get("currentFocus") or state.get("issue_type", "logical_error")
+    if state.get("stage") == "debug" and focus not in {
+        "coding_progress", "algorithm", "syntax_error", "runtime_error",
+        "wrong_output", "failed_tests", "logical_error",
+    }:
+        focus = "debug_general"
     action = state.get("action", "ASK_METACOGNITIVE")
     if action == "PROVIDE_PSEUDOCODE":
-        return {
-            "final_question": "我们先缩小范围：结合刚才的运行结果，你认为代码下一步最需要检查哪一项信息？"
-        }
+        focus = "debug_general" if state.get("stage") == "debug" else focus
     if action == "SUMMARIZE_RULE":
         idea = recognized[0] if recognized else "你刚刚确认的思路"
         return {
@@ -393,6 +398,36 @@ def safe_fallback_question_node(state: Agent2State) -> Dict[str, str]:
         "coding_progress": [
             "你现在准备让代码先完成哪一件小事？", "你希望下一部分代码实现什么效果？", "你目前正尝试在程序中表达哪个步骤？",
         ],
+        "logical_error": [
+            "用一个示例逐行跟踪代码时，哪个中间值第一次和你的预期不同？",
+            "把实际输出和预期输出并排比较，它们最早在哪一步出现差异？",
+            "你当前的判断条件在什么情况下会更新变量，在什么情况下不会？",
+        ],
+        "wrong_output": [
+            "实际输出和预期输出之间最具体的差别是什么？",
+            "用最小的测试输入运行时，程序输出了什么，而你原本预期什么？",
+            "哪个计算结果直接决定了当前错误的最终输出？",
+        ],
+        "failed_tests": [
+            "通过和失败的测试输入相比，失败用例多了哪一种特殊情况？",
+            "先只看一个失败用例，哪一步计算最值得手动验证？",
+            "失败测试暴露的是初始化、循环范围还是更新条件的问题？",
+        ],
+        "syntax_error": [
+            "错误信息指向哪一行，那一行的括号、冒号或缩进有什么不一致？",
+            "从错误行向前看，哪一个语句结构还没有完整结束？",
+            "把错误行和一个正确的同类语句比较，结构上少了什么或多了什么？",
+        ],
+        "runtime_error": [
+            "错误发生时正在访问或计算哪个值，它当时的实际类型或范围是什么？",
+            "根据错误信息，程序运行到哪一行才停止？",
+            "什么输入会触发这次运行错误，而较简单的输入不会？",
+        ],
+        "debug_general": [
+            "用题目中的一个示例逐行跟踪，哪个中间值第一次偏离预期？",
+            "当前实际结果与预期结果之间最具体的差异是什么？",
+            "在初始化、循环范围、判断条件和更新语句中，哪一项能由运行结果直接验证？",
+        ],
         "reflection_learning": [
             "这个解法中，哪一个思路可以复用到相似问题？", "你的最终方法为什么能解决这道题？", "再次解决类似问题时，你会做出什么调整？",
         ],
@@ -402,7 +437,7 @@ def safe_fallback_question_node(state: Agent2State) -> Dict[str, str]:
         for item in state.get("conversation_history", [])
         if item.get("role") == "tutor"
     ]
-    candidates = questions.get(focus, ["你接下来准备检查思路中的哪一部分？"])
+    candidates = questions.get(focus, questions["debug_general"] if state.get("stage") == "debug" else questions["algorithm"])
     unused_candidates = [
         candidate
         for candidate in candidates

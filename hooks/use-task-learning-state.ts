@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CodeRunResult, RunStatus } from "@/types/code-run";
 import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
+import { getStudyTaskAttempt } from "@/services/study-progress";
 
 export interface PlanningDraft {
   approach: string;
@@ -174,14 +175,56 @@ export function clearTaskLearningState(taskId: string) {
 
 export function useTaskLearningState(taskId: string) {
   const [state, setState] = useState<TaskLearningState>(() => createInitialState());
+  const [hydratedTaskId, setHydratedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
-    setState(loadTaskLearningState(taskId));
+    let cancelled = false;
+    setHydratedTaskId(null);
+
+    const hydrate = async () => {
+      const hasLocalState = canUseStorage() && Boolean(window.localStorage.getItem(storageKey(taskId)));
+      let next = loadTaskLearningState(taskId);
+
+      if (!hasLocalState) {
+        const attempt = await getStudyTaskAttempt(taskId);
+        if (attempt) {
+          const plan = attempt.student_plan ?? {};
+          const rawSteps = Array.isArray(plan.steps) ? plan.steps : [];
+          const steps: [string, string, string] = [
+            String(rawSteps[0] ?? ""),
+            String(rawSteps[1] ?? ""),
+            String(rawSteps[2] ?? ""),
+          ];
+          const approach = String(plan.approach ?? "");
+          const storedStatus = String(plan.status ?? "not_started") as PlanningStatus;
+          const isCoding = attempt.status === "completed" ||
+            ["code", "debug", "reflect"].includes(attempt.current_stage ?? "");
+          next = {
+            ...next,
+            planningDraft: {
+              approach,
+              steps,
+              status: isCoding ? "ready" : storedStatus,
+            },
+            hasRunCode: (attempt.code_attempt_count ?? 0) > 0,
+          };
+          next.progress = calculateProgress(next);
+        }
+      }
+
+      if (!cancelled) {
+        setState(next);
+        setHydratedTaskId(taskId);
+      }
+    };
+
+    void hydrate();
+    return () => { cancelled = true; };
   }, [taskId]);
 
   useEffect(() => {
-    saveTaskLearningState(taskId, state);
-  }, [state, taskId]);
+    if (hydratedTaskId === taskId) saveTaskLearningState(taskId, state);
+  }, [hydratedTaskId, state, taskId]);
 
   const updateState = useCallback((patch: Partial<TaskLearningState>) => {
     setState((current) => {
