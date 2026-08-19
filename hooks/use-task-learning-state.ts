@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CodeRunResult, RunStatus } from "@/types/code-run";
+import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
 
 export interface PlanningDraft {
   approach: string;
@@ -70,7 +71,7 @@ function createInitialState(): TaskLearningState {
 }
 
 function storageKey(taskId: string) {
-  return `socratic-task-learning-state:${taskId}`;
+  return getParticipantTaskStorageKey("socratic-task-learning-state", taskId);
 }
 
 function canUseStorage() {

@@ -120,6 +120,7 @@ export interface TutorRequest {
   hintLevel?: number;
   conversationId: string;
   stage: GuidanceStage;
+  entryPath: "understand" | "plan" | "code";
   mode: TutorMode;
   conversation: TutorMessage[];
   action: TutorActionType;

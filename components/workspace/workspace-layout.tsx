@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CodeRunResult } from "@/types/code-run";
 import type { ProgrammingTaskDetail, TaskEntryPath } from "@/types/task";
 import type { TutorLearningContext, TutorPlanInteraction } from "@/types/tutor";
@@ -8,11 +8,12 @@ import { CodeEditorPanel } from "@/components/editor/code-editor-panel";
 import { SocraticTutorPanel } from "@/components/tutor/socratic-tutor-panel";
 import { TutorPanelToggle } from "@/components/tutor/tutor-panel-toggle";
 import { getGeneratedTaskSummaries } from "@/lib/imported-tasks-storage";
+import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
 
 export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
   const aiTutorEnabled = ![
     "task_1_maximum",
-    "task_5_below_limit",
+    "task_5_minimum",
   ].includes(task.id);
   const [isTutorCollapsed, setIsTutorCollapsed] = useState(false);
   const [currentCode, setCurrentCode] = useState(task.starterCode);
@@ -27,6 +28,20 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
     latestPrediction: "",
     hintLevel: 0,
   });
+  const draftSnapshotsRef = useRef<Record<string, {
+    code: string;
+    entryPath: TaskEntryPath;
+    planningStatus: string;
+    planningApproach: string;
+    planningSteps: string[];
+  }>>({});
+  draftSnapshotsRef.current[task.id] = {
+    code: currentCode,
+    entryPath,
+    planningStatus: learningContext.planningStatus,
+    planningApproach: learningContext.planningApproach,
+    planningSteps: learningContext.planningSteps,
+  };
   const nextTask = useMemo(() => {
     const tasks = getGeneratedTaskSummaries();
     const currentIndex = tasks.findIndex((candidate) => candidate.id === task.id);
@@ -40,12 +55,14 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
     setLatestRunResult(undefined);
     setPlanInteraction(undefined);
     const storedEntryPath = window.localStorage.getItem(
-      `socratic-task-entry-path:${task.id}`,
+      getParticipantTaskStorageKey("socratic-task-entry-path", task.id),
     );
     setEntryPath(
       !aiTutorEnabled
         ? "undecided"
-        : storedEntryPath === "plan" || storedEntryPath === "code"
+        : storedEntryPath === "understand" ||
+            storedEntryPath === "plan" ||
+            storedEntryPath === "code"
         ? storedEntryPath
         : "undecided",
     );
@@ -58,8 +75,57 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
     });
   }, [aiTutorEnabled, task.id, task.starterCode]);
 
+  useEffect(() => {
+    const taskId = task.id;
+    const starterCode = task.starterCode;
+    const syncDraft = () => {
+      const snapshot = draftSnapshotsRef.current[taskId];
+      const studySessionId = window.sessionStorage.getItem("socratic-study-session-id");
+      if (!snapshot || !studySessionId) return;
+
+      const hasPlan = Boolean(
+        snapshot.planningApproach.trim() ||
+        snapshot.planningSteps.some((step) => step.trim()),
+      );
+      const hasActivity =
+        snapshot.entryPath !== "undecided" ||
+        snapshot.code !== starterCode ||
+        hasPlan;
+      if (!hasActivity) return;
+
+      void fetch("/api/study/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId,
+          studySessionId,
+          entryPath:
+            snapshot.entryPath === "undecided" ? null : snapshot.entryPath,
+          currentStage:
+            snapshot.planningStatus === "ready" ? "code" : "plan",
+          plan: {
+            status: snapshot.planningStatus,
+            approach: snapshot.planningApproach,
+            steps: snapshot.planningSteps,
+          },
+          code: snapshot.code,
+        }),
+        keepalive: true,
+      }).catch(() => undefined);
+    };
+
+    window.addEventListener("pagehide", syncDraft);
+    return () => {
+      window.removeEventListener("pagehide", syncDraft);
+      syncDraft();
+    };
+  }, [task.id, task.starterCode]);
+
   const chooseEntryPath = (path: Exclude<TaskEntryPath, "undecided">) => {
-    window.localStorage.setItem(`socratic-task-entry-path:${task.id}`, path);
+    window.localStorage.setItem(
+      getParticipantTaskStorageKey("socratic-task-entry-path", task.id),
+      path,
+    );
     setEntryPath(path);
   };
 
@@ -135,6 +201,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
                   setLearningContext((current) => ({ ...current, hintLevel }));
                 }}
                 entryPath={entryPath}
+                onEnterPlanning={() => chooseEntryPath("plan")}
               />
             </div>
           )}

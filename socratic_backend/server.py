@@ -30,7 +30,7 @@ load_dotenv(Path(__file__).with_name(".env"))
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from study_logger import log_intervention, save_assessment_plan, save_assessment_score, save_code_run
+from study_logger import log_intervention, save_assessment_plan, save_assessment_score, save_code_run, save_task_draft
 from llm_base import base_llm_call, model as scoring_model
 
 from tutor_graph import graph
@@ -106,6 +106,7 @@ class TutorRequest(BaseModel):
     hintLevel: Optional[int] = 0
     conversationId: str
     stage: str
+    entryPath: str
     mode: str
     conversation: List[ConversationMessage] = []
     action: str
@@ -164,6 +165,7 @@ class StudySessionStartResponse(BaseModel):
     userId: str
     userCode: str
     studySessionId: str
+    resumed: bool = False
 
 
 class StudyRunRecordRequest(BaseModel):
@@ -171,6 +173,15 @@ class StudyRunRecordRequest(BaseModel):
     studySessionId: str
     code: str
     result: dict
+
+
+class StudyDraftRequest(BaseModel):
+    taskId: str
+    studySessionId: str
+    plan: dict
+    code: str = ""
+    entryPath: Optional[str] = None
+    currentStage: str = "plan"
 
 
 # ---------- Code execution models (mirrors types/code-run.ts) ----------
@@ -254,6 +265,7 @@ def _is_dialogue_reset_request(message: str) -> bool:
 
 
 def get_tutor_content(req: TutorRequest):
+    request_started = time.perf_counter()
     if _is_dialogue_reset_request(req.studentMessage):
         return (
             "可以，我们先换一种方式。你现在先不用追踪例子，只看代码：你想先完成“保存第一个数”，还是“比较后面的数”？",
@@ -301,6 +313,7 @@ def get_tutor_content(req: TutorRequest):
         "problem_content": problem,
         "action": req.action,
         "stage": req.stage,
+        "entry_path": req.entryPath,
         "mode": req.mode,
         "plan_form": plan_form,
         "student_answer": req.studentMessage,
@@ -351,13 +364,6 @@ def get_tutor_content(req: TutorRequest):
     }
     result_state = graph.invoke(initial_state)
     content = result_state.get("tutor_message") or "你接下来准备怎么做？"
-    log_intervention(
-        session_id=req.conversationId,
-        task_id=req.taskId,
-        state=result_state,
-        tutor_question=content,
-        study_session_id=req.studySessionId,
-    )
     question_type = result_state.get("question_type") or "understanding"
     agent_trace = result_state.get("agent_trace", [])
 
@@ -376,6 +382,24 @@ def get_tutor_content(req: TutorRequest):
             plan_interaction = {**plan_data, "showReviewCard": False}
         else:
             plan_review = plan_data
+
+    result_state.update({
+        "question_type": question_type,
+        "learner_state_evidence": result_state.get("learner_state") or previous_learner_state,
+        "plan_review_result": plan_interaction or plan_review,
+        "model_provider": os.getenv("MODEL_PROVIDER", "openai-compatible"),
+        "model_name": scoring_model or "unknown",
+        "model_version": os.getenv("MODEL_VERSION") or scoring_model or "unknown",
+        "prompt_version": os.getenv("TUTOR_PROMPT_VERSION", "socratic-tutor-v1"),
+        "response_latency_ms": round((time.perf_counter() - request_started) * 1000),
+    })
+    log_intervention(
+        session_id=req.conversationId,
+        task_id=req.taskId,
+        state=result_state,
+        tutor_question=content,
+        study_session_id=req.studySessionId,
+    )
 
     return (
         content,
@@ -625,7 +649,7 @@ def database_health():
 
 @app.post("/api/tutor/message", response_model=TutorResponse)
 def tutor_message(req: TutorRequest):
-    if req.taskId in {"task_1_maximum", "task_5_below_limit"}:
+    if req.taskId in {"task_1_maximum", "task_5_minimum"}:
         raise HTTPException(
             status_code=403,
             detail="AI Tutor is disabled for this assessment task.",
@@ -648,10 +672,22 @@ def _extract_json_object(text: str) -> dict:
 
 @app.post("/api/assessment/score", response_model=AssessmentScoreResponse)
 def score_assessment(req: AssessmentScoreRequest):
-    if req.taskId not in {"task_1_maximum", "task_5_below_limit"}:
+    if req.taskId not in {"task_1_maximum", "task_5_minimum"}:
         raise HTTPException(status_code=403, detail="Scoring is limited to pre/post assessment tasks.")
 
-    rubric = """You are a blind computational-thinking assessment rater. You do not know whether this is a pre-test or post-test. Score only the supplied artifacts. Never reward polish without evidence. Evaluate five dimensions at integer level 0-4: decomposition, algorithmic_thinking, abstraction, pattern_recognition, evaluation_debugging. Return JSON only. For every dimension return: level, summary, observations (specific behaviors), plan_evidence (short exact excerpts or precise absence), code_evidence (specific variables/conditions/lines described), run_evidence (test outcomes and changes), deductions (each with reason and level impact), missing_for_next_level, and confidence (low/medium/high). Detailed evidence must explain both awarded credit and deductions, distinguish observed evidence from inference, and state when evidence is unavailable. Pattern recognition means identifying and applying the general traverse-filter/compare-update pattern, not claiming knowledge of another task. Evaluation/debugging must use run history and reflection rather than final correctness alone. Do not include chain-of-thought."""
+    rubric = """You are a blind computational-thinking assessment rater. You do not know whether this is a pre-test or post-test. Score only the supplied artifacts and never reward polish without evidence.
+
+Evaluate six dimensions. Give each dimension an integer score from 0 to 5, for a maximum total of 30:
+1. decomposition: separates the problem into coherent, executable subproblems or steps.
+2. algorithmic_thinking: specifies a correct ordered process, state initialization, traversal, comparison, update, and output.
+3. abstraction: identifies the essential state and general rule without irrelevant or task-specific clutter.
+4. pattern_recognition: identifies or applies the reusable traverse/compare/update pattern; do not infer prior-task knowledge merely from a correct answer.
+5. evaluation: predicts or checks behavior, considers examples and edge cases, interprets test outcomes, and verifies that output meets requirements.
+6. debugging: uses observed failure evidence to locate a cause, makes a targeted revision, and checks whether the revision fixes the issue. Final correctness alone is not debugging evidence. If no failure or revision is observable, explicitly state that debugging evidence is unavailable rather than inventing it.
+
+Use this common scoring scale for every dimension: 0=no evidence or fundamentally incorrect; 1=minimal fragment; 2=partial but major gaps; 3=adequate core evidence with some gaps; 4=strong and mostly complete evidence; 5=clear, complete, consistent, and well-supported evidence.
+
+Return JSON only. For every dimension return: score, summary, observations (specific behaviors), plan_evidence (short exact excerpts or precise absence), code_evidence (specific variables/conditions/lines described), run_evidence (test outcomes and changes), deductions (each with reason and point impact), missing_for_next_score, and confidence (low/medium/high). Detailed evidence must explain both awarded credit and deductions, distinguish observed evidence from inference, and state when evidence is unavailable. Do not include chain-of-thought."""
     artifacts = json.dumps({
         "task_id": req.taskId,
         "title": req.taskTitle,
@@ -663,30 +699,36 @@ def score_assessment(req: AssessmentScoreRequest):
         "required_output_schema": {
             "dimensions": {
                 "decomposition": {}, "algorithmic_thinking": {}, "abstraction": {},
-                "pattern_recognition": {}, "evaluation_debugging": {}
+                "pattern_recognition": {}, "evaluation": {}, "debugging": {}
             },
             "overall_strengths": [], "overall_limitations": [], "cross_artifact_consistency": "",
         },
     }, ensure_ascii=False)
     raw = _extract_json_object(base_llm_call(rubric, artifacts))
     dimensions = raw.get("dimensions") or {}
-    required = ["decomposition", "algorithmic_thinking", "abstraction", "pattern_recognition", "evaluation_debugging"]
+    required = ["decomposition", "algorithmic_thinking", "abstraction", "pattern_recognition", "evaluation", "debugging"]
     normalized = {}
     for name in required:
         detail = dimensions.get(name) if isinstance(dimensions.get(name), dict) else {}
-        level = max(0, min(4, int(detail.get("level", 0))))
-        normalized[name] = {**detail, "level": level, "score": level * 5}
+        dimension_score = max(0, min(5, int(detail.get("score", detail.get("level", 0)))))
+        normalized[name] = {**detail, "score": dimension_score, "max_score": 5}
     total = sum(item["score"] for item in normalized.values())
     score = {
-        "rubric_version": "ct-rubric-v1",
+        "rubric_version": "ct-rubric-v2-six-dimensions",
         "scoring_model": scoring_model,
         "dimensions": normalized,
         "total": total,
+        "total_max": 30,
         "overall_strengths": raw.get("overall_strengths") or [],
         "overall_limitations": raw.get("overall_limitations") or [],
         "cross_artifact_consistency": raw.get("cross_artifact_consistency") or "",
         "evidence_policy": "blind_artifact_only",
     }
+    save_assessment_score(
+        task_id=req.taskId, plan=req.plan, code=req.code, runs=req.runs,
+        score=score, study_session_id=req.studySessionId,
+    )
+    return AssessmentScoreResponse(submitted=True, total=total)
 
 
 @app.post("/api/study/session/start", response_model=StudySessionStartResponse)
@@ -702,9 +744,26 @@ def start_study_session(req: StudySessionStartRequest):
         supabase.table("users").insert({
             "id": user_id,
             "user_code": user_code,
-            "study_group": "pilot",
-            "consented_at": datetime.now(timezone.utc).isoformat(),
         }).execute()
+
+    active_sessions = (
+        supabase.table("study_sessions")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("status", "active")
+        .order("started_at", desc=True)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if active_sessions:
+        return StudySessionStartResponse(
+            userId=user_id,
+            userCode=user_code,
+            studySessionId=active_sessions[0]["id"],
+            resumed=True,
+        )
+
     session_id = str(uuid.uuid4())
     supabase.table("study_sessions").insert({
         "id": session_id,
@@ -712,25 +771,37 @@ def start_study_session(req: StudySessionStartRequest):
         "status": "active",
         "started_at": datetime.now(timezone.utc).isoformat(),
         "client_version": "study-v1",
-        "consent_version": "study-v1",
     }).execute()
-    return StudySessionStartResponse(userId=user_id, userCode=user_code, studySessionId=session_id)
+    return StudySessionStartResponse(
+        userId=user_id,
+        userCode=user_code,
+        studySessionId=session_id,
+        resumed=False,
+    )
 
 
 @app.post("/api/study/run")
 def record_study_run(req: StudyRunRecordRequest):
     save_code_run(task_id=req.taskId, code=req.code, result=req.result, study_session_id=req.studySessionId)
     return {"saved": True}
-    save_assessment_score(
-        task_id=req.taskId, plan=req.plan, code=req.code, runs=req.runs,
-        score=score, study_session_id=req.studySessionId,
+
+
+@app.post("/api/study/draft")
+def sync_study_draft(req: StudyDraftRequest):
+    save_task_draft(
+        task_id=req.taskId,
+        plan=req.plan,
+        code=req.code,
+        entry_path=req.entryPath,
+        current_stage=req.currentStage,
+        study_session_id=req.studySessionId,
     )
-    return AssessmentScoreResponse(submitted=True, total=total)
+    return {"saved": True}
 
 
 @app.post("/api/assessment/plan")
 def submit_assessment_plan(req: AssessmentPlanRequest):
-    if req.taskId not in {"task_1_maximum", "task_5_below_limit"}:
+    if req.taskId not in {"task_1_maximum", "task_5_minimum"}:
         raise HTTPException(status_code=403, detail="Plan locking is limited to assessment tasks.")
     locked = save_assessment_plan(
         task_id=req.taskId, plan=req.plan, study_session_id=req.studySessionId,

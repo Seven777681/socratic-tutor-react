@@ -6,7 +6,7 @@ const BACKEND_URL =
 
 const ASSESSMENT_ONLY_TASKS = new Set([
   "task_1_maximum",
-  "task_5_below_limit",
+  "task_5_minimum",
 ]);
 
 export async function POST(request: Request) {

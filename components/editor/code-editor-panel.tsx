@@ -112,7 +112,7 @@ export function CodeEditorPanel({
     entryPath === "plan" && learningState.planningDraft.status !== "ready";
   const canEnterCoding = learningState.planningDraft.status === "ready";
 
-  const chooseLearningPath = (path: "plan" | "code") => {
+  const chooseLearningPath = (path: "understand" | "plan" | "code") => {
     if (
       path === "plan" &&
       !aiTutorEnabled &&
@@ -655,7 +655,7 @@ export function CodeEditorPanel({
             </h3>
             <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 sm:text-sm">
               {aiTutorEnabled
-                ? "Either way, write your plan first. The AI Tutor can help when you need it."
+                ? "If you have an approach, write your plan. If not, the AI Tutor will first help you understand the problem."
                 : "Write your plan independently before you begin coding. No AI feedback is provided for this assessment task."}
             </p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -677,10 +677,10 @@ export function CodeEditorPanel({
               </button>
               <button
                 type="button"
-                onClick={() => chooseLearningPath("plan")}
+                onClick={() => chooseLearningPath("understand")}
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-[#b9b2ff] bg-white px-4 text-sm font-extrabold text-[#6255f6] transition hover:border-[#6255f6] hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15"
               >
-                {aiTutorEnabled ? "No, help me make a plan" : "No, I will plan step by step"}
+                {aiTutorEnabled ? "No, help me understand" : "No, I will plan step by step"}
               </button>
               </>}
             </div>

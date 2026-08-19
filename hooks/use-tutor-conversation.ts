@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CodeRunResult } from "@/types/code-run";
 import type { TaskPedagogy } from "@/types/task";
+import type { TaskEntryPath } from "@/types/task";
 import type {
   GuidanceStage,
   TutorActionType,
@@ -19,11 +20,12 @@ import {
   loadTutorConversation,
   saveTutorConversation,
 } from "@/hooks/use-tutor-storage";
+import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
 
 const INTERNAL_TUTOR_MODE: TutorMode = "run_and_reflect";
 
 function handledRunStorageKey(taskId: string) {
-  return `socratic-tutor-handled-run:${taskId}`;
+  return getParticipantTaskStorageKey("socratic-tutor-handled-run", taskId);
 }
 
 function createConversation({
@@ -91,6 +93,7 @@ export function useTutorConversation({
   latestRunResult,
   learningContext,
   stage,
+  entryPath,
   onPlanInteraction,
   onHintLevelChange,
 }: {
@@ -102,6 +105,7 @@ export function useTutorConversation({
   latestRunResult?: CodeRunResult;
   learningContext: TutorLearningContext;
   stage: GuidanceStage;
+  entryPath: Exclude<TaskEntryPath, "undecided">;
   onPlanInteraction?: (review: TutorPlanInteraction) => void;
   onHintLevelChange?: (hintLevel: number) => void;
 }) {
@@ -211,6 +215,7 @@ export function useTutorConversation({
           latestPrediction: learningContext.latestPrediction,
           hintLevel: learningContext.hintLevel,
           stage,
+          entryPath,
           conversationId: conversation.id,
           conversation: requestConversation.filter((message) => message.role !== "system"),
           action,
@@ -251,6 +256,7 @@ export function useTutorConversation({
       conversation.messages,
       conversation.id,
       currentCode,
+      entryPath,
       learningContext.hintLevel,
       learningContext.latestPrediction,
       learningContext.planningApproach,

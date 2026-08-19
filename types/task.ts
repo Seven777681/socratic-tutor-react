@@ -149,7 +149,7 @@ export interface ProgrammingTaskDetail {
 }
 
 export type SaveStatus = "saved" | "saving" | "unsaved";
-export type TaskEntryPath = "undecided" | "plan" | "code";
+export type TaskEntryPath = "undecided" | "understand" | "plan" | "code";
 
 export interface CodeEditorState {
   taskId: string;

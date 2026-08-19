@@ -46,6 +46,7 @@ export function SocraticTutorPanel({
   onPlanInteraction,
   onHintLevelChange,
   entryPath,
+  onEnterPlanning,
 }: {
   task: ProgrammingTaskDetail;
   currentCode: string;
@@ -55,6 +56,7 @@ export function SocraticTutorPanel({
   onPlanInteraction?: (review: TutorPlanInteraction) => void;
   onHintLevelChange?: (hintLevel: number) => void;
   entryPath: TaskEntryPath;
+  onEnterPlanning: () => void;
 }) {
   const [isGuidelinesOpen, setIsGuidelinesOpen] = useState(false);
   const [isClearOpen, setIsClearOpen] = useState(false);
@@ -81,6 +83,7 @@ export function SocraticTutorPanel({
     latestRunResult,
     learningContext,
     stage,
+    entryPath: entryPath === "undecided" ? "understand" : entryPath,
     onPlanInteraction,
     onHintLevelChange,
   });
@@ -93,7 +96,7 @@ export function SocraticTutorPanel({
 
   useEffect(() => {
     if (
-      entryPath !== "plan" ||
+      entryPath !== "understand" ||
       planningHelpStartedRef.current ||
       conversation.messages.length > 0
     ) {
@@ -171,12 +174,30 @@ export function SocraticTutorPanel({
           </div>
         </div>
       ) : (
-        <TutorConversation
-          messages={conversation.messages}
-          status={status}
-          onBegin={beginWithQuestion}
-          onHasIdea={beginWithPlan}
-        />
+        <>
+          <TutorConversation
+            messages={conversation.messages}
+            status={status}
+            onBegin={beginWithQuestion}
+            onHasIdea={beginWithPlan}
+          />
+          {entryPath === "understand" &&
+          status === "ready" &&
+          conversation.messages.some((message) => message.role === "tutor") ? (
+            <div className="border-t border-[#E8EAF3] bg-[#FBFCFF] px-4 py-3">
+              <p className="mb-2 text-xs font-semibold leading-5 text-slate-500">
+                Continue asking questions until the problem is clear. When you can explain the goal and inputs, move on to your plan.
+              </p>
+              <button
+                type="button"
+                onClick={onEnterPlanning}
+                className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-[linear-gradient(135deg,#6C4CF5,#536DFE)] px-4 text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(98,85,246,0.2)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/20"
+              >
+                I understand — continue to Planning
+              </button>
+            </div>
+          ) : null}
+        </>
       )}
       {errorMessage ? (
         <div role="alert" className="mx-4 mb-3 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm font-semibold leading-6 text-rose-700">

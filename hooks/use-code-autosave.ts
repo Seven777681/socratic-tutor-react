@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SaveStatus } from "@/types/task";
+import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
 
 const autosaveDelayMs = 800;
 
@@ -12,7 +13,7 @@ export function useCodeAutosave({
   taskId: string;
   starterCode: string;
 }) {
-  const storageKey = useMemo(() => `socratic-code-${taskId}`, [taskId]);
+  const storageKey = getParticipantTaskStorageKey("socratic-code", taskId);
   const [currentCode, setCurrentCode] = useState(starterCode);
   const [savedCode, setSavedCode] = useState(starterCode);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");

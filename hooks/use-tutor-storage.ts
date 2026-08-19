@@ -1,15 +1,16 @@
 "use client";
 
 import type { TutorConversation, TutorMode } from "@/types/tutor";
+import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
 
 const TUTOR_STORAGE_VERSION = 3;
 
 export function getTutorStorageKey(taskId: string) {
-  return `socratic-tutor-${taskId}`;
+  return getParticipantTaskStorageKey("socratic-tutor", taskId);
 }
 
 export function getTutorModeStorageKey(taskId: string) {
-  return `socratic-tutor-mode-${taskId}`;
+  return getParticipantTaskStorageKey("socratic-tutor-mode", taskId);
 }
 
 export function loadTutorMode(taskId: string): TutorMode | undefined {
