@@ -105,6 +105,7 @@ export interface TutorConversation {
 
 export interface TutorRequest {
   taskId: string;
+  studySessionId?: string | null;
   taskTitle?: string;
   taskDescription?: string;
   taskPedagogy?: TaskPedagogy;

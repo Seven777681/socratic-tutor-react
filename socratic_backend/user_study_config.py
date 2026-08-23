@@ -2,7 +2,7 @@
 
 STUDY_TASK_IDS = {
     "task_1_maximum", "task_2_above_average",
-    "task_3_remove_duplicates", "task_4_second_largest",
+    "task_3_remove_duplicates",
 }
 
 INTERVENTION_CATEGORIES = {
@@ -35,13 +35,6 @@ INTERVENTIONS = {
             "category": "logical_error", "trigger": "every item is appended",
             "planning_goal": "state the condition for adding an item",
             "coding_goal": "check prior membership before appending",
-        },
-    },
-    "task_4_second_largest": {
-        "lost_previous_largest": {
-            "category": "logical_error", "trigger": "new maximum overwrites the old maximum",
-            "planning_goal": "identify why the previous maximum must be preserved",
-            "coding_goal": "update both tracked values in a safe order",
         },
     },
 }

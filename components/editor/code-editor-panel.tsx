@@ -57,6 +57,14 @@ function trackLearningEvent({
   }
 }
 
+function getExampleProgramInput(input: string | undefined) {
+  const value = (input ?? "").trim();
+  if (value.startsWith("[") && value.endsWith("]")) {
+    return value.slice(1, -1).replace(/,/g, " ").replace(/\s+/g, " ").trim();
+  }
+  return value;
+}
+
 export function CodeEditorPanel({
   task,
   taskId,
@@ -83,7 +91,9 @@ export function CodeEditorPanel({
     column: 1,
   });
   const [isResetOpen, setIsResetOpen] = useState(false);
-  const [stdin, setStdin] = useState("5");
+  const [stdin, setStdin] = useState(() =>
+    getExampleProgramInput(task.examples[0]?.input),
+  );
   const [runStatus, setRunStatus] = useState<RunStatus>("idle");
   const [runResult, setRunResult] = useState<CodeRunResult | undefined>();
   const [activeResultTab, setActiveResultTab] = useState<RunResultTab>("console");
@@ -111,6 +121,10 @@ export function CodeEditorPanel({
   const showPlan =
     entryPath === "plan" && learningState.planningDraft.status !== "ready";
   const canEnterCoding = learningState.planningDraft.status === "ready";
+
+  useEffect(() => {
+    setStdin(getExampleProgramInput(task.examples[0]?.input));
+  }, [task.examples[0]?.input, taskId]);
 
   const chooseLearningPath = (path: "understand" | "plan" | "code") => {
     if (
@@ -572,6 +586,47 @@ export function CodeEditorPanel({
     updateState,
   ]);
 
+  const completeTaskAndContinue = useCallback(async () => {
+    if (isGeneratingReflection) return;
+    setIsGeneratingReflection(true);
+    try {
+      const response = await fetch("/api/study/task/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId,
+          studySessionId: window.sessionStorage.getItem("socratic-study-session-id"),
+          entryPath,
+          plan: {
+            status: learningState.planningDraft.status,
+            approach: learningState.planningDraft.approach,
+            steps: learningState.planningDraft.steps,
+          },
+          code: currentCode,
+        }),
+      });
+      if (!response.ok) throw new Error("Task completion failed");
+      window.location.assign(nextTask?.href ?? "/tasks");
+    } catch {
+      // The draft is also persisted locally and by WorkspaceLayout's unload sync.
+      // Do not trap the learner on this page when the completion endpoint is
+      // temporarily unavailable.
+      window.alert(
+        "Your latest work is saved locally, but completion could not be synced yet.",
+      );
+      window.location.assign(nextTask?.href ?? "/tasks");
+    } finally {
+      setIsGeneratingReflection(false);
+    }
+  }, [
+    currentCode,
+    entryPath,
+    isGeneratingReflection,
+    learningState.planningDraft,
+    nextTask,
+    taskId,
+  ]);
+
   const isReflectionComplete = useMemo(
     () =>
       Object.values(learningState.reflectionAnswers).every(
@@ -795,6 +850,9 @@ export function CodeEditorPanel({
           }
           onSubmit={() => {
             void generateReflectionSummary();
+          }}
+          onContinue={() => {
+            void completeTaskAndContinue();
           }}
           nextTask={nextTask}
           assessmentOnly={!aiTutorEnabled}

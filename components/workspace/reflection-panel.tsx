@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { ReflectionAnswers } from "@/hooks/use-task-learning-state";
 import { ArrowRightIcon } from "@/components/dashboard/dashboard-icons";
 
@@ -38,6 +37,7 @@ export function ReflectionPanel({
   isComplete,
   onAnswersChange,
   onSubmit,
+  onContinue,
   nextTask,
   assessmentOnly = false,
 }: {
@@ -47,6 +47,7 @@ export function ReflectionPanel({
   isComplete: boolean;
   onAnswersChange: (answers: ReflectionAnswers) => void;
   onSubmit: () => void;
+  onContinue: () => void;
   nextTask?: {
     href: string;
     title: string;
@@ -147,13 +148,15 @@ export function ReflectionPanel({
             {nextTask ? nextTask.title : "Return to Tasks to review your progress."}
           </p>
         </div>
-        <Link
-          href={nextTask?.href ?? "/tasks"}
-          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#6C4CF5,#536DFE)] px-5 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(98,85,246,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(98,85,246,0.3)] focus:outline-none focus:ring-4 focus:ring-[#6255f6]/20 active:translate-y-0"
+        <button
+          type="button"
+          onClick={onContinue}
+          disabled={!summary || isGenerating}
+          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#6C4CF5,#536DFE)] px-5 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(98,85,246,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(98,85,246,0.3)] focus:outline-none focus:ring-4 focus:ring-[#6255f6]/20 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {nextTask ? "Next Task" : "Back to Tasks"}
           <ArrowRightIcon className="h-4 w-4" />
-        </Link>
+        </button>
       </div>
     </section>
   );

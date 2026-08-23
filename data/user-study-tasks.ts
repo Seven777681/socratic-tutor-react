@@ -83,27 +83,7 @@ export const userStudyTasks: ProgrammingTaskDetail[] = [
     starterCode: "numbers = [int(value) for value in input().split()]\n\n# TODO: Print unique values in first-seen order without set()\n", href: "/tasks/task_3_remove_duplicates",
   },
   {
-    ...base, id: "task_4_second_largest", taskNumber: 4, order: 4,
-    title: "Second Largest Distinct Value", difficulty: "medium", thinkingDepth: "medium",
-    description: ["Write a Python function that finds the second largest distinct value in a list."],
-    constraints: ["Do not use max()", "Do not use sort()", "Do not use sorted()", "The list contains at least two distinct values"],
-    examples: [
-      { id: "example-1", input: "[4, 7, 2, 9, 7]", output: "7" },
-      { id: "example-2", input: "[-2, -8, -4]", output: "-4" },
-    ],
-    testCases: [
-      { id: "t4-1", name: "Mixed values", input: "4 7 2 9 7", output: "7", visibility: "hidden", misconceptionTag: "lost_previous_largest" },
-      { id: "t4-2", name: "Two values", input: "10 5", output: "5", visibility: "hidden" },
-      { id: "t4-3", name: "Negative values", input: "-2 -8 -4", output: "-4", visibility: "hidden" },
-      { id: "t4-4", name: "Repeated values", input: "5 5 3 3 1", output: "3", visibility: "hidden", misconceptionTag: "maximum_not_distinct" },
-    ],
-    learningObjectives: ["Maintain two state variables", "Preserve the previous maximum", "Handle distinctness", "Update state in the correct order"],
-    inputDescription: "One line of space-separated integers containing at least two distinct values.", outputDescription: "The second largest distinct integer.",
-    pedagogy: { primaryConcept: "two-value invariant", secondaryConcepts: ["distinctness", "ordered state updates"], prerequisites: ["lists", "loops", "conditionals"], commonMisconceptions: ["losing the previous largest", "treating duplicates as second largest", "incorrect initialization", "updating in the wrong order", "using prohibited built-ins"], expectedPlanElements: ["track largest and second largest", "preserve the old largest", "ignore duplicates", "update in the correct order"], reflectionPrompts: ["What must remain true about both tracked values?"] },
-    starterCode: "numbers = [int(value) for value in input().split()]\n\n# TODO: Print the second largest distinct value\n", href: "/tasks/task_4_second_largest",
-  },
-  {
-    ...base, id: "task_5_minimum", taskNumber: 5, order: 5,
+    ...base, id: "task_4_minimum", taskNumber: 4, order: 4,
     title: "Find the Minimum", difficulty: "easy", thinkingDepth: "easy",
     description: ["Write a Python function that finds the smallest value in a non-empty list of integers."],
     constraints: ["Do not use min()", "Do not use sort()", "Do not use sorted()"],
@@ -112,10 +92,10 @@ export const userStudyTasks: ProgrammingTaskDetail[] = [
       { id: "example-2", input: "[-8, -3, -10]", output: "-10" },
     ],
     testCases: [
-      { id: "t5-1", name: "Mixed values", input: "3 7 2 5", output: "2", visibility: "hidden" },
-      { id: "t5-2", name: "Negative values", input: "-8 -3 -10", output: "-10", visibility: "hidden", misconceptionTag: "initialized_to_zero" },
-      { id: "t5-3", name: "Single value", input: "5", output: "5", visibility: "hidden" },
-      { id: "t5-4", name: "Equal values", input: "4 4 4", output: "4", visibility: "hidden" },
+      { id: "t4-1", name: "Mixed values", input: "3 7 2 5", output: "2", visibility: "hidden" },
+      { id: "t4-2", name: "Negative values", input: "-8 -3 -10", output: "-10", visibility: "hidden", misconceptionTag: "initialized_to_zero" },
+      { id: "t4-3", name: "Single value", input: "5", output: "5", visibility: "hidden" },
+      { id: "t4-4", name: "Equal values", input: "4 4 4", output: "4", visibility: "hidden" },
     ],
     learningObjectives: ["Traverse a list", "Compare values", "Maintain a state variable", "Choose a valid initialization"],
     inputDescription: "One line of space-separated integers representing a non-empty list.",
@@ -129,7 +109,7 @@ export const userStudyTasks: ProgrammingTaskDetail[] = [
       reflectionPrompts: ["What must the tracked value represent after each iteration?"],
     },
     starterCode: "numbers = [int(value) for value in input().split()]\n\n# TODO: Find and print the smallest value without prohibited built-ins\n",
-    href: "/tasks/task_5_minimum",
+    href: "/tasks/task_4_minimum",
   },
 ];
 

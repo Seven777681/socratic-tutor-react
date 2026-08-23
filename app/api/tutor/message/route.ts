@@ -6,7 +6,7 @@ const BACKEND_URL =
 
 const ASSESSMENT_ONLY_TASKS = new Set([
   "task_1_maximum",
-  "task_5_minimum",
+  "task_4_minimum",
 ]);
 
 export async function POST(request: Request) {
@@ -25,6 +25,13 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Invalid tutor request." },
       { status: 400 },
+    );
+  }
+
+  if (!body.studySessionId) {
+    return NextResponse.json(
+      { error: "An active study session is required." },
+      { status: 401 },
     );
   }
 

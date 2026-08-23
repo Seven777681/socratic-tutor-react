@@ -30,7 +30,7 @@ load_dotenv(Path(__file__).with_name(".env"))
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from study_logger import log_intervention, save_assessment_plan, save_assessment_score, save_code_run, save_task_draft, save_tutor_conversation_snapshot
+from study_logger import complete_study_task, log_intervention, save_assessment_plan, save_assessment_score, save_code_run, save_task_draft, save_tutor_conversation_snapshot
 from llm_base import base_llm_call, model as scoring_model
 
 from tutor_graph import graph
@@ -193,6 +193,14 @@ class StudyConversationRequest(BaseModel):
     entryPath: Optional[str] = None
 
 
+class StudyTaskCompleteRequest(BaseModel):
+    taskId: str
+    studySessionId: str
+    plan: dict
+    code: str = ""
+    entryPath: Optional[str] = None
+
+
 # ---------- Code execution models (mirrors types/code-run.ts) ----------
 
 class CodeRunTestCaseInput(BaseModel):
@@ -275,17 +283,6 @@ def _is_dialogue_reset_request(message: str) -> bool:
 
 def get_tutor_content(req: TutorRequest):
     request_started = time.perf_counter()
-    if _is_dialogue_reset_request(req.studentMessage):
-        return (
-            "可以，我们先换一种方式。你现在先不用追踪例子，只看代码：你想先完成“保存第一个数”，还是“比较后面的数”？",
-            "understanding",
-            [],
-            None,
-            None,
-            max(0, min(2, req.hintLevel or 0)),
-            {"currentFocus": "coding_progress", "attemptsOnFocus": 0, "consecutiveOffTarget": 0},
-        )
-
     problem = req.taskDescription or req.taskTitle or "the current problem"
     if req.taskPedagogy:
         pedagogy = req.taskPedagogy
@@ -372,7 +369,9 @@ def get_tutor_content(req: TutorRequest):
         "agent_trace": [],
     }
     result_state = graph.invoke(initial_state)
-    content = result_state.get("tutor_message") or "你接下来准备怎么做？"
+    content = (result_state.get("tutor_message") or "").strip()
+    if not content:
+        raise RuntimeError("The tutor model did not produce a contextual question.")
     question_type = result_state.get("question_type") or "understanding"
     agent_trace = result_state.get("agent_trace", [])
 
@@ -656,9 +655,26 @@ def database_health():
     }
 
 
+def _require_active_study_session(study_session_id: Optional[str]):
+    if not study_session_id:
+        raise HTTPException(status_code=401, detail="An active study session is required.")
+    sessions = (
+        supabase.table("study_sessions")
+        .select("id,status")
+        .eq("id", study_session_id)
+        .eq("status", "active")
+        .limit(1)
+        .execute()
+        .data
+    )
+    if not sessions:
+        raise HTTPException(status_code=401, detail="The study session is not active.")
+
+
 @app.post("/api/tutor/message", response_model=TutorResponse)
 def tutor_message(req: TutorRequest):
-    if req.taskId in {"task_1_maximum", "task_5_minimum"}:
+    _require_active_study_session(req.studySessionId)
+    if req.taskId in {"task_1_maximum", "task_4_minimum"}:
         raise HTTPException(
             status_code=403,
             detail="AI Tutor is disabled for this assessment task.",
@@ -681,7 +697,8 @@ def _extract_json_object(text: str) -> dict:
 
 @app.post("/api/assessment/score", response_model=AssessmentScoreResponse)
 def score_assessment(req: AssessmentScoreRequest):
-    if req.taskId not in {"task_1_maximum", "task_5_minimum"}:
+    _require_active_study_session(req.studySessionId)
+    if req.taskId not in {"task_1_maximum", "task_4_minimum"}:
         raise HTTPException(status_code=403, detail="Scoring is limited to pre/post assessment tasks.")
 
     rubric = """You are a blind computational-thinking assessment rater. You do not know whether this is a pre-test or post-test. Score only the supplied artifacts and never reward polish without evidence.
@@ -785,21 +802,20 @@ def start_study_session(req: StudySessionStartRequest):
             "user_code": user_code,
         }).execute()
 
-    active_sessions = (
+    previous_sessions = (
         supabase.table("study_sessions")
-        .select("id")
+        .select("id,status")
         .eq("user_id", user_id)
-        .eq("status", "active")
         .order("started_at", desc=True)
         .limit(1)
         .execute()
         .data
     )
-    if active_sessions:
+    if previous_sessions:
         return StudySessionStartResponse(
             userId=user_id,
             userCode=user_code,
-            studySessionId=active_sessions[0]["id"],
+            studySessionId=previous_sessions[0]["id"],
             resumed=True,
         )
 
@@ -809,7 +825,7 @@ def start_study_session(req: StudySessionStartRequest):
         "user_id": user_id,
         "status": "active",
         "started_at": datetime.now(timezone.utc).isoformat(),
-        "client_version": "study-v1",
+        "client_version": "study-v2-agent-trace",
     }).execute()
     return StudySessionStartResponse(
         userId=user_id,
@@ -836,6 +852,21 @@ def sync_study_draft(req: StudyDraftRequest):
         study_session_id=req.studySessionId,
     )
     return {"saved": True}
+
+
+@app.post("/api/study/task/complete")
+def complete_task(req: StudyTaskCompleteRequest):
+    _require_active_study_session(req.studySessionId)
+    if req.taskId not in {"task_2_above_average", "task_3_remove_duplicates"}:
+        raise HTTPException(status_code=403, detail="This task cannot use the regular completion endpoint.")
+    complete_study_task(
+        task_id=req.taskId,
+        plan=req.plan,
+        code=req.code,
+        entry_path=req.entryPath,
+        study_session_id=req.studySessionId,
+    )
+    return {"completed": True}
 
 
 @app.get("/api/study/progress")
@@ -866,7 +897,7 @@ def sync_study_conversation(req: StudyConversationRequest):
 
 @app.post("/api/assessment/plan")
 def submit_assessment_plan(req: AssessmentPlanRequest):
-    if req.taskId not in {"task_1_maximum", "task_5_minimum"}:
+    if req.taskId not in {"task_1_maximum", "task_4_minimum"}:
         raise HTTPException(status_code=403, detail="Plan locking is limited to assessment tasks.")
     locked = save_assessment_plan(
         task_id=req.taskId, plan=req.plan, study_session_id=req.studySessionId,

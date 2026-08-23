@@ -177,6 +177,10 @@ def _write_to_supabase(*, session_id: str, task_id: str, state: dict, tutor_ques
             "detected_misconception": record["detected_misconception"],
             "agent": record["agent"],
             "conversation_id": session_id,
+            "agent_trace": state.get("agent_trace") or [],
+            "trace_version": "langgraph-agent-trace-v1",
+            "trace_capture_mode": "server_runtime",
+            "trace_captured_at": now,
         },
         "occurred_at": now,
     })
@@ -225,7 +229,7 @@ def save_assessment_score(*, task_id: str, plan: dict, code: str, runs: list, sc
         "sequence_number": len(runs) + 1, "event_name": "computational_thinking_score",
         "stage": "reflect", "metadata": score, "occurred_at": now,
     })
-    if task_id == "task_5_minimum":
+    if task_id == "task_4_minimum":
         client.table("study_sessions").update({
             "status": "completed", "completed_at": now,
         }).eq("id", study_session_id).execute()
@@ -289,6 +293,26 @@ def save_task_draft(*, task_id: str, plan: dict, code: str, entry_path: str | No
         }).execute()
 
 
+def complete_study_task(*, task_id: str, plan: dict, code: str,
+                        entry_path: str | None, study_session_id: str):
+    """Persist final artifacts and complete a regular tutor-supported task."""
+    save_task_draft(
+        task_id=task_id,
+        plan=plan,
+        code=code,
+        entry_path=entry_path,
+        current_stage="reflect",
+        study_session_id=study_session_id,
+    )
+    client = _get_supabase()
+    attempt_id = _get_attempt_id(client, study_session_id, task_id)
+    client.table("task_attempts").update({
+        "status": "completed",
+        "current_stage": "reflect",
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", attempt_id).execute()
+
+
 def save_tutor_conversation_snapshot(*, task_id: str, messages: list[dict],
                                      stage: str, entry_path: str | None,
                                      study_session_id: str):
@@ -338,6 +362,31 @@ def save_tutor_conversation_snapshot(*, task_id: str, messages: list[dict],
         else:
             client.table("tutor_messages").insert(compact_row).execute()
 
+        agent_trace = message.get("agentTrace") or []
+        if message.get("role") == "tutor" and agent_trace:
+            trace_event_id = _stable_uuid(
+                "agent-trace-snapshot", attempt_id, message.get("id") or sequence
+            )
+            captured_at = message.get("timestamp") or datetime.now(timezone.utc).isoformat()
+            _upsert_interaction_event_compatibly(client, {
+                "id": trace_event_id,
+                "attempt_id": attempt_id,
+                "sequence_number": sequence,
+                "event_name": "agent_trace_snapshot",
+                "stage": message.get("stage") or stage,
+                "hint_level": message.get("hintLevel"),
+                "intervention_path": message.get("interventionPath"),
+                "current_focus": (message.get("learnerState") or {}).get("currentFocus"),
+                "metadata": {
+                    "message_id": message.get("id"),
+                    "agent_trace": agent_trace,
+                    "trace_version": "langgraph-agent-trace-v1",
+                    "trace_capture_mode": "client_snapshot",
+                    "trace_captured_at": captured_at,
+                },
+                "occurred_at": captured_at,
+            })
+
 
 def save_code_run(*, task_id: str, code: str, result: dict, study_session_id: str):
     client = _get_supabase()
@@ -353,7 +402,7 @@ def save_code_run(*, task_id: str, code: str, result: dict, study_session_id: st
     else:
         client.table("task_attempts").insert({
             "id": attempt_id, "session_id": study_session_id, "task_id": task_id,
-            "entry_path": "plan" if task_id in {"task_1_maximum", "task_5_minimum"} else None,
+            "entry_path": "plan" if task_id in {"task_1_maximum", "task_4_minimum"} else None,
             "current_stage": "code", "status": "active",
             "student_plan": {}, "final_code": code, "planning_revision_count": 0,
             "code_attempt_count": next_run, "started_at": now,

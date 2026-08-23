@@ -244,6 +244,14 @@ Strategy rules:
 - If the student asks how to express an idea in Python, acknowledge that concrete
   request and guide the relevant language concept instead of repeating the prior
   conceptual question.
+- Vary the conversational move according to context: ask for a prediction, request
+  a concrete trace, contrast two possibilities, ask for a reason, or ask for the
+  next small action. Do not use the same rhetorical frame in consecutive turns.
+- Do not routinely summarize, praise, or paraphrase the student's answer before
+  asking the question. Prefer a direct question when the context is already clear.
+- Avoid formulaic openings such as "你已经...", "你已正确...", "你刚才提到...",
+  "很好...", and their English equivalents. Quote the student's words only when a
+  specific ambiguity must be clarified.
 
 Return one or two concise sentences containing exactly one question mark. Normal
 paths should output only the question. SUMMARIZE_RULE may prefix its question with
@@ -251,8 +259,8 @@ one general rule; PROVIDE_PSEUDOCODE may prefix its question with one abstract
 reasoning outline. Never provide corrected code, a complete plan, or the exact bug
 location. Respond to the latest
 student answer and do not repeat a question already present in the conversation.
-Briefly acknowledge a correct idea from the latest answer inside the question when
-natural, then target exactly one missing idea. Do not praise an incorrect answer.
+Target exactly one missing idea. Acknowledgement is optional and should be omitted
+unless it materially improves clarity. Do not praise an incorrect answer.
 """
     user_content = (
         f"Problem:\n{state.get('problem', '')}\n\n"
@@ -299,7 +307,11 @@ outline, but never executable or corrected code. Do not output chain-of-thought.
         except json.JSONDecodeError:
             parsed = {}
 
-    failed_rules = [str(item) for item in parsed.get("failedRules", [])]
+    # The model validator is advisory. Subjective rejections such as
+    # `uses_student_context` previously sent many good, contextual questions into
+    # the same small fallback library, which made the dialogue sound scripted.
+    model_failed_rules = [str(item) for item in parsed.get("failedRules", [])]
+    failed_rules = []
     if _question_mark_count(question) != 1:
         failed_rules.append("single_question")
     if re.search(r"\band what\b", question, re.IGNORECASE):
@@ -340,10 +352,11 @@ outline, but never executable or corrected code. Do not output chain-of-thought.
         failed_rules.append("targets_focus")
 
     failed_rules = list(dict.fromkeys(failed_rules))
-    valid = bool(parsed.get("valid", False)) and not failed_rules
+    reported_rules = list(dict.fromkeys(model_failed_rules + failed_rules))
+    valid = bool(question) and not failed_rules
     retry_count = int(state.get("retry_count", 0)) + (0 if valid else 1)
     return {
-        "validation": {"valid": valid, "failedRules": failed_rules},
+        "validation": {"valid": valid, "failedRules": reported_rules},
         "retry_count": retry_count,
     }
 
@@ -353,116 +366,19 @@ def route_after_validation(state: Agent2State):
         return END
     if state.get("retry_count", 0) <= 1:
         return "generate_socratic_question"
-    return "safe_fallback_question"
-
-
-def safe_fallback_question_node(state: Agent2State) -> Dict[str, str]:
-    learner_state = state.get("learner_state", {})
-    latest = learner_state.get("latestAnswer", {})
-    recognized = latest.get("recognizedIdeas", [])
-    prefix = f"你已经明确了“{recognized[0]}”。" if recognized else ""
-    student_answer = " ".join(str(state.get("student_answer", "")).split())
-    if not prefix and student_answer:
-        excerpt = student_answer[:80].rstrip("?？。！!")
-        prefix = f"你刚才提到“{excerpt}”。"
-    focus = learner_state.get("currentFocus") or state.get("issue_type", "logical_error")
-    if state.get("stage") == "debug" and focus not in {
-        "coding_progress", "algorithm", "syntax_error", "runtime_error",
-        "wrong_output", "failed_tests", "logical_error",
-    }:
-        focus = "debug_general"
-    action = state.get("action", "ASK_METACOGNITIVE")
-    if action == "PROVIDE_PSEUDOCODE":
-        focus = "debug_general" if state.get("stage") == "debug" else focus
-    if action == "SUMMARIZE_RULE":
-        idea = recognized[0] if recognized else "你刚刚确认的思路"
-        return {
-            "final_question": f"你已经得出了一个可复用的思路：{idea}。它还能用于哪类相似问题？"
-        }
-    questions = {
-        "problem_goal": [
-            "程序最终需要得到哪一个结果？", "请用自己的话描述程序要完成的目标？", "程序运行结束时应该完成什么？",
-        ],
-        "input": [
-            "程序开始处理前会接收哪些数据？", "你会怎样描述题目提供给程序的信息？", "程序一开始可以使用哪些值？",
-        ],
-        "output": [
-            "处理完成后，程序应该输出什么值？", "程序结束时，用户应该看到什么？", "你会怎样描述预期的最终结果？",
-        ],
-        "algorithm": [
-            "程序检查每个值时需要做出什么判断？", "程序可以怎样利用当前值逐步接近答案？", "逐个处理这些值时，哪个状态需要随之变化？",
-        ],
-        "plan_submission": [
-            "开始编码前，你会怎样把当前思路总结到计划中？", "你准备在计划中写下哪些方法和步骤？", "怎样把刚才形成的思路整理成一份简短计划？",
-        ],
-        "coding_progress": [
-            "你现在准备让代码先完成哪一件小事？", "你希望下一部分代码实现什么效果？", "你目前正尝试在程序中表达哪个步骤？",
-        ],
-        "logical_error": [
-            "用一个示例逐行跟踪代码时，哪个中间值第一次和你的预期不同？",
-            "把实际输出和预期输出并排比较，它们最早在哪一步出现差异？",
-            "你当前的判断条件在什么情况下会更新变量，在什么情况下不会？",
-        ],
-        "wrong_output": [
-            "实际输出和预期输出之间最具体的差别是什么？",
-            "用最小的测试输入运行时，程序输出了什么，而你原本预期什么？",
-            "哪个计算结果直接决定了当前错误的最终输出？",
-        ],
-        "failed_tests": [
-            "通过和失败的测试输入相比，失败用例多了哪一种特殊情况？",
-            "先只看一个失败用例，哪一步计算最值得手动验证？",
-            "失败测试暴露的是初始化、循环范围还是更新条件的问题？",
-        ],
-        "syntax_error": [
-            "错误信息指向哪一行，那一行的括号、冒号或缩进有什么不一致？",
-            "从错误行向前看，哪一个语句结构还没有完整结束？",
-            "把错误行和一个正确的同类语句比较，结构上少了什么或多了什么？",
-        ],
-        "runtime_error": [
-            "错误发生时正在访问或计算哪个值，它当时的实际类型或范围是什么？",
-            "根据错误信息，程序运行到哪一行才停止？",
-            "什么输入会触发这次运行错误，而较简单的输入不会？",
-        ],
-        "debug_general": [
-            "用题目中的一个示例逐行跟踪，哪个中间值第一次偏离预期？",
-            "当前实际结果与预期结果之间最具体的差异是什么？",
-            "在初始化、循环范围、判断条件和更新语句中，哪一项能由运行结果直接验证？",
-        ],
-        "reflection_learning": [
-            "这个解法中，哪一个思路可以复用到相似问题？", "你的最终方法为什么能解决这道题？", "再次解决类似问题时，你会做出什么调整？",
-        ],
-    }
-    previous_questions = [
-        str(item.get("content", ""))
-        for item in state.get("conversation_history", [])
-        if item.get("role") == "tutor"
-    ]
-    candidates = questions.get(focus, questions["debug_general"] if state.get("stage") == "debug" else questions["algorithm"])
-    unused_candidates = [
-        candidate
-        for candidate in candidates
-        if not _is_repeated_question(candidate, previous_questions)
-    ]
-    pool = unused_candidates or candidates
-    selected = min(
-        pool,
-        key=lambda candidate: max(
-            (_question_similarity(candidate, previous) for previous in previous_questions),
-            default=0.0,
-        ),
-    )
-    return {"final_question": prefix + selected}
+    # Keep the model's second contextual attempt instead of replacing it with a
+    # prewritten question. The caller will surface a real service error if model
+    # generation itself fails.
+    return END
 
 
 builder = StateGraph(Agent2State)
 builder.add_node("select_question_strategy", select_question_strategy_node)
 builder.add_node("generate_socratic_question", generate_socratic_question_node)
 builder.add_node("validate_question", validate_question_node)
-builder.add_node("safe_fallback_question", safe_fallback_question_node)
 builder.add_edge(START, "select_question_strategy")
 builder.add_edge("select_question_strategy", "generate_socratic_question")
 builder.add_edge("generate_socratic_question", "validate_question")
 builder.add_conditional_edges("validate_question", route_after_validation)
-builder.add_edge("safe_fallback_question", END)
 
 agent2_graph = builder.compile()

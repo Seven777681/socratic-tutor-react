@@ -14,7 +14,7 @@ import { getStudyTaskAttempt } from "@/services/study-progress";
 export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
   const aiTutorEnabled = ![
     "task_1_maximum",
-    "task_5_minimum",
+    "task_4_minimum",
   ].includes(task.id);
   const [isTutorCollapsed, setIsTutorCollapsed] = useState(false);
   const [currentCode, setCurrentCode] = useState(task.starterCode);

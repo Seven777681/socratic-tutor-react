@@ -664,7 +664,7 @@ Rules:
         "learner_state": learner_state,
         "action": action_by_focus[current_focus],
         "message": (
-            "Your plan shows enough understanding to start coding."
+            "这份计划已经可以支持你开始实现了。"
             if can_enter_coding
             else ""
         ),

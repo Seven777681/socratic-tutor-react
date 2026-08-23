@@ -4,11 +4,18 @@ const BACKEND_URL =
   process.env.SOCRATIC_BACKEND_URL || "http://127.0.0.1:8001";
 
 export async function POST(request: Request) {
-  let body: unknown;
+  let body: Record<string, unknown>;
   try {
-    body = await request.json();
+    body = (await request.json()) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: "Invalid assessment submission." }, { status: 400 });
+  }
+
+  if (!body.studySessionId) {
+    return NextResponse.json(
+      { error: "An active study session is required." },
+      { status: 401 },
+    );
   }
 
   const controller = new AbortController();

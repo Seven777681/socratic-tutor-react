@@ -23,13 +23,13 @@ export function WorkspaceHeader({ task }: { task: ProgrammingTaskDetail }) {
             <RobotLogo />
           </Link>
 
-          <Link
+          <a
             href="/tasks"
             className="hidden h-10 items-center gap-2 rounded-lg border border-[#E4E7F0] bg-white px-3 text-sm font-bold text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50/70 hover:text-[#6255f6] focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 sm:inline-flex"
           >
             <ArrowRightIcon className="h-4 w-4 rotate-180" />
             Tasks
-          </Link>
+          </a>
 
           <div className="min-w-0">
             <h1 className="truncate text-base font-extrabold tracking-normal text-[#101426] sm:text-lg">
@@ -60,12 +60,12 @@ export function WorkspaceHeader({ task }: { task: ProgrammingTaskDetail }) {
           >
             S
           </span>
-          <Link
+          <a
             href="/tasks"
             className="hidden h-10 items-center rounded-lg border border-[#b9b2ff] bg-white px-3 text-sm font-bold text-[#6255f6] transition hover:border-[#6255f6] hover:bg-indigo-50/70 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 lg:inline-flex"
           >
             Exit Task
-          </Link>
+          </a>
         </div>
       </div>
     </header>
