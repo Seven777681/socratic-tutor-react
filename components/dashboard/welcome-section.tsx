@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
 import { ArrowRightIcon } from "@/components/dashboard/dashboard-icons";
-import { getGeneratedTaskSummaries } from "@/lib/imported-tasks-storage";
+import { getTaskSummaries } from "@/lib/task-catalog";
 
 function getTimeGreeting(hour: number) {
   if (hour < 12) {
@@ -21,7 +21,7 @@ function getTimeGreeting(hour: number) {
 export function WelcomeSection() {
   const greeting = useMemo(() => getTimeGreeting(new Date().getHours()), []);
   const recommendedTask = useMemo(() => {
-    const tasks = getGeneratedTaskSummaries();
+    const tasks = getTaskSummaries();
     return tasks.find((task) => task.status !== "completed") ?? tasks[0];
   }, []);
 

@@ -13,7 +13,6 @@ import {
 const navItems = [
   { label: "Dashboard", href: "/dashboard" },
   { label: "Tasks", href: "/tasks" },
-  { label: "Import", href: "/assignment-import" },
   { label: "History", href: "/history" },
 ];
 
@@ -23,7 +22,7 @@ const menuItems = [
   { label: "Sign Out", href: "/login" },
 ];
 
-type ActiveNavItem = "dashboard" | "tasks" | "assignment-import" | "history" | "none";
+type ActiveNavItem = "dashboard" | "tasks" | "history" | "none";
 
 function NavLink({
   href,

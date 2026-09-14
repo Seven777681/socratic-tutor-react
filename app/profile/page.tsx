@@ -30,8 +30,8 @@ export default function ProfilePage() {
               Study Notice
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Uploaded files stay in your browser in this prototype. Backend
-              sync and account settings can be connected later.
+              Your task progress and Tutor preferences are saved in this
+              browser. Account synchronization can be connected later.
             </p>
           </div>
 

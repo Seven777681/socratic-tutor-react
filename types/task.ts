@@ -20,7 +20,7 @@ export type TaskConcept =
   | "lists"
   | "strings";
 
-export type TaskSourceType = "question_bank" | "custom_imported";
+export type TaskSourceType = "question_bank";
 
 export type QuestionBankModuleId =
   | "syntax_basics"
@@ -43,8 +43,6 @@ export type TaskSort =
   | "concept"
   | "thinking_progress"
   | "recently_updated";
-
-export type TaskViewMode = "learning_path" | "all_questions";
 
 export interface ProgrammingTaskSummary {
   id: string;
@@ -77,14 +75,10 @@ export interface ProgrammingTaskSummary {
 
 export interface TaskFilters {
   query: string;
-  source: string | "all";
-  taskSource: TaskSourceType | "all";
-  module: QuestionBankModuleId | "all";
   topic: TaskTopic | "all";
   depth: TaskDifficulty | "all";
   status: TaskStatus | "all";
   sort: TaskSort;
-  view: TaskViewMode;
 }
 
 export interface TaskExample {

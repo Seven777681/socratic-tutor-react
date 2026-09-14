@@ -55,6 +55,21 @@ def _get_attempt_id(client, study_session_id: str, task_id: str) -> str:
     return _stable_uuid("study-attempt", study_session_id, task_id)
 
 
+def _get_user_identity(client, study_session_id: str) -> dict:
+    """Resolve the anonymous participant identity for export-friendly rows."""
+    sessions = (client.table("study_sessions").select("user_id")
+                .eq("id", study_session_id).limit(1).execute().data)
+    if not sessions or not sessions[0].get("user_id"):
+        return {}
+    user_id = sessions[0]["user_id"]
+    users = (client.table("users").select("user_code")
+             .eq("id", user_id).limit(1).execute().data)
+    return {
+        "user_id": user_id,
+        "user_code": users[0].get("user_code") if users else None,
+    }
+
+
 def _message_row(*, attempt_id: str, sequence: int, message: dict, fallback_stage: str) -> dict:
     source_id = message.get("id") or f"sequence-{sequence}"
     learner_state = message.get("learnerState") or {}
@@ -85,17 +100,22 @@ def _message_row(*, attempt_id: str, sequence: int, message: dict, fallback_stag
 _OPTIONAL_TUTOR_MESSAGE_COLUMNS = {
     "question_type", "learner_state_evidence", "plan_review_result",
     "model_provider", "model_name", "model_version", "prompt_version",
+    "response_latency_ms", "user_id", "user_code",
 }
+
+
+def _core_tutor_message_row(row: dict) -> dict:
+    return {
+        key: value for key, value in row.items()
+        if key not in _OPTIONAL_TUTOR_MESSAGE_COLUMNS
+    }
 
 
 def _upsert_tutor_messages_compatibly(client, rows: list[dict]):
     try:
         client.table("tutor_messages").upsert(rows).execute()
     except Exception as error:
-        fallback_rows = [
-            {key: value for key, value in row.items() if key not in _OPTIONAL_TUTOR_MESSAGE_COLUMNS}
-            for row in rows
-        ]
+        fallback_rows = [_core_tutor_message_row(row) for row in rows]
         client.table("tutor_messages").upsert(fallback_rows).execute()
         print(
             f"Tutor analytics columns unavailable; saved core message fields only: {error}",
@@ -163,6 +183,8 @@ def _write_to_supabase(*, session_id: str, task_id: str, state: dict, tutor_ques
     }
     rows.append(_message_row(attempt_id=attempt_id, sequence=len(rows) + 1,
                              message=tutor_message, fallback_stage=stage))
+    user_identity = _get_user_identity(client, resolved_study_session_id)
+    rows = [{**row, **user_identity} for row in rows]
     _upsert_tutor_messages_compatibly(client, rows)
 
     event_id = _stable_uuid("event", attempt_id, len(messages), tutor_question)
@@ -335,13 +357,14 @@ def save_tutor_conversation_snapshot(*, task_id: str, messages: list[dict],
     conversation_messages = [
         message for message in messages if message.get("role") in {"student", "tutor"}
     ]
+    user_identity = _get_user_identity(client, study_session_id)
     for sequence, message in enumerate(conversation_messages, start=1):
-        row = _message_row(
+        row = {**_message_row(
             attempt_id=attempt_id,
             sequence=sequence,
             message=message,
             fallback_stage=stage,
-        )
+        ), **user_identity}
         # Do not replace richer server-side analytics with null snapshot values.
         compact_row = {key: value for key, value in row.items() if value is not None}
         existing_message = (
@@ -356,11 +379,21 @@ def save_tutor_conversation_snapshot(*, task_id: str, messages: list[dict],
                 for key, value in compact_row.items()
                 if key not in {"id", "attempt_id", "sequence_number"}
             }
-            client.table("tutor_messages").update(update).eq(
-                "id", existing_message[0]["id"]
-            ).execute()
+            try:
+                client.table("tutor_messages").update(update).eq(
+                    "id", existing_message[0]["id"]
+                ).execute()
+            except Exception:
+                client.table("tutor_messages").update(
+                    _core_tutor_message_row(update)
+                ).eq("id", existing_message[0]["id"]).execute()
         else:
-            client.table("tutor_messages").insert(compact_row).execute()
+            try:
+                client.table("tutor_messages").insert(compact_row).execute()
+            except Exception:
+                client.table("tutor_messages").insert(
+                    _core_tutor_message_row(compact_row)
+                ).execute()
 
         agent_trace = message.get("agentTrace") or []
         if message.get("role") == "tutor" and agent_trace:

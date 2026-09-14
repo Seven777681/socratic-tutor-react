@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { emptyDashboardStats } from "@/data/dashboard";
-import { questionModules } from "@/data/question-modules";
 import {
-  getGeneratedTaskSummaries,
-} from "@/lib/imported-tasks-storage";
+  getTaskSummaries,
+} from "@/lib/task-catalog";
 import { loadTaskLearningState } from "@/hooks/use-task-learning-state";
 import type { DashboardStat, DashboardStats } from "@/types/dashboard";
 import type { ProgrammingTaskSummary } from "@/types/task";
@@ -25,38 +24,9 @@ function isQuestionBankTaskCompleted(task: ProgrammingTaskSummary) {
   }
 }
 
-function getCurrentModulePosition(questionBankTasks: ProgrammingTaskSummary[]) {
-  const modules = [...questionModules].sort((first, second) => first.order - second.order);
-  const totalModules = modules.length;
-
-  if (totalModules === 0) {
-    return { currentModulePosition: 0, totalModules };
-  }
-
-  try {
-    const modulePosition = modules.findIndex((module) => {
-      const moduleTasks = questionBankTasks.filter(
-        (task) => task.moduleId === module.id,
-      );
-
-      return moduleTasks.some((task) => !isQuestionBankTaskCompleted(task));
-    });
-
-    return {
-      currentModulePosition:
-        modulePosition === -1 ? totalModules : modulePosition + 1,
-      totalModules,
-    };
-  } catch {
-    return { currentModulePosition: 1, totalModules };
-  }
-}
-
 export function getDashboardStats(): DashboardStats {
-  const tasks = getGeneratedTaskSummaries();
+  const tasks = getTaskSummaries();
   const questionBankTasks = tasks.filter((task) => task.sourceType === "question_bank");
-  const { currentModulePosition, totalModules } =
-    getCurrentModulePosition(questionBankTasks);
 
   const questionsTotal = questionBankTasks.length;
   const questionsCompleted = questionBankTasks.filter(
@@ -64,8 +34,6 @@ export function getDashboardStats(): DashboardStats {
   ).length;
 
   return {
-    currentModulePosition,
-    totalModules,
     questionsCompleted,
     questionsTotal,
     learningStreakDays: emptyDashboardStats.learningStreakDays,
@@ -84,10 +52,10 @@ function toDashboardStatCards(stats: DashboardStats): DashboardStat[] {
       icon: "completed",
     },
     {
-      id: "path-progress",
-      title: "Path Progress",
-      value: `${stats.currentModulePosition} / ${stats.totalModules}`,
-      description: "Current module in your learning path",
+      id: "task-library",
+      title: "Task Library",
+      value: `${stats.questionsTotal} tasks`,
+      description: "Ordered from Follow to Solve",
       icon: "questions",
     },
     {

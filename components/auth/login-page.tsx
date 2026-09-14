@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { BrandPanel } from "@/components/auth/brand-panel";
 import { LanguageSelector } from "@/components/auth/language-selector";
-import { ParticipantLoginForm } from "@/components/auth/participant-login-form";
+import { LoginForm } from "@/components/auth/login-form";
 
 export function LoginPage() {
   return (
@@ -31,14 +31,14 @@ export function LoginPage() {
                     Multi-Agent Coding Tutor
                   </span>
                   <h2 className="mt-3 text-[32px] font-extrabold leading-tight tracking-normal text-slate-950 sm:text-[34px] lg:text-[36px]">
-                    User Study Login
+                    Code with Guidance
                   </h2>
                   <p className="mt-2.5 text-sm leading-6 text-slate-500">
-                    Enter the anonymous participant code provided by the researcher.
+                    Sign in to practice with Socratic guidance.
                   </p>
                 </div>
 
-                <ParticipantLoginForm />
+                <LoginForm />
               </div>
 
               <div className="mt-5 px-2 text-center text-xs leading-6 text-slate-500">

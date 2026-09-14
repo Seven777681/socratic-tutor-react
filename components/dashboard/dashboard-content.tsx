@@ -2,11 +2,11 @@
 
 import { ContinueLearningCard } from "@/components/dashboard/continue-learning-card";
 import { DashboardFooter } from "@/components/dashboard/dashboard-footer";
-import { LearningPath } from "@/components/dashboard/learning-path";
 import { MultiAgentPreview } from "@/components/dashboard/multi-agent-preview";
-import { QuickUploadCard } from "@/components/dashboard/quick-upload-card";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { WelcomeSection } from "@/components/dashboard/welcome-section";
+import { RecentActivity } from "@/components/dashboard/recent-activity";
+import { AiTutorIntroduction } from "@/components/dashboard/ai-tutor-introduction";
 import { useDashboardStats } from "@/hooks/use-dashboard-stats";
 import { useDashboardLearning } from "@/hooks/use-dashboard-learning";
 
@@ -32,9 +32,9 @@ export function DashboardContent() {
         <MultiAgentPreview />
       </section>
 
-      <LearningPath />
+      <RecentActivity />
 
-      <QuickUploadCard />
+      <AiTutorIntroduction />
 
       <DashboardFooter />
     </div>

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { FileCodeIcon, SearchXIcon } from "@/components/dashboard/dashboard-icons";
 
 export function TasksEmptyState({
@@ -15,18 +14,11 @@ export function TasksEmptyState({
           <FileCodeIcon className="h-7 w-7" />
         </span>
         <h2 className="mt-5 text-2xl font-extrabold tracking-normal text-[#101426]">
-          No thinking tasks yet
+          No tasks available
         </h2>
         <p className="mx-auto mt-2 max-w-[520px] text-sm leading-6 text-slate-500">
-          Upload your first class file, and the AI will generate customized
-          Socratic questions for you.
+          The built-in task catalog could not be loaded. Please refresh the page.
         </p>
-        <Link
-          href="/assignment-import"
-          className="mt-6 inline-flex h-11 items-center justify-center rounded-lg bg-[linear-gradient(90deg,#6657f5,#4678ff)] px-5 text-sm font-bold text-white shadow-lg shadow-indigo-200/80 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15"
-        >
-          Upload File Now
-        </Link>
       </section>
     );
   }

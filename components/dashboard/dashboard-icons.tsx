@@ -1,7 +1,7 @@
 import type { SVGProps } from "react";
 
 type IconProps = SVGProps<SVGSVGElement>;
-type ModuleIcon = "braces" | "gitBranch" | "refresh" | "sigma" | "list" | "upload";
+type ModuleIcon = "braces" | "gitBranch" | "refresh" | "sigma" | "list";
 
 function IconBase({ children, ...props }: IconProps) {
   return (

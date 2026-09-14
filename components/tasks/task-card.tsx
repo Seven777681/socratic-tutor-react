@@ -4,15 +4,16 @@ import type { ProgrammingTaskSummary, TaskDifficulty } from "@/types/task";
 import {
   ArrowRightIcon,
   BookOpenIcon,
+  ClockIcon,
   GaugeIcon,
 } from "@/components/dashboard/dashboard-icons";
 import {
-  difficultyLabels,
   sourceTypeLabels,
   statusLabels,
   topicLabels,
 } from "@/components/tasks/task-formatters";
 import { TaskProgress } from "@/components/tasks/task-progress";
+import { getTaskPracticeLevel } from "@/data/course-content";
 import {
   TaskProgressMessage,
   TaskStatusBadge,
@@ -37,6 +38,7 @@ function actionLabel(task: ProgrammingTaskSummary) {
 }
 
 function CardContent({ task }: { task: ProgrammingTaskSummary }) {
+  const practiceLevel = getTaskPracticeLevel(task.id);
   const isPrimaryAction =
     task.status === "not_started" || task.status === "in_progress";
 
@@ -47,15 +49,9 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
           Task {String(task.taskNumber).padStart(2, "0")}
         </p>
         <div className="flex flex-wrap justify-end gap-2">
-          {task.imported ? (
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-              {sourceTypeLabels[task.sourceType]}
-            </span>
-          ) : (
-            <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-[#6255f6]">
-              {sourceTypeLabels[task.sourceType]}
-            </span>
-          )}
+          <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-[#6255f6]">
+            {sourceTypeLabels[task.sourceType]}
+          </span>
           <TaskStatusBadge status={task.status} />
         </div>
       </div>
@@ -78,7 +74,11 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
           className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${difficultyClasses[task.difficulty]}`}
         >
           <GaugeIcon className="h-3.5 w-3.5" />
-          {difficultyLabels[task.thinkingDepth]}
+          {practiceLevel}
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+          <ClockIcon className="h-3.5 w-3.5" />
+          {task.estimatedMinutes} min
         </span>
       </div>
 

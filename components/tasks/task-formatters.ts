@@ -24,7 +24,6 @@ export const thinkingDepthLabels = difficultyLabels;
 
 export const sourceTypeLabels: Record<TaskSourceType, string> = {
   question_bank: "Question Bank",
-  custom_imported: "Custom Imported",
 };
 
 export const statusLabels: Record<TaskStatus, string> = {

@@ -30,6 +30,7 @@ import {
   difficultyLabels,
   topicLabels,
 } from "@/components/tasks/task-formatters";
+import { getTaskKnowledge } from "@/data/course-content";
 
 function trackLearningEvent({
   eventType,
@@ -81,6 +82,8 @@ export function CodeEditorPanel({
   entryPath,
   onEntryPathChange,
 }: CodeEditorPanelProps) {
+  const knowledge = getTaskKnowledge(task);
+  const firstExampleInput = task.examples[0]?.input;
   const [preferences, setPreferences] = useState<EditorPreferences>({
     fontSize: 16,
     wordWrap: false,
@@ -123,8 +126,8 @@ export function CodeEditorPanel({
   const canEnterCoding = learningState.planningDraft.status === "ready";
 
   useEffect(() => {
-    setStdin(getExampleProgramInput(task.examples[0]?.input));
-  }, [task.examples[0]?.input, taskId]);
+    setStdin(getExampleProgramInput(firstExampleInput));
+  }, [firstExampleInput, taskId]);
 
   const chooseLearningPath = (path: "understand" | "plan" | "code") => {
     if (
@@ -915,6 +918,27 @@ export function CodeEditorPanel({
                   ))}
                 </div>
               </section>
+
+              <details className="group rounded-[16px] border border-[#d9d5ff] bg-[#f7f6ff]" open>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-extrabold text-[#101426]">
+                  Knowledge for This Task
+                  <span className="text-xs font-bold text-[#6255f6] group-open:hidden">Show</span>
+                  <span className="hidden text-xs font-bold text-[#6255f6] group-open:inline">Hide</span>
+                </summary>
+                <div className="space-y-4 border-t border-[#d9d5ff] px-4 py-4">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-[#101426]">{knowledge.title}</h3>
+                    <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-600">
+                      {knowledge.points.map((point) => <li key={point}>{point}</li>)}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500">Small example</p>
+                    <pre className="mt-2 overflow-x-auto rounded-xl bg-[#161b2d] p-4 text-sm leading-6 text-indigo-100"><code>{knowledge.example}</code></pre>
+                  </div>
+                  <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-900">Think first: {knowledge.reminder}</p>
+                </div>
+              </details>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <section className="rounded-[16px] border border-[#E4E7F0] bg-[#FBFCFF] p-4">

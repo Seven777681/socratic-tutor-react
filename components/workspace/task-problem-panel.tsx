@@ -9,8 +9,11 @@ import { TaskExample } from "@/components/workspace/task-example";
 import { TaskPanelHeader } from "@/components/workspace/task-panel-header";
 import { TaskProgressSummary } from "@/components/workspace/task-progress-summary";
 import { TaskSection } from "@/components/workspace/task-section";
+import { getTaskKnowledge } from "@/data/course-content";
 
 export function TaskProblemPanel({ task }: { task: ProgrammingTaskDetail }) {
+  const knowledge = getTaskKnowledge(task);
+
   return (
     <aside className="flex h-full min-h-0 flex-col overflow-hidden border-r border-[#E4E7F0] bg-white shadow-[0_14px_40px_rgba(78,91,130,0.06)] lg:rounded-r-[20px]">
       <TaskPanelHeader task={task} />
@@ -28,6 +31,27 @@ export function TaskProblemPanel({ task }: { task: ProgrammingTaskDetail }) {
                 ))}
               </div>
             </div>
+          </div>
+        </TaskSection>
+
+        <TaskSection title="Knowledge for This Task">
+          <div className="space-y-4">
+            <div className="rounded-xl border border-[#d9d5ff] bg-[#f7f6ff] p-4">
+              <h3 className="text-sm font-extrabold text-[#101426]">{knowledge.title}</h3>
+              <ul className="mt-3 grid gap-2">
+                {knowledge.points.map((point) => (
+                  <li key={point} className="flex items-start gap-2 text-sm leading-6 text-slate-600">
+                    <LightbulbIcon className="mt-1 h-4 w-4 shrink-0 text-[#6255f6]" />
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500">Small example</p>
+              <pre className="mt-2 overflow-x-auto rounded-xl bg-[#161b2d] p-4 text-sm leading-6 text-indigo-100"><code>{knowledge.example}</code></pre>
+            </div>
+            <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold leading-6 text-amber-900">Think first: {knowledge.reminder}</p>
           </div>
         </TaskSection>
 

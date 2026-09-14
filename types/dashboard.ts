@@ -1,12 +1,5 @@
 export type TaskDifficulty = "easy" | "medium" | "hard";
 
-export type UploadFileType =
-  | "pdf"
-  | "docx"
-  | "pptx"
-  | "txt"
-  | "markdown";
-
 export interface ContinueTask {
   id: string;
   title: string;
@@ -18,7 +11,7 @@ export interface ContinueTask {
   href: string;
   sourceFileName?: string;
   sourceFileId?: string;
-  sourceType?: "question_bank" | "custom_imported";
+  sourceType?: "question_bank";
   concept?: string;
 }
 
@@ -31,22 +24,7 @@ export interface DashboardStat {
 }
 
 export interface DashboardStats {
-  currentModulePosition: number;
-  totalModules: number;
   questionsCompleted: number;
   questionsTotal: number;
   learningStreakDays: number;
-}
-
-export interface RecentUpload {
-  id: string;
-  fileName: string;
-  fileType: UploadFileType;
-  language: "Python";
-  generatedTaskCount: number;
-  completedTaskCount: number;
-  progress: number;
-  importedAt: string;
-  continueTaskId?: string;
-  sourceTaskIds: string[];
 }

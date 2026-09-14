@@ -1,11 +1,9 @@
 export function TasksPageHeader({
   completedTasks,
   totalTasks,
-  currentModuleTitle,
 }: {
   completedTasks: number;
   totalTasks: number;
-  currentModuleTitle: string;
 }) {
   const completionPercentage = totalTasks === 0
     ? 0
@@ -19,12 +17,12 @@ export function TasksPageHeader({
             Socratic Question Bank
           </h1>
           <p className="mt-3 max-w-[760px] text-base leading-7 text-slate-600">
-            Follow a structured path from syntax basics to integrated challenges.
+            Start with tiny Python tasks, then build toward independent problem solving.
           </p>
         </div>
 
         <div className="grid w-full gap-3 rounded-[18px] border border-[#E4E7F0] bg-white/80 p-4 shadow-sm sm:grid-cols-3 lg:w-[520px]">
-          <div>
+          <div className="sm:col-span-2">
             <p className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
               Completed Tasks
             </p>
@@ -34,10 +32,10 @@ export function TasksPageHeader({
           </div>
           <div>
             <p className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
-              Current Module
+              Recommended Next Step
             </p>
             <p className="mt-1 truncate text-sm font-extrabold text-[#101426]">
-              {currentModuleTitle}
+              Continue with the first unfinished task
             </p>
           </div>
           <div>

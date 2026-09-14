@@ -1,9 +1,7 @@
 import type {
-  QuestionBankModuleId,
   TaskDifficulty,
   TaskFilters,
   TaskSort,
-  TaskSourceType,
   TaskStatus,
   TaskTopic,
 } from "@/types/task";
@@ -20,29 +18,14 @@ const topicOptions: Array<{ value: TaskTopic | "all"; label: string }> = [
   { value: "strings", label: "Strings" },
 ];
 
-const sourceOptions: Array<{ value: TaskSourceType | "all"; label: string }> = [
-  { value: "all", label: "All Sources" },
-  { value: "question_bank", label: "Question Bank" },
-  { value: "custom_imported", label: "Custom Imported" },
-];
-
-const moduleOptions: Array<{ value: QuestionBankModuleId | "all"; label: string }> = [
-  { value: "all", label: "All Modules" },
-  { value: "syntax_basics", label: "Syntax Basics" },
-  { value: "simple_logic", label: "Simple Logic" },
-  { value: "data_structures", label: "Data Structures" },
-  { value: "function_design", label: "Function Design" },
-  { value: "integrated_challenges", label: "Integrated Challenges" },
-];
-
 const difficultyOptions: Array<{
   value: TaskDifficulty | "all";
   label: string;
 }> = [
-  { value: "all", label: "All Thinking Depths" },
-  { value: "easy", label: "Foundational" },
-  { value: "medium", label: "Intermediate" },
-  { value: "hard", label: "Deep Dive" },
+  { value: "all", label: "All Practice Levels" },
+  { value: "easy", label: "Follow" },
+  { value: "medium", label: "Apply / Combine" },
+  { value: "hard", label: "Solve" },
 ];
 
 const statusOptions: Array<{ value: TaskStatus | "all"; label: string }> = [
@@ -73,22 +56,10 @@ export function TaskFilterBar({
 }) {
   return (
     <section className="rounded-[20px] border border-[#E4E7F0] bg-white p-4 shadow-[0_16px_45px_rgba(78,91,130,0.08)] sm:p-5">
-      <div className="grid gap-3 xl:grid-cols-[minmax(240px,1fr)_170px_180px_170px_170px_190px]">
+      <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_180px_180px_190px]">
         <TaskSearchInput
           value={filters.query}
           onChange={(query) => onFiltersChange({ ...filters, query })}
-        />
-        <TaskFilterSelect
-          label="Filter by task source"
-          value={filters.taskSource}
-          options={sourceOptions}
-          onChange={(taskSource) => onFiltersChange({ ...filters, taskSource })}
-        />
-        <TaskFilterSelect
-          label="Filter by module"
-          value={filters.module}
-          options={moduleOptions}
-          onChange={(module) => onFiltersChange({ ...filters, module })}
         />
         <TaskFilterSelect
           label="Filter by concept"
@@ -97,7 +68,7 @@ export function TaskFilterBar({
           onChange={(topic) => onFiltersChange({ ...filters, topic })}
         />
         <TaskFilterSelect
-          label="Filter by thinking depth"
+          label="Filter by practice level"
           value={filters.depth}
           options={difficultyOptions}
           onChange={(depth) =>

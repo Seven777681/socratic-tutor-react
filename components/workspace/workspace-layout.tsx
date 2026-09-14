@@ -7,7 +7,7 @@ import type { TutorLearningContext, TutorPlanInteraction } from "@/types/tutor";
 import { CodeEditorPanel } from "@/components/editor/code-editor-panel";
 import { SocraticTutorPanel } from "@/components/tutor/socratic-tutor-panel";
 import { TutorPanelToggle } from "@/components/tutor/tutor-panel-toggle";
-import { getGeneratedTaskSummaries } from "@/lib/imported-tasks-storage";
+import { getTaskSummaries } from "@/lib/task-catalog";
 import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
 import { getStudyTaskAttempt } from "@/services/study-progress";
 
@@ -44,7 +44,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
     planningSteps: learningContext.planningSteps,
   };
   const nextTask = useMemo(() => {
-    const tasks = getGeneratedTaskSummaries();
+    const tasks = getTaskSummaries();
     const currentIndex = tasks.findIndex((candidate) => candidate.id === task.id);
     const next = currentIndex >= 0 ? tasks[currentIndex + 1] : undefined;
 

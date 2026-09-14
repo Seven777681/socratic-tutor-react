@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { topicLabels } from "@/components/tasks/task-formatters";
-import { getGeneratedTaskSummaries } from "@/lib/imported-tasks-storage";
+import { getTaskSummaries } from "@/lib/task-catalog";
 import type { ContinueTask } from "@/types/dashboard";
 import type { ProgrammingTaskSummary } from "@/types/task";
 
@@ -27,7 +27,7 @@ export function useDashboardLearning() {
   const [task, setTask] = useState<ContinueTask | undefined>(undefined);
 
   useEffect(() => {
-    const tasks = getGeneratedTaskSummaries();
+    const tasks = getTaskSummaries();
     const nextTask =
       tasks.find((candidate) => candidate.status !== "completed") ?? tasks[0];
 
