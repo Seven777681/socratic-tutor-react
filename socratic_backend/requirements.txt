@@ -5,4 +5,6 @@ langgraph>=1.2.10
 openai>=2.52.0
 python-dotenv>=1.2.2
 pydantic>=2.13.4
-supabase>=2.31.0
+SQLAlchemy>=2.0.54
+PyMySQL>=1.2.0
+Alembic>=1.20.0

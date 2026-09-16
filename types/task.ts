@@ -144,6 +144,7 @@ export interface ProgrammingTaskDetail {
 
 export type SaveStatus = "saved" | "saving" | "unsaved";
 export type TaskEntryPath = "undecided" | "understand" | "plan" | "code";
+export type TaskPlanningMode = "direct" | "optional" | "short" | "required";
 
 export interface CodeEditorState {
   taskId: string;
@@ -164,6 +165,7 @@ export interface CodeEditorPanelProps {
   starterCode: string;
   language: "python";
   aiTutorEnabled?: boolean;
+  planningMode?: TaskPlanningMode;
   onRun?: (code: string) => void;
   onCodeChange?: (code: string) => void;
   onRunResultChange?: (result: import("@/types/code-run").CodeRunResult) => void;

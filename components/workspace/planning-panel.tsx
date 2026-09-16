@@ -20,6 +20,8 @@ export function PlanningPanel({
   onReviewPlan,
   onEditPlan,
   submitLabel = "Review My Plan",
+  visibleStepCount = 3,
+  requiredStepCount = 2,
 }: {
   value: PlanningDraft;
   errors: PlanningErrors;
@@ -31,6 +33,8 @@ export function PlanningPanel({
   onReviewPlan: () => void;
   onEditPlan: () => void;
   submitLabel?: string;
+  visibleStepCount?: 1 | 2 | 3;
+  requiredStepCount?: 1 | 2;
 }) {
   const updateStep = (index: number, step: string) => {
     const steps: [string, string, string] = [...value.steps];
@@ -105,9 +109,9 @@ export function PlanningPanel({
           <h4 className="text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500">
             2. My Steps
           </h4>
-          {value.steps.map((step, index) => {
+          {value.steps.slice(0, visibleStepCount).map((step, index) => {
             const stepId = `planning-step-${index + 1}`;
-            const isOptional = index === 2;
+            const isOptional = index >= requiredStepCount;
             return (
               <label
                 key={stepId}
@@ -128,9 +132,9 @@ export function PlanningPanel({
                       onChange={(event) => updateStep(index, event.target.value)}
                       placeholder={`Step ${index + 1}`}
                       aria-describedby={
-                        errors.steps && index < 2 ? "planning-steps-error" : undefined
+                        errors.steps && index < requiredStepCount ? "planning-steps-error" : undefined
                       }
-                      aria-invalid={Boolean(errors.steps && index < 2)}
+                      aria-invalid={Boolean(errors.steps && index < requiredStepCount)}
                       className="h-10 min-w-0 flex-1 rounded-xl border border-[#E4E7F0] bg-white px-3 text-sm font-semibold text-[#101426] outline-none transition placeholder:text-slate-400 focus:border-[#6255f6] focus:ring-4 focus:ring-[#6255f6]/10"
                     />
                     {isOptional ? (

@@ -14,12 +14,13 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Make sure `.env` has your model credentials:
+Make sure `.env` has your model credentials and MySQL connection:
 
 ```
 OPENAI_API_KEY=...
 OPENAI_BASE_URL=https://api.deepseek.com
 MODEL_NAME=deepseek-coder
+DATABASE_URL=mysql+pymysql://socratic_app:password@127.0.0.1:3306/socratic_tutor?charset=utf8mb4
 ```
 
 ## Run
@@ -28,7 +29,13 @@ MODEL_NAME=deepseek-coder
 uvicorn server:app --reload --port 8001
 ```
 
-Health check: `GET http://127.0.0.1:8001/health`
+Health checks:
+
+- `GET http://127.0.0.1:8001/health`
+- `GET http://127.0.0.1:8001/health/db`
+
+The backend uses SQLAlchemy with PyMySQL. The tables are created from
+`models.py` when the API starts; all database access is kept in `database.py`.
 
 ## How it connects to the frontend
 

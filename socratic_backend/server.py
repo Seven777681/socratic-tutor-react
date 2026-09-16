@@ -11,6 +11,9 @@ this service. Request/response field names intentionally mirror
 """
 
 import os
+import base64
+import hashlib
+import hmac
 import random
 import re
 import json
@@ -19,6 +22,7 @@ import sys
 import tempfile
 import time
 import uuid
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -35,19 +39,10 @@ from llm_base import base_llm_call, model as scoring_model
 
 from tutor_graph import graph
 
-from supabase import create_client, Client
-
-# 读取.env文件
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
-# 创建supabase客户端（拥有最高权限）
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-
-
-
+from database import check_database, database, init_database
 
 app = FastAPI(title="Socratic Tutor Backend")
+init_database()
 
 # Server-to-server call from the Next.js API route doesn't need CORS, but we
 # allow the local dev origin too in case this is hit directly while testing.
@@ -167,6 +162,17 @@ class StudySessionStartResponse(BaseModel):
     userCode: str
     studySessionId: str
     resumed: bool = False
+
+
+class AuthLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AuthRegisterRequest(BaseModel):
+    username: str
+    displayName: str
+    password: str
 
 
 class StudyRunRecordRequest(BaseModel):
@@ -645,13 +651,92 @@ def health():
     return {"status": "ok"}
 
 
+def _hash_password(password: str) -> str:
+    iterations = 600_000
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return "pbkdf2_sha256${}${}${}".format(
+        iterations,
+        base64.urlsafe_b64encode(salt).decode("ascii"),
+        base64.urlsafe_b64encode(digest).decode("ascii"),
+    )
+
+
+def _verify_password(password: str, encoded: str) -> bool:
+    try:
+        algorithm, iterations, salt, expected = encoded.split("$", 3)
+        if algorithm != "pbkdf2_sha256":
+            return False
+        digest = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode("utf-8"),
+            base64.urlsafe_b64decode(salt.encode("ascii")),
+            int(iterations),
+        )
+        return hmac.compare_digest(
+            base64.urlsafe_b64encode(digest).decode("ascii"),
+            expected,
+        )
+    except (TypeError, ValueError):
+        return False
+
+
+def _auth_user(row: dict) -> dict:
+    return {
+        "id": row["id"],
+        "username": row["username"],
+        "usernameType": row["username_type"],
+        "displayName": row["display_name"],
+        "role": row["role"],
+    }
+
+
+@app.post("/api/auth/register")
+def register_account(req: AuthRegisterRequest):
+    username = req.username.strip().lower()
+    if not username or len(req.password) < 6 or len(req.displayName.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Invalid registration details.")
+    existing = database.table("accounts").select("id").eq("username", username).limit(1).execute().data
+    if existing:
+        raise HTTPException(status_code=409, detail="This username is already registered.")
+    row = {
+        "id": str(uuid.uuid4()),
+        "username": username,
+        "username_type": "email" if "@" in username else "phone",
+        "display_name": req.displayName.strip(),
+        "password_hash": _hash_password(req.password),
+        "role": "student",
+    }
+    database.table("accounts").insert(row).execute()
+    return {
+        "success": True,
+        "message": "Account created.",
+        "user": _auth_user(row),
+        "token": f"auth-token-{uuid.uuid4()}",
+    }
+
+
+@app.post("/api/auth/login")
+def login_account(req: AuthLoginRequest):
+    username = req.username.strip().lower()
+    rows = database.table("accounts").select("*").eq("username", username).limit(1).execute().data
+    if not rows or not _verify_password(req.password, rows[0]["password_hash"]):
+        raise HTTPException(status_code=401, detail="Incorrect username or password. Please try again.")
+    return {
+        "success": True,
+        "message": "Signed in.",
+        "user": _auth_user(rows[0]),
+        "token": f"auth-token-{uuid.uuid4()}",
+    }
+
+
 @app.get("/health/db")
 def database_health():
-    response = supabase.table("tasks").select("id", count="exact").limit(1).execute()
+    details = check_database()
     return {
         "status": "ok",
-        "table": "tasks",
-        "count": response.count,
+        "database": details["database_name"],
+        "version": details["version"],
     }
 
 
@@ -659,7 +744,7 @@ def _require_active_study_session(study_session_id: Optional[str]):
     if not study_session_id:
         raise HTTPException(status_code=401, detail="An active study session is required.")
     sessions = (
-        supabase.table("study_sessions")
+        database.table("study_sessions")
         .select("id,status")
         .eq("id", study_session_id)
         .eq("status", "active")
@@ -792,18 +877,18 @@ def start_study_session(req: StudySessionStartRequest):
     user_code = req.userCode.strip().upper()
     if not re.fullmatch(r"U\d{3}", user_code):
         raise HTTPException(status_code=400, detail="Participant code must use the format U001.")
-    existing = supabase.table("users").select("id,user_code").eq("user_code", user_code).limit(1).execute().data
+    existing = database.table("users").select("id,user_code").eq("user_code", user_code).limit(1).execute().data
     if existing:
         user_id = existing[0]["id"]
     else:
         user_id = str(uuid.uuid4())
-        supabase.table("users").insert({
+        database.table("users").insert({
             "id": user_id,
             "user_code": user_code,
         }).execute()
 
     previous_sessions = (
-        supabase.table("study_sessions")
+        database.table("study_sessions")
         .select("id,status")
         .eq("user_id", user_id)
         .order("started_at", desc=True)
@@ -820,7 +905,7 @@ def start_study_session(req: StudySessionStartRequest):
         )
 
     session_id = str(uuid.uuid4())
-    supabase.table("study_sessions").insert({
+    database.table("study_sessions").insert({
         "id": session_id,
         "user_id": user_id,
         "status": "active",
@@ -872,7 +957,7 @@ def complete_task(req: StudyTaskCompleteRequest):
 @app.get("/api/study/progress")
 def get_study_progress(studySessionId: str):
     response = (
-        supabase.table("task_attempts")
+        database.table("task_attempts")
         .select(
             "task_id,status,current_stage,entry_path,student_plan,final_code,"
             "planning_revision_count,code_attempt_count,completed_at"

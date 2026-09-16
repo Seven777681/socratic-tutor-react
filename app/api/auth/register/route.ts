@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import type { RegisterRequest } from "@/types/auth";
 import { isValidUsername } from "@/lib/auth/username-utils";
 import {
-  findUserByUsername,
-  registerMockUser,
   validateVerificationCode,
 } from "@/lib/server/mock-auth-store";
+
+const BACKEND_URL = process.env.SOCRATIC_BACKEND_URL || "http://127.0.0.1:8001";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as Partial<RegisterRequest>;
@@ -76,25 +76,24 @@ export async function POST(request: Request) {
     );
   }
 
-  if (findUserByUsername(username)) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, displayName, password }),
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
     return NextResponse.json(
-      { success: false, message: "This username is already registered." },
-      { status: 409 },
+      response.ok
+        ? data
+        : { success: false, message: data.detail ?? "Account could not be created." },
+      { status: response.status },
+    );
+  } catch {
+    return NextResponse.json(
+      { success: false, message: "Authentication service is unavailable." },
+      { status: 503 },
     );
   }
-
-  const user = registerMockUser({
-    username,
-    verificationCode,
-    displayName,
-    password,
-    confirmPassword,
-  });
-
-  return NextResponse.json({
-    success: true,
-    message: "Account created.",
-    user,
-    token: `mock-auth-token-${user.id}`,
-  });
 }

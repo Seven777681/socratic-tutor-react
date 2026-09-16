@@ -10,8 +10,17 @@ import { TutorPanelToggle } from "@/components/tutor/tutor-panel-toggle";
 import { getTaskSummaries } from "@/lib/task-catalog";
 import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
 import { getStudyTaskAttempt } from "@/services/study-progress";
+import { getTaskPracticeLevel } from "@/data/course-content";
 
 export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
+  const practiceLevel = getTaskPracticeLevel(task.id);
+  const planningMode = practiceLevel === "Follow"
+    ? "direct"
+    : practiceLevel === "Apply"
+      ? "optional"
+      : practiceLevel === "Combine"
+        ? "short"
+        : "required";
   const aiTutorEnabled = ![
     "task_1_maximum",
     "task_4_minimum",
@@ -44,7 +53,9 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
     planningSteps: learningContext.planningSteps,
   };
   const nextTask = useMemo(() => {
-    const tasks = getTaskSummaries();
+    const tasks = [...getTaskSummaries()].sort(
+      (first, second) => first.taskNumber - second.taskNumber,
+    );
     const currentIndex = tasks.findIndex((candidate) => candidate.id === task.id);
     const next = currentIndex >= 0 ? tasks[currentIndex + 1] : undefined;
 
@@ -60,7 +71,11 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
     );
     const validStoredPath = storedEntryPath === "understand" ||
       storedEntryPath === "plan" || storedEntryPath === "code";
-    setEntryPath(validStoredPath ? storedEntryPath : "undecided");
+    setEntryPath(
+      planningMode === "direct"
+        ? "code"
+        : validStoredPath ? storedEntryPath : "undecided",
+    );
     setLearningContext({
       planningStatus: "not_started",
       planningApproach: "",
@@ -68,7 +83,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
       latestPrediction: "",
       hintLevel: 0,
     });
-    if (!validStoredPath) {
+    if (!validStoredPath && planningMode !== "direct") {
       void getStudyTaskAttempt(task.id).then((attempt) => {
         if (!attempt) return;
         const restoredPath = attempt.entry_path === "understand" ||
@@ -81,7 +96,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
         setEntryPath(restoredPath);
       });
     }
-  }, [aiTutorEnabled, task.id, task.starterCode]);
+  }, [aiTutorEnabled, planningMode, task.id, task.starterCode]);
 
   useEffect(() => {
     const taskId = task.id;
@@ -155,6 +170,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
             starterCode={task.starterCode}
             language={task.language}
             aiTutorEnabled={aiTutorEnabled}
+            planningMode={planningMode}
             onCodeChange={setCurrentCode}
             onRunResultChange={setLatestRunResult}
             planInteraction={planInteraction}

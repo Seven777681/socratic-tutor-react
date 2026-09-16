@@ -81,6 +81,7 @@ export function CodeEditorPanel({
   nextTask,
   entryPath,
   onEntryPathChange,
+  planningMode = "required",
 }: CodeEditorPanelProps) {
   const knowledge = getTaskKnowledge(task);
   const firstExampleInput = task.examples[0]?.input;
@@ -123,7 +124,10 @@ export function CodeEditorPanel({
   const runResultsRef = useRef<HTMLDivElement>(null);
   const showPlan =
     entryPath === "plan" && learningState.planningDraft.status !== "ready";
-  const canEnterCoding = learningState.planningDraft.status === "ready";
+  const canEnterCoding =
+    planningMode === "direct" || learningState.planningDraft.status === "ready";
+  const visibleStepCount = planningMode === "required" ? 3 : planningMode === "short" ? 2 : 1;
+  const requiredStepCount = planningMode === "required" ? 2 : 1;
 
   useEffect(() => {
     setStdin(getExampleProgramInput(firstExampleInput));
@@ -175,8 +179,36 @@ export function CodeEditorPanel({
   }, [currentCode, onCodeChange]);
 
   useEffect(() => {
+    if (planningMode !== "direct") {
+      return;
+    }
+
+    if (learningState.planningDraft.status !== "ready") {
+      updateState({
+        planningDraft: {
+          ...learningState.planningDraft,
+          status: "ready",
+          reviewBypassed: true,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+    }
+    if (entryPath !== "code") {
+      onEntryPathChange("code");
+    }
+  }, [
+    entryPath,
+    learningState.planningDraft,
+    onEntryPathChange,
+    planningMode,
+    updateState,
+  ]);
+
+  useEffect(() => {
     if (
       aiTutorEnabled &&
+      planningMode !== "direct" &&
+      planningMode !== "optional" &&
       learningState.planningDraft.status === "ready" &&
       learningState.planningDraft.reviewBypassed
     ) {
@@ -194,6 +226,7 @@ export function CodeEditorPanel({
     aiTutorEnabled,
     learningState.planningDraft,
     onEntryPathChange,
+    planningMode,
     updateState,
   ]);
 
@@ -383,8 +416,13 @@ export function CodeEditorPanel({
     if (!draft.approach.trim()) {
       nextErrors.approach = "Add a short approach.";
     }
-    if (!draft.steps[0].trim() || !draft.steps[1].trim()) {
-      nextErrors.steps = "Add at least two steps.";
+    const hasRequiredSteps = draft.steps
+      .slice(0, requiredStepCount)
+      .every((step) => step.trim());
+    if (!hasRequiredSteps) {
+      nextErrors.steps = requiredStepCount === 1
+        ? "Add at least one step."
+        : "Add at least two steps.";
     }
     return nextErrors;
   };
@@ -708,12 +746,20 @@ export function CodeEditorPanel({
           <section className="mt-5 w-full max-w-[920px] rounded-xl border border-[#d9d5ff] bg-[linear-gradient(135deg,#f8f7ff,#eef2ff)] px-4 py-4">
             <h3 className="text-base font-extrabold text-slate-700 sm:text-lg">
               {aiTutorEnabled
-                ? "Do you already have an approach for solving this task?"
+                ? planningMode === "optional"
+                  ? "How would you like to begin?"
+                  : planningMode === "short"
+                    ? "Write a quick plan before coding"
+                    : "Plan this challenge before coding"
                 : "Ready to plan your solution?"}
             </h3>
             <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 sm:text-sm">
               {aiTutorEnabled
-                ? "If you have an approach, write your plan. If not, the AI Tutor will first help you understand the problem."
+                ? planningMode === "optional"
+                  ? "This Apply task is small enough to code directly. You can also make a simple plan with the AI Tutor."
+                  : planningMode === "short"
+                    ? "One clear approach and one required step are enough for this Combine task."
+                    : "This Solve task combines several ideas. Write an approach and at least two steps, then review it with the Tutor."
                 : "Write your plan independently before you begin coding. No AI feedback is provided for this assessment task."}
             </p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
@@ -728,17 +774,27 @@ export function CodeEditorPanel({
               ) : <>
               <button
                 type="button"
-                onClick={() => chooseLearningPath("plan")}
+                onClick={() => chooseLearningPath(
+                  planningMode === "optional" ? "code" : "plan",
+                )}
                 className="inline-flex h-9 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#6C4CF5,#536DFE)] px-4 text-sm font-extrabold text-white shadow-[0_8px_18px_rgba(98,85,246,0.2)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/20"
               >
-                Yes, write my plan
+                {planningMode === "optional"
+                  ? "Start Coding"
+                  : planningMode === "short"
+                    ? "Write a Short Plan"
+                    : "Build My Plan"}
               </button>
               <button
                 type="button"
-                onClick={() => chooseLearningPath("understand")}
+                onClick={() => chooseLearningPath(
+                  planningMode === "optional" ? "plan" : "understand",
+                )}
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-[#b9b2ff] bg-white px-4 text-sm font-extrabold text-[#6255f6] transition hover:border-[#6255f6] hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15"
               >
-                {aiTutorEnabled ? "No, help me understand" : "No, I will plan step by step"}
+                {planningMode === "optional"
+                  ? "Plan with AI Tutor"
+                  : "Help Me Understand"}
               </button>
               </>}
             </div>
@@ -760,11 +816,19 @@ export function CodeEditorPanel({
             : "Briefly describe the main idea you will use."
         }
         firstInvalidRef={firstPlanningFieldRef}
+        visibleStepCount={visibleStepCount}
+        requiredStepCount={requiredStepCount}
         onChange={updatePlanningDraft}
         onReviewPlan={() => {
           void reviewPlan();
         }}
-        submitLabel={aiTutorEnabled ? "Review My Plan" : "Start Coding"}
+        submitLabel={aiTutorEnabled
+          ? planningMode === "optional"
+            ? "Review Optional Plan"
+            : planningMode === "short"
+              ? "Review Short Plan"
+              : "Review My Plan"
+          : "Start Coding"}
         onEditPlan={editPlanning}
       /> : null}
 

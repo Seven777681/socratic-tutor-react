@@ -6,11 +6,12 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from database import database
+
 _LOCK = threading.Lock()
 _COUNTERS = {}
 _LOG_PATH = Path(os.getenv("SOCRATIC_STUDY_LOG", Path(__file__).parent / "logs" / "user-study.jsonl"))
 _UUID_NAMESPACE = uuid.UUID("a57f741c-1ed5-45d2-80a4-502b416f50a9")
-_SUPABASE = None
 _STUDY_SESSION_ID = None
 
 
@@ -18,16 +19,8 @@ def _stable_uuid(*parts: object) -> str:
     return str(uuid.uuid5(_UUID_NAMESPACE, "|".join(str(part) for part in parts)))
 
 
-def _get_supabase():
-    global _SUPABASE
-    if _SUPABASE is None:
-        from supabase import create_client
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        if not url or not key:
-            raise RuntimeError("Supabase study logging is not configured")
-        _SUPABASE = create_client(url, key)
-    return _SUPABASE
+def _get_database():
+    return database
 
 
 def _get_study_session_id(explicit_session_id: str | None = None) -> str:
@@ -38,7 +31,7 @@ def _get_study_session_id(explicit_session_id: str | None = None) -> str:
     if configured:
         return configured
     if _STUDY_SESSION_ID is None:
-        response = (_get_supabase().table("study_sessions").select("id")
+        response = (_get_database().table("study_sessions").select("id")
                     .eq("status", "active").order("started_at", desc=True).limit(1).execute())
         if not response.data:
             raise RuntimeError("No active study session exists")
@@ -144,8 +137,8 @@ def _upsert_code_run_compatibly(client, row: dict):
         )
 
 
-def _write_to_supabase(*, session_id: str, task_id: str, state: dict, tutor_question: str, record: dict, study_session_id: str | None = None):
-    client = _get_supabase()
+def _write_to_database(*, session_id: str, task_id: str, state: dict, tutor_question: str, record: dict, study_session_id: str | None = None):
+    client = _get_database()
     resolved_study_session_id = _get_study_session_id(study_session_id)
     attempt_id = _get_attempt_id(client, resolved_study_session_id, task_id)
     now = record["timestamp"]
@@ -223,7 +216,7 @@ def _write_to_supabase(*, session_id: str, task_id: str, state: dict, tutor_ques
 
 def save_assessment_score(*, task_id: str, plan: dict, code: str, runs: list, score: dict, study_session_id: str | None = None):
     """Store a blind pre/post assessment score with its full audit evidence."""
-    client = _get_supabase()
+    client = _get_database()
     study_session_id = _get_study_session_id(study_session_id)
     attempt_id = _get_attempt_id(client, study_session_id, task_id)
     now = datetime.now(timezone.utc).isoformat()
@@ -258,7 +251,7 @@ def save_assessment_score(*, task_id: str, plan: dict, code: str, runs: list, sc
 
 
 def save_assessment_plan(*, task_id: str, plan: dict, study_session_id: str):
-    client = _get_supabase()
+    client = _get_database()
     attempt_id = _get_attempt_id(client, study_session_id, task_id)
     now = datetime.now(timezone.utc).isoformat()
     locked_plan = {**plan, "lockedAt": now}
@@ -282,7 +275,7 @@ def save_assessment_plan(*, task_id: str, plan: dict, study_session_id: str):
 def save_task_draft(*, task_id: str, plan: dict, code: str, entry_path: str | None,
                     current_stage: str, study_session_id: str):
     """Persist the latest in-progress artifacts when a participant leaves a task."""
-    client = _get_supabase()
+    client = _get_database()
     attempt_id = _get_attempt_id(client, study_session_id, task_id)
     now = datetime.now(timezone.utc).isoformat()
     existing = (client.table("task_attempts")
@@ -326,7 +319,7 @@ def complete_study_task(*, task_id: str, plan: dict, code: str,
         current_stage="reflect",
         study_session_id=study_session_id,
     )
-    client = _get_supabase()
+    client = _get_database()
     attempt_id = _get_attempt_id(client, study_session_id, task_id)
     client.table("task_attempts").update({
         "status": "completed",
@@ -338,8 +331,8 @@ def complete_study_task(*, task_id: str, plan: dict, code: str,
 def save_tutor_conversation_snapshot(*, task_id: str, messages: list[dict],
                                      stage: str, entry_path: str | None,
                                      study_session_id: str):
-    """Backfill the browser's durable conversation snapshot into Supabase."""
-    client = _get_supabase()
+    """Backfill the browser's durable conversation snapshot into MySQL."""
+    client = _get_database()
     attempt_id = _get_attempt_id(client, study_session_id, task_id)
     existing = (client.table("task_attempts").select("id,entry_path")
                 .eq("id", attempt_id).limit(1).execute().data)
@@ -422,7 +415,7 @@ def save_tutor_conversation_snapshot(*, task_id: str, messages: list[dict],
 
 
 def save_code_run(*, task_id: str, code: str, result: dict, study_session_id: str):
-    client = _get_supabase()
+    client = _get_database()
     attempt_id = _get_attempt_id(client, study_session_id, task_id)
     now = result.get("createdAt") or datetime.now(timezone.utc).isoformat()
     existing = client.table("task_attempts").select("id,code_attempt_count").eq("id", attempt_id).limit(1).execute().data
@@ -477,7 +470,7 @@ def log_intervention(*, session_id: str, task_id: str, state: dict, tutor_questi
         with _LOG_PATH.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record, ensure_ascii=False) + "\n")
         try:
-            _write_to_supabase(session_id=session_id, task_id=task_id, state=state,
+            _write_to_database(session_id=session_id, task_id=task_id, state=state,
                                tutor_question=tutor_question, record=record,
                                study_session_id=study_session_id)
         except Exception as error:
