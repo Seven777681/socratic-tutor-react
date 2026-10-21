@@ -13,6 +13,11 @@ export interface StudyTaskAttempt {
 let cachedSessionId = "";
 let cachedRequest: Promise<StudyTaskAttempt[]> | null = null;
 
+export function invalidateStudyProgress() {
+  cachedSessionId = "";
+  cachedRequest = null;
+}
+
 export function getStudyProgress(): Promise<StudyTaskAttempt[]> {
   if (typeof window === "undefined") return Promise.resolve([]);
 

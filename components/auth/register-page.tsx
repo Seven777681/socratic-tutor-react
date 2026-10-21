@@ -62,7 +62,7 @@ export function RegisterPage() {
 
         <section className="flex min-w-0 flex-col md:items-center md:justify-center">
           <div className="flex w-full max-w-[520px] flex-col md:items-stretch">
-            <div className="mb-5 hidden self-end md:block">
+            <div className="mb-5 self-end">
               <LanguageSelector />
             </div>
 

@@ -4,11 +4,22 @@ import { createTutorMessage } from "@/data/mock-tutor-conversations";
 
 const MOCK_TUTOR_DELAY_MS = 850;
 
+function useChinese() {
+  return typeof window !== "undefined" && window.localStorage.getItem("socratic-tutor-language") === "zh";
+}
+
 function waitForTutorDelay() {
   return new Promise<void>((resolve) => window.setTimeout(resolve, MOCK_TUTOR_DELAY_MS));
 }
 
 function runObservation(latestRunResult?: CodeRunResult) {
+  if (useChinese()) {
+    if (!latestRunResult) return "你的代码还没有运行。";
+    if (latestRunResult.status === "success") return "你当前的解法已经通过所有可用检查。";
+    if (latestRunResult.status === "timeout") return "你最近一次运行未能在时间限制内完成。";
+    if (latestRunResult.error) return `最近一次运行报告了“${latestRunResult.error.title}”。`;
+    return `你最近的输出是 ${latestRunResult.stdout.trim() || "空"}。`;
+  }
   if (!latestRunResult) return "Your code has not been run yet.";
   if (latestRunResult.status === "success") return "Your latest solution passed all available checks.";
   if (latestRunResult.status === "timeout") return "Your latest run did not finish within the time limit.";
@@ -17,6 +28,18 @@ function runObservation(latestRunResult?: CodeRunResult) {
 }
 
 function actionResponse(action: TutorActionType, run?: CodeRunResult) {
+  if (useChinese()) {
+    if (action === "review_plan") return "你的计划中，哪一步把输入或初始值与最终输出连接起来？";
+    if (action === "generate_reflection_summary") return "你练习了如何把计划、预测、代码和运行反馈连接成一个完整的学习循环。";
+    if (action === "explain_success") return "代码中的哪一部分能够说明这个成功结果也适用于其他有效输入？";
+    if (action === "debug") return `${runObservation(run)} 你会先检查哪一行来解释这个结果？`;
+    if (action === "check_edge_cases") return "请尝试最小输入、典型输入和边界输入。每种情况下都应该保持什么条件？";
+    if (action === "reflect_solution") return "什么策略帮助你从题目描述逐步得到可运行的解法？";
+    if (action === "rephrase") return "程序开始时需要知道什么？结束时又应该满足什么条件？";
+    if (action === "smaller_hint") return "请手动跟踪一个很小的示例。完成第一个关键步骤后，应该满足什么条件？";
+    if (action === "check_reasoning") return "代码中的哪一行能够支持你刚才描述的推理？";
+    return undefined;
+  }
   if (action === "review_plan") {
     return "Which step in your plan connects the input or starting value to the final output?";
   }
@@ -75,7 +98,9 @@ export async function getMockTutorResponse({
 
   return createTutorMessage(
     response ??
-      `${runObservation(latestRunResult)} What is the next small uncertainty you want to reason through?`,
+      (useChinese()
+        ? `${runObservation(latestRunResult)} 你接下来最想理清的一个小问题是什么？`
+        : `${runObservation(latestRunResult)} What is the next small uncertainty you want to reason through?`),
     stage,
     questionType,
     tutorMode,

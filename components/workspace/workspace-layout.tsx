@@ -11,8 +11,29 @@ import { getTaskSummaries } from "@/lib/task-catalog";
 import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
 import { getStudyTaskAttempt } from "@/services/study-progress";
 import { getTaskPracticeLevel } from "@/data/course-content";
+import { localizeStarterCode, useLanguage } from "@/components/i18n/language-provider";
+import { taskLocalizationsZh } from "@/data/task-localizations-zh";
 
 export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
+  const { language, t } = useLanguage();
+  const localizedTask = useMemo<ProgrammingTaskDetail>(() => {
+    const override = language === "zh" ? taskLocalizationsZh[task.id] : undefined;
+    return ({
+    ...task,
+    ...override,
+    title: override?.title ?? t(task.title),
+    sourceFileName: t(task.sourceFileName),
+    moduleTitle: task.moduleTitle ? t(task.moduleTitle) : task.moduleTitle,
+    questionSetTitle: task.questionSetTitle ? t(task.questionSetTitle) : task.questionSetTitle,
+    description: override?.description ?? task.description.map((item) => t(item)),
+    learningObjectives: override?.learningObjectives ?? task.learningObjectives.map((item) => t(item)),
+    inputDescription: override?.inputDescription ?? t(task.inputDescription),
+    outputDescription: override?.outputDescription ?? t(task.outputDescription),
+    constraints: override?.constraints ?? task.constraints.map((item) => t(item)),
+    helpfulReminder: task.helpfulReminder ? t(task.helpfulReminder) : task.helpfulReminder,
+    starterCode: localizeStarterCode(task.starterCode, language),
+  });
+  }, [language, t, task]);
   const practiceLevel = getTaskPracticeLevel(task.id);
   const planningMode = practiceLevel === "Follow"
     ? "direct"
@@ -26,7 +47,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
     "task_4_minimum",
   ].includes(task.id);
   const [isTutorCollapsed, setIsTutorCollapsed] = useState(false);
-  const [currentCode, setCurrentCode] = useState(task.starterCode);
+  const [currentCode, setCurrentCode] = useState(localizedTask.starterCode);
   const [latestRunResult, setLatestRunResult] = useState<CodeRunResult | undefined>();
   const [planReviewRequestId, setPlanReviewRequestId] = useState(0);
   const [planInteraction, setPlanInteraction] = useState<TutorPlanInteraction | undefined>();
@@ -63,7 +84,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
   }, [task.id]);
 
   useEffect(() => {
-    setCurrentCode(task.starterCode);
+    setCurrentCode(localizedTask.starterCode);
     setLatestRunResult(undefined);
     setPlanInteraction(undefined);
     const storedEntryPath = window.localStorage.getItem(
@@ -96,7 +117,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
         setEntryPath(restoredPath);
       });
     }
-  }, [aiTutorEnabled, planningMode, task.id, task.starterCode]);
+  }, [aiTutorEnabled, localizedTask.starterCode, planningMode, task.id]);
 
   useEffect(() => {
     const taskId = task.id;
@@ -165,9 +186,9 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
       >
         <div className="min-w-0">
           <CodeEditorPanel
-            task={task}
+            task={localizedTask}
             taskId={task.id}
-            starterCode={task.starterCode}
+            starterCode={localizedTask.starterCode}
             language={task.language}
             aiTutorEnabled={aiTutorEnabled}
             planningMode={planningMode}
@@ -215,7 +236,7 @@ export function WorkspaceLayout({ task }: { task: ProgrammingTaskDetail }) {
                 />
               </div>
               <SocraticTutorPanel
-                task={task}
+                task={localizedTask}
                 currentCode={currentCode}
                 latestRunResult={latestRunResult}
                 learningContext={learningContext}

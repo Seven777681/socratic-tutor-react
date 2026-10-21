@@ -7,6 +7,7 @@ import { FormField } from "@/components/auth/form-field";
 import { PasswordInput } from "@/components/auth/password-input";
 import type { AuthResponse, LoginFormErrors, LoginFormValues } from "@/types/auth";
 import { isValidUsername } from "@/lib/auth/username-utils";
+import { saveAuthSession } from "@/lib/auth/client-auth";
 
 const initialValues: LoginFormValues = {
   username: "",
@@ -85,8 +86,7 @@ export function LoginForm() {
         return;
       }
 
-      window.sessionStorage.setItem("socratic-auth-user", JSON.stringify(result.user));
-      window.sessionStorage.setItem("socratic-auth-token", result.token);
+      saveAuthSession(result.user, result.token);
       setIsSignedIn(true);
       setSuccessMessage("Signed in. Redirecting to dashboard...");
 

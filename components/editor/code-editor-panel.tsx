@@ -31,6 +31,9 @@ import {
   topicLabels,
 } from "@/components/tasks/task-formatters";
 import { getTaskKnowledge } from "@/data/course-content";
+import { getAuthToken } from "@/lib/auth/client-auth";
+import { invalidateStudyProgress } from "@/services/study-progress";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 function trackLearningEvent({
   eventType,
@@ -83,7 +86,16 @@ export function CodeEditorPanel({
   onEntryPathChange,
   planningMode = "required",
 }: CodeEditorPanelProps) {
-  const knowledge = getTaskKnowledge(task);
+  const { language: uiLanguage } = useLanguage();
+  const sourceKnowledge = getTaskKnowledge(task);
+  const knowledge = uiLanguage === "zh"
+    ? {
+        ...sourceKnowledge,
+        title: `${task.title}相关知识`,
+        points: task.learningObjectives,
+        reminder: "先明确读取的内容、处理步骤和准确输出，再开始编写代码。",
+      }
+    : sourceKnowledge;
   const firstExampleInput = task.examples[0]?.input;
   const [preferences, setPreferences] = useState<EditorPreferences>({
     fontSize: 16,
@@ -177,6 +189,17 @@ export function CodeEditorPanel({
   useEffect(() => {
     onCodeChange?.(currentCode);
   }, [currentCode, onCodeChange]);
+
+  useEffect(() => {
+    if (!runResult?.codeSnapshot || runResult.codeSnapshot === currentCode) {
+      return;
+    }
+
+    setRunResult(undefined);
+    setRunStatus("idle");
+    onRunResultChange?.(undefined);
+    updateState({ latestRunResult: undefined, runStatus: "idle" });
+  }, [currentCode, onRunResultChange, runResult, updateState]);
 
   useEffect(() => {
     if (planningMode !== "direct") {
@@ -563,6 +586,7 @@ export function CodeEditorPanel({
         if (!response.ok) {
           throw new Error("Assessment submission failed");
         }
+        invalidateStudyProgress();
         window.location.assign(nextTask?.href ?? "/tasks");
       } catch {
         window.alert("Your assessment could not be saved. Please keep this page open and try again.");
@@ -575,15 +599,22 @@ export function CodeEditorPanel({
     try {
       const response = await fetch("/api/tutor/message", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getAuthToken() ?? ""}`,
+        },
         body: JSON.stringify({
           taskId,
+          taskTitle: task.title,
+          taskDescription: task.description.join("\n"),
+          taskPedagogy: task.pedagogy,
           studySessionId: window.sessionStorage.getItem("socratic-study-session-id"),
           studentMessage: Object.values(learningState.reflectionAnswers).join("\n"),
           currentCode,
           latestRunResult: learningState.latestRunResult,
           conversationId: `reflection-${taskId}`,
           stage: "reflect",
+          entryPath: entryPath === "undecided" ? "code" : entryPath,
           mode: "run_and_reflect",
           conversation: [],
           action: "generate_reflection_summary",
@@ -613,6 +644,7 @@ export function CodeEditorPanel({
   }, [
     aiTutorEnabled,
     currentCode,
+    entryPath,
     isGeneratingReflection,
     learningState.latestRunResult,
     learningState.reflectionAnswers,
@@ -622,6 +654,7 @@ export function CodeEditorPanel({
     recentRuns,
     nextTask,
     task.description,
+    task.pedagogy,
     task.title,
     taskId,
     updateState,
@@ -646,16 +679,20 @@ export function CodeEditorPanel({
           code: currentCode,
         }),
       });
-      if (!response.ok) throw new Error("Task completion failed");
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string; detail?: string }
+          | null;
+        throw new Error(payload?.detail || payload?.error || "Task completion failed");
+      }
+      invalidateStudyProgress();
       window.location.assign(nextTask?.href ?? "/tasks");
-    } catch {
-      // The draft is also persisted locally and by WorkspaceLayout's unload sync.
-      // Do not trap the learner on this page when the completion endpoint is
-      // temporarily unavailable.
+    } catch (error) {
       window.alert(
-        "Your latest work is saved locally, but completion could not be synced yet.",
+        error instanceof Error
+          ? `Your work is saved locally, but the task was not marked complete: ${error.message}`
+          : "Your work is saved locally, but the task was not marked complete. Please try again.",
       );
-      window.location.assign(nextTask?.href ?? "/tasks");
     } finally {
       setIsGeneratingReflection(false);
     }

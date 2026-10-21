@@ -37,6 +37,15 @@ Health checks:
 The backend uses SQLAlchemy with PyMySQL. The tables are created from
 `models.py` when the API starts; all database access is kept in `database.py`.
 
+## Memory foundation
+
+The first memory phase runs in shadow mode: it records observable Tutor state
+without changing prompts or responses. `memory/` owns the memory logic,
+`task_memories` keeps one current record per account and task, and
+`memory_events` stores an audit trail of memory changes. AI Tutor requests use
+the bearer token issued at login, so memory ownership comes from a verified
+`accounts.id` rather than a client-supplied account ID.
+
 ## How it connects to the frontend
 
 The Next.js route `app/api/tutor/message/route.ts` proxies every tutor

@@ -50,6 +50,33 @@ def _append_trace(state: TutorState, agent: str, label: str, summary: str):
     })
 
 
+def _short_term_context_for_answer_evaluator(state: TutorState) -> list[dict]:
+    """Return only persisted messages missing from the browser snapshot."""
+    current_messages = state.get("messages", [])
+    current_ids = {
+        str(message.get("id"))
+        for message in current_messages
+        if message.get("id")
+    }
+    current_content = {
+        (str(message.get("role", "")), str(message.get("content", "")).strip())
+        for message in current_messages
+    }
+    context = []
+    for message in state.get("short_term_memory", [])[-12:]:
+        source_id = str(message.get("source_message_id") or "")
+        role = str(message.get("role") or "unknown")
+        content = str(message.get("content") or "").strip()
+        if not content:
+            continue
+        if source_id and source_id in current_ids:
+            continue
+        if (role, content) in current_content:
+            continue
+        context.append({"role": role, "content": content[:500]})
+    return context
+
+
 def plan_agent(state: TutorState) -> TutorState:
     plan_form = state.get("plan_form", {})
     steps = plan_form.get("steps", [])
@@ -144,6 +171,8 @@ def answer_evaluation_agent(state: TutorState) -> TutorState:
     if not latest_answer.strip():
         return state
 
+    memory_context = _short_term_context_for_answer_evaluator(state)
+    profile_summary = str(state.get("user_profile_summary") or "")[:500]
     learner_state = evaluate_tutor_answer(
         problem=state.get("problem_content", ""),
         code=state.get("student_code", ""),
@@ -151,6 +180,15 @@ def answer_evaluation_agent(state: TutorState) -> TutorState:
         latest_question=state.get("latest_tutor_question", ""),
         latest_answer=latest_answer,
         previous_learner_state=state.get("learner_state", {}),
+        short_term_history=memory_context,
+        profile_summary=profile_summary,
+    )
+    state["short_term_memory_context_count"] = len(memory_context)
+    state["short_term_memory_used_by"] = (
+        ["answer_evaluation_agent"] if memory_context else []
+    )
+    state["profile_memory_used_by"] = (
+        ["answer_evaluation_agent"] if profile_summary else []
     )
     state["learner_state"] = learner_state
     diagnosis = learner_state.get("latestAnswer", {})
@@ -159,7 +197,7 @@ def answer_evaluation_agent(state: TutorState) -> TutorState:
         state,
         "Answer Evaluator",
         "Learner answer evaluation",
-        f"quality={diagnosis.get('quality', 'uncertain')}, focus_resolved={diagnosis.get('focusResolved', False)}",
+        f"quality={diagnosis.get('quality', 'uncertain')}, focus_resolved={diagnosis.get('focusResolved', False)}, memory_context={len(memory_context)}, profile_memory={bool(profile_summary)}",
     )
     return state
 

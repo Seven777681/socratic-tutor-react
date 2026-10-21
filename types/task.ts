@@ -168,7 +168,7 @@ export interface CodeEditorPanelProps {
   planningMode?: TaskPlanningMode;
   onRun?: (code: string) => void;
   onCodeChange?: (code: string) => void;
-  onRunResultChange?: (result: import("@/types/code-run").CodeRunResult) => void;
+  onRunResultChange?: (result: import("@/types/code-run").CodeRunResult | undefined) => void;
   planInteraction?: import("@/types/tutor").TutorPlanInteraction;
   onReviewPlanInTutor?: (
     context: import("@/types/tutor").TutorLearningContext,

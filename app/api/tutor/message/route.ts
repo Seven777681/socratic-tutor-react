@@ -28,9 +28,10 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!body.studySessionId) {
+  const authorization = request.headers.get("authorization");
+  if (!authorization?.startsWith("Bearer ")) {
     return NextResponse.json(
-      { error: "An active study session is required." },
+      { error: "Sign in to use the AI Tutor." },
       { status: 401 },
     );
   }
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: authorization,
       },
       body: JSON.stringify(body),
       signal: controller.signal,

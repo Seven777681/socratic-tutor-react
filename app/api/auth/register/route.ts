@@ -11,7 +11,6 @@ export async function POST(request: Request) {
   const body = (await request.json()) as Partial<RegisterRequest>;
   const username = body.username?.trim() ?? "";
   const verificationCode = body.verificationCode?.trim() ?? "";
-  const displayName = body.displayName?.trim() ?? "";
   const password = body.password ?? "";
   const confirmPassword = body.confirmPassword ?? "";
 
@@ -48,20 +47,6 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!displayName) {
-    return NextResponse.json(
-      { success: false, message: "Please enter your display name." },
-      { status: 400 },
-    );
-  }
-
-  if (displayName.length < 2) {
-    return NextResponse.json(
-      { success: false, message: "Display name must be at least 2 characters." },
-      { status: 400 },
-    );
-  }
-
   if (!password || password.length < 6) {
     return NextResponse.json(
       { success: false, message: "Password must be at least 6 characters." },
@@ -80,7 +65,7 @@ export async function POST(request: Request) {
     const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, displayName, password }),
+      body: JSON.stringify({ username, password }),
       cache: "no-store",
     });
     const data = await response.json().catch(() => ({}));

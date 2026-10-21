@@ -1,3 +1,5 @@
+"use client";
+
 import type { ProgrammingTaskDetail } from "@/types/task";
 import {
   CheckCircleIcon,
@@ -10,9 +12,19 @@ import { TaskPanelHeader } from "@/components/workspace/task-panel-header";
 import { TaskProgressSummary } from "@/components/workspace/task-progress-summary";
 import { TaskSection } from "@/components/workspace/task-section";
 import { getTaskKnowledge } from "@/data/course-content";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 export function TaskProblemPanel({ task }: { task: ProgrammingTaskDetail }) {
-  const knowledge = getTaskKnowledge(task);
+  const { language } = useLanguage();
+  const sourceKnowledge = getTaskKnowledge(task);
+  const knowledge = language === "zh"
+    ? {
+        ...sourceKnowledge,
+        title: `${task.title}相关知识`,
+        points: task.learningObjectives,
+        reminder: "先明确输入、处理步骤和预期输出，再开始编写代码。",
+      }
+    : sourceKnowledge;
 
   return (
     <aside className="flex h-full min-h-0 flex-col overflow-hidden border-r border-[#E4E7F0] bg-white shadow-[0_14px_40px_rgba(78,91,130,0.06)] lg:rounded-r-[20px]">

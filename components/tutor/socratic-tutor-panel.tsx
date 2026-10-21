@@ -15,7 +15,9 @@ import { TutorContextSummary } from "@/components/tutor/tutor-context-summary";
 import { TutorConversation } from "@/components/tutor/tutor-conversation";
 import { TutorGuidelinesDialog } from "@/components/tutor/tutor-guidelines-dialog";
 import { TutorHeader } from "@/components/tutor/tutor-header";
+import { MemoryDebugPanel } from "@/components/tutor/memory-debug-panel";
 import { useTutorConversation } from "@/hooks/use-tutor-conversation";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 function getGuidanceStage({
   latestRunResult,
@@ -58,6 +60,7 @@ export function SocraticTutorPanel({
   entryPath: TaskEntryPath;
   onEnterPlanning: () => void;
 }) {
+  const { t } = useLanguage();
   const [isGuidelinesOpen, setIsGuidelinesOpen] = useState(false);
   const [isClearOpen, setIsClearOpen] = useState(false);
   const stage = getGuidanceStage({
@@ -166,10 +169,13 @@ export function SocraticTutorPanel({
         <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center">
           <div className="max-w-xs rounded-2xl border border-dashed border-[#D9DDF0] bg-[#FBFCFF] px-5 py-6">
             <p className="text-sm font-extrabold text-[#101426]">
-              Read the problem first
+              {t("Read the problem first", "请先阅读题目")}
             </p>
             <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">
-              Choose your learning path below the problem. The Tutor will join when you need guidance.
+              {t(
+                "Choose your learning path below the problem. The Tutor will join when you need guidance.",
+                "请在题目下方选择学习路径。需要帮助时，AI 导师会加入并提供引导。",
+              )}
             </p>
           </div>
         </div>
@@ -203,6 +209,13 @@ export function SocraticTutorPanel({
         <div role="alert" className="mx-4 mb-3 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm font-semibold leading-6 text-rose-700">
           {errorMessage}
         </div>
+      ) : null}
+      {process.env.NODE_ENV === "development" ? (
+        <MemoryDebugPanel
+          taskId={task.id}
+          conversationId={conversation.id}
+          messageCount={conversation.messages.length}
+        />
       ) : null}
       {entryPath !== "undecided" ? (
         <TutorComposer

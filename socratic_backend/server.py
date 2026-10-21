@@ -23,7 +23,7 @@ import tempfile
 import time
 import uuid
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).with_name(".env"))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from study_logger import complete_study_task, log_intervention, save_assessment_plan, save_assessment_score, save_code_run, save_task_draft, save_tutor_conversation_snapshot
@@ -40,9 +40,11 @@ from llm_base import base_llm_call, model as scoring_model
 from tutor_graph import graph
 
 from database import check_database, database, init_database
+from memory import MemoryManager
 
 app = FastAPI(title="Socratic Tutor Backend")
 init_database()
+memory_manager = MemoryManager()
 
 # Server-to-server call from the Next.js API route doesn't need CORS, but we
 # allow the local dev origin too in case this is hit directly while testing.
@@ -171,8 +173,11 @@ class AuthLoginRequest(BaseModel):
 
 class AuthRegisterRequest(BaseModel):
     username: str
-    displayName: str
     password: str
+
+
+class AuthDisplayNameRequest(BaseModel):
+    displayName: str
 
 
 class StudyRunRecordRequest(BaseModel):
@@ -287,8 +292,36 @@ def _is_dialogue_reset_request(message: str) -> bool:
     )
 
 
-def get_tutor_content(req: TutorRequest):
+def get_tutor_content(req: TutorRequest, account_id: str):
     request_started = time.perf_counter()
+    task_memory = memory_manager.load_task_memory(account_id, req.taskId)
+    try:
+        short_term_memory = memory_manager.load_recent_messages(
+            account_id,
+            req.taskId,
+            req.conversationId,
+        )
+    except Exception as error:
+        print(f"Shadow short-term memory read failed: {error}", file=sys.stderr)
+        short_term_memory = []
+    try:
+        user_profile = memory_manager.load_user_profile(account_id)
+    except Exception as error:
+        print(f"Profile memory read failed: {error}", file=sys.stderr)
+        user_profile = None
+    has_stable_profile = bool(
+        user_profile
+        and (
+            user_profile.get("programming_level")
+            or user_profile.get("known_concepts")
+            or user_profile.get("struggling_concepts")
+        )
+    )
+    user_profile_summary = (
+        str(user_profile.get("profile_summary") or "")[:500]
+        if has_stable_profile
+        else ""
+    )
     problem = req.taskDescription or req.taskTitle or "the current problem"
     if req.taskPedagogy:
         pedagogy = req.taskPedagogy
@@ -367,6 +400,15 @@ def get_tutor_content(req: TutorRequest):
         "messages": [message.model_dump() for message in req.conversation],
         "learner_state": previous_learner_state,
         "latest_tutor_question": latest_tutor_question,
+        "prior_learning_focus": previous_learner_state.get("currentFocus"),
+        "task_memory": task_memory or {},
+        "memory_loaded": task_memory is not None,
+        # Only the answer evaluator may consume this; other agents stay isolated.
+        "short_term_memory": short_term_memory,
+        "short_term_memory_loaded": bool(short_term_memory),
+        "user_profile_summary": user_profile_summary,
+        "profile_memory_loaded": bool(user_profile_summary),
+        "profile_memory_used_by": [],
         "hint_level": req.hintLevel or 0,
         "confusion_level": 0,
         "is_stuck": False,
@@ -406,14 +448,47 @@ def get_tutor_content(req: TutorRequest):
         "model_version": os.getenv("MODEL_VERSION") or scoring_model or "unknown",
         "prompt_version": os.getenv("TUTOR_PROMPT_VERSION", "socratic-tutor-v1"),
         "response_latency_ms": round((time.perf_counter() - request_started) * 1000),
+        "short_term_memory_count": len(short_term_memory),
     })
-    log_intervention(
-        session_id=req.conversationId,
-        task_id=req.taskId,
-        state=result_state,
-        tutor_question=content,
-        study_session_id=req.studySessionId,
-    )
+    try:
+        memory_manager.record_tutor_turn(
+            account_id=account_id,
+            task_id=req.taskId,
+            state=result_state,
+            tutor_message=content,
+        )
+    except Exception as error:
+        print(f"Shadow memory write failed: {error}", file=sys.stderr)
+
+    if req.studentMessage.strip():
+        latest_student_message = next(
+            (message for message in reversed(req.conversation) if message.role == "student"),
+            None,
+        )
+        source_message_id = (
+            latest_student_message.id
+            if latest_student_message and latest_student_message.id
+            else f"{req.conversationId}:{hashlib.sha256(req.studentMessage.encode('utf-8')).hexdigest()[:24]}"
+        )
+        try:
+            memory_manager.record_profile_observation(
+                account_id=account_id,
+                task_id=req.taskId,
+                conversation_id=req.conversationId,
+                source_message_id=source_message_id,
+                state=result_state,
+            )
+        except Exception as error:
+            print(f"Shadow profile memory write failed: {error}", file=sys.stderr)
+
+    if req.studySessionId:
+        log_intervention(
+            session_id=req.conversationId,
+            task_id=req.taskId,
+            state=result_state,
+            tutor_question=content,
+            study_session_id=req.studySessionId,
+        )
 
     return (
         content,
@@ -691,10 +766,59 @@ def _auth_user(row: dict) -> dict:
     }
 
 
+def _issue_auth_token(account_id: str) -> str:
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    database.table("auth_sessions").insert({
+        "id": str(uuid.uuid4()),
+        "account_id": account_id,
+        "token_hash": hashlib.sha256(token.encode("utf-8")).hexdigest(),
+        "created_at": now.isoformat(),
+        "expires_at": (now + timedelta(days=30)).isoformat(),
+        "last_used_at": now.isoformat(),
+    }).execute()
+    return token
+
+
+def _require_account(request: Request) -> str:
+    authorization = request.headers.get("authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(status_code=401, detail="Sign in to use the AI Tutor.")
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    sessions = (
+        database.table("auth_sessions")
+        .select("id,account_id,expires_at")
+        .eq("token_hash", token_hash)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if not sessions:
+        raise HTTPException(status_code=401, detail="The login session is invalid.")
+    expires_at = datetime.fromisoformat(sessions[0]["expires_at"].replace("Z", "+00:00"))
+    if expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="The login session has expired.")
+    database.table("auth_sessions").update({
+        "last_used_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", sessions[0]["id"]).execute()
+    return sessions[0]["account_id"]
+
+
+def _next_student_display_name() -> str:
+    rows = database.table("accounts").select("display_name").execute().data
+    sequence_numbers = []
+    for row in rows:
+        match = re.fullmatch(r"Student (\d+)", row["display_name"] or "")
+        if match:
+            sequence_numbers.append(int(match.group(1)))
+    return f"Student {max(sequence_numbers, default=0) + 1:03d}"
+
+
 @app.post("/api/auth/register")
 def register_account(req: AuthRegisterRequest):
     username = req.username.strip().lower()
-    if not username or len(req.password) < 6 or len(req.displayName.strip()) < 2:
+    if not username or len(req.password) < 6:
         raise HTTPException(status_code=400, detail="Invalid registration details.")
     existing = database.table("accounts").select("id").eq("username", username).limit(1).execute().data
     if existing:
@@ -703,7 +827,7 @@ def register_account(req: AuthRegisterRequest):
         "id": str(uuid.uuid4()),
         "username": username,
         "username_type": "email" if "@" in username else "phone",
-        "display_name": req.displayName.strip(),
+        "display_name": _next_student_display_name(),
         "password_hash": _hash_password(req.password),
         "role": "student",
     }
@@ -712,7 +836,7 @@ def register_account(req: AuthRegisterRequest):
         "success": True,
         "message": "Account created.",
         "user": _auth_user(row),
-        "token": f"auth-token-{uuid.uuid4()}",
+        "token": _issue_auth_token(row["id"]),
     }
 
 
@@ -726,8 +850,21 @@ def login_account(req: AuthLoginRequest):
         "success": True,
         "message": "Signed in.",
         "user": _auth_user(rows[0]),
-        "token": f"auth-token-{uuid.uuid4()}",
+        "token": _issue_auth_token(rows[0]["id"]),
     }
+
+
+@app.patch("/api/auth/profile")
+def update_auth_profile(req: AuthDisplayNameRequest, request: Request):
+    account_id = _require_account(request)
+    display_name = re.sub(r"\s+", " ", req.displayName).strip()
+    if len(display_name) < 2 or len(display_name) > 30:
+        raise HTTPException(status_code=400, detail="Username must be between 2 and 30 characters.")
+    database.table("accounts").update({"display_name": display_name}).eq("id", account_id).execute()
+    rows = database.table("accounts").select("*").eq("id", account_id).limit(1).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="Account not found.")
+    return {"success": True, "message": "Username updated.", "user": _auth_user(rows[0])}
 
 
 @app.get("/health/db")
@@ -757,15 +894,27 @@ def _require_active_study_session(study_session_id: Optional[str]):
 
 
 @app.post("/api/tutor/message", response_model=TutorResponse)
-def tutor_message(req: TutorRequest):
-    _require_active_study_session(req.studySessionId)
+def tutor_message(req: TutorRequest, request: Request):
+    account_id = _require_account(request)
     if req.taskId in {"task_1_maximum", "task_4_minimum"}:
         raise HTTPException(
             status_code=403,
             detail="AI Tutor is disabled for this assessment task.",
         )
-    content, question_type, agent_trace, plan_review, plan_interaction, hint_level, learner_state = get_tutor_content(req)
+    content, question_type, agent_trace, plan_review, plan_interaction, hint_level, learner_state = get_tutor_content(req, account_id)
     message = _make_tutor_message(content, question_type, agent_trace, plan_review, plan_interaction, hint_level, learner_state, req)
+    try:
+        conversation_snapshot = [item.model_dump() for item in req.conversation]
+        conversation_snapshot.append(message.model_dump())
+        memory_manager.sync_short_term_conversation(
+            account_id=account_id,
+            task_id=req.taskId,
+            conversation_id=req.conversationId,
+            messages=conversation_snapshot,
+            stage=req.stage,
+        )
+    except Exception as error:
+        print(f"Short-term memory sync failed: {error}", file=sys.stderr)
     return TutorResponse(message=message)
 
 
@@ -861,6 +1010,59 @@ Return JSON only. For every dimension return: score, summary, observations (spec
         "cross_artifact_consistency": raw.get("cross_artifact_consistency") or "",
         "evidence_policy": "blind_artifact_only",
     }
+
+
+@app.get("/api/memory/debug")
+def memory_debug(request: Request, task_id: str, conversation_id: str):
+    account_id = _require_account(request)
+    recent_messages = memory_manager.load_recent_messages(
+        account_id,
+        task_id,
+        conversation_id,
+    )
+    profile = memory_manager.load_user_profile(account_id)
+    concept_masteries = memory_manager.profile_memory.get_concept_masteries(account_id)
+    score_events = memory_manager.profile_memory.get_score_events(account_id)
+    observations = (
+        database.table("profile_observations")
+        .select("id,task_id,conversation_id,observation_type,concept,value,confidence,evidence,status,created_at")
+        .eq("account_id", account_id)
+        .eq("task_id", task_id)
+        .order("created_at", desc=True)
+        .limit(20)
+        .execute()
+        .data
+    )
+    events = (
+        database.table("memory_events")
+        .select("id,memory_type,event_name,evidence,created_at")
+        .eq("account_id", account_id)
+        .eq("task_id", task_id)
+        .order("created_at", desc=True)
+        .limit(20)
+        .execute()
+        .data
+    )
+    usage_event = next(
+        (
+            event
+            for event in events
+            if event["memory_type"] == "task_memory"
+            and isinstance(event.get("evidence"), dict)
+        ),
+        None,
+    )
+    return {
+        "task_id": task_id,
+        "conversation_id": conversation_id,
+        "short_term_messages": recent_messages,
+        "profile": profile,
+        "concept_masteries": concept_masteries,
+        "score_events": score_events,
+        "profile_observations": observations,
+        "latest_usage": usage_event,
+        "recent_events": events,
+    }
     save_assessment_score(
         task_id=req.taskId, plan=req.plan, code=req.code, runs=req.runs,
         score=score, study_session_id=req.studySessionId,
@@ -942,8 +1144,8 @@ def sync_study_draft(req: StudyDraftRequest):
 @app.post("/api/study/task/complete")
 def complete_task(req: StudyTaskCompleteRequest):
     _require_active_study_session(req.studySessionId)
-    if req.taskId not in {"task_2_above_average", "task_3_remove_duplicates"}:
-        raise HTTPException(status_code=403, detail="This task cannot use the regular completion endpoint.")
+    if req.taskId in {"task_1_maximum", "task_4_minimum"}:
+        raise HTTPException(status_code=403, detail="Assessment tasks must use the assessment submission flow.")
     complete_study_task(
         task_id=req.taskId,
         plan=req.plan,

@@ -6,14 +6,17 @@ import type { editor } from "monaco-editor";
 import type { EditorPreferences } from "@/types/task";
 import type { CursorPosition } from "@/components/editor/editor-types";
 
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+const MonacoEditor = dynamic(
+  () => import("@monaco-editor/react").then((module) => module.default),
+  {
   ssr: false,
   loading: () => (
     <div className="flex h-full min-h-[360px] items-center justify-center bg-[#FBFCFF] text-sm font-bold text-slate-500">
       Loading editor...
     </div>
   ),
-});
+  },
+);
 
 const defineSocraticTheme: BeforeMount = (monaco) => {
   monaco.editor.defineTheme("socratic-light", {

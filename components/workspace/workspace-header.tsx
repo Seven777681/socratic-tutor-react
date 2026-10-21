@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import type { ProgrammingTaskDetail } from "@/types/task";
 import {
@@ -9,8 +11,11 @@ import {
   difficultyLabels,
   statusLabels,
 } from "@/components/tasks/task-formatters";
+import { LanguageSelector } from "@/components/auth/language-selector";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 export function WorkspaceHeader({ task }: { task: ProgrammingTaskDetail }) {
+  const { t } = useLanguage();
   return (
     <header className="h-[68px] border-b border-[#E4E7F0] bg-white/90 backdrop-blur-xl">
       <div className="mx-auto flex h-full w-full max-w-[1800px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
@@ -33,7 +38,7 @@ export function WorkspaceHeader({ task }: { task: ProgrammingTaskDetail }) {
 
           <div className="min-w-0">
             <h1 className="truncate text-base font-extrabold tracking-normal text-[#101426] sm:text-lg">
-              Task {String(task.taskNumber).padStart(2, "0")}: {task.title}
+              {t("Task", "题目")} {String(task.taskNumber).padStart(2, "0")}: {t(task.title)}
             </h1>
             <div className="mt-1 hidden flex-wrap gap-2 md:flex">
               <span className="rounded-full bg-[#eceaff] px-2.5 py-0.5 text-xs font-bold text-[#6255f6]">
@@ -50,6 +55,7 @@ export function WorkspaceHeader({ task }: { task: ProgrammingTaskDetail }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <LanguageSelector />
           <span className="hidden items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 sm:inline-flex">
             <CheckCircleIcon className="h-4 w-4" />
             Saved

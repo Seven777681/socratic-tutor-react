@@ -19,6 +19,8 @@ import { TasksEmptyState } from "@/components/tasks/tasks-empty-state";
 import { TasksPageHeader } from "@/components/tasks/tasks-page-header";
 import { getTaskSummaries } from "@/lib/task-catalog";
 import { getStudyProgress } from "@/services/study-progress";
+import { useLanguage } from "@/components/i18n/language-provider";
+import { taskLocalizationsZh } from "@/data/task-localizations-zh";
 
 const topicValues: TaskTopic[] = [
   "variables",
@@ -157,13 +159,24 @@ export function TasksPageContent({
 }: {
   tasks?: ProgrammingTaskSummary[];
 }) {
+  const { language, t } = useLanguage();
   const searchParams = useSearchParams();
   const [generatedTasks, setGeneratedTasks] = useState<ProgrammingTaskSummary[]>(tasks);
   const [filters, setFilters] = useState<TaskFilters>(() =>
     getInitialFilters(searchParams),
   );
   useEffect(() => {
-    const storedTasks = getTaskSummaries();
+    const storedTasks = getTaskSummaries().map((task) => {
+      const override = language === "zh" ? taskLocalizationsZh[task.id] : undefined;
+      return {
+        ...task,
+        title: override?.title ?? t(task.title),
+        description: override?.description[0] ?? t(task.description),
+        sourceFileName: t(task.sourceFileName),
+        moduleTitle: task.moduleTitle ? t(task.moduleTitle) : task.moduleTitle,
+        questionSetTitle: task.questionSetTitle ? t(task.questionSetTitle) : task.questionSetTitle,
+      };
+    });
     setGeneratedTasks(storedTasks);
 
     void getStudyProgress().then((attempts) => {
@@ -180,7 +193,7 @@ export function TasksPageContent({
       });
       setGeneratedTasks(restoredTasks);
     });
-  }, []);
+  }, [language, t]);
 
   const allTasks = useMemo(
     () => generatedTasks,

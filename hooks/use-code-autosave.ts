@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SaveStatus } from "@/types/task";
 import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
 import { getStudyTaskAttempt } from "@/services/study-progress";
+import { localizeStarterCode, useLanguage } from "@/components/i18n/language-provider";
 
 const autosaveDelayMs = 800;
 
@@ -14,6 +15,7 @@ export function useCodeAutosave({
   taskId: string;
   starterCode: string;
 }) {
+  const { language } = useLanguage();
   const storageKey = getParticipantTaskStorageKey("socratic-code", taskId);
   const [currentCode, setCurrentCode] = useState(starterCode);
   const [savedCode, setSavedCode] = useState(starterCode);
@@ -28,7 +30,10 @@ export function useCodeAutosave({
       const attempt = storedCode ? undefined : await getStudyTaskAttempt(taskId);
       if (cancelled) return;
       const databaseCode = attempt?.final_code?.trim() ? attempt.final_code : null;
-      const initialCode = storedCode ?? databaseCode ?? starterCode;
+      const initialCode = localizeStarterCode(
+        storedCode ?? databaseCode ?? starterCode,
+        language,
+      );
 
       setCurrentCode(initialCode);
       setSavedCode(initialCode);
@@ -39,7 +44,7 @@ export function useCodeAutosave({
     };
     void restore();
     return () => { cancelled = true; };
-  }, [starterCode, storageKey, taskId]);
+  }, [language, starterCode, storageKey, taskId]);
 
   const persistCode = useCallback(
     (code: string) => {

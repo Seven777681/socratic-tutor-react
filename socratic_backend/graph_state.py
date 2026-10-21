@@ -19,6 +19,16 @@ class TutorState(TypedDict, total=False):
     messages: List[Dict[str, str]]
     learner_state: Dict[str, Any]
     latest_tutor_question: str
+    prior_learning_focus: Optional[str]
+    task_memory: Dict[str, Any]
+    memory_loaded: bool
+    short_term_memory: List[Dict[str, Any]]
+    short_term_memory_loaded: bool
+    short_term_memory_context_count: int
+    short_term_memory_used_by: List[str]
+    user_profile_summary: str
+    profile_memory_loaded: bool
+    profile_memory_used_by: List[str]
 
     understanding_score: int
     missing_steps: List[str]

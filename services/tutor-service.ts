@@ -1,4 +1,5 @@
 import type { TutorRequest, TutorResponse } from "@/types/tutor";
+import { getAuthToken } from "@/lib/auth/client-auth";
 
 export async function getTutorResponse(
   payload: TutorRequest,
@@ -11,6 +12,7 @@ export async function getTutorResponse(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${getAuthToken() ?? ""}`,
       },
       body: JSON.stringify({
         ...payload,

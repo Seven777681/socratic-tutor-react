@@ -94,7 +94,7 @@ export function registerMockUser(values: RegisterRequest) {
     id: randomUUID(),
     username: normalizedUsername,
     usernameType: getUsernameType(normalizedUsername),
-    displayName: values.displayName.trim(),
+    displayName: `Student ${String(store.users.length + 1).padStart(3, "0")}`,
     passwordHash: hashValue(values.password),
     role: "student",
     createdAt: new Date().toISOString(),

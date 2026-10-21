@@ -17,6 +17,7 @@ import {
   TaskProgressMessage,
   TaskStatusBadge,
 } from "@/components/tasks/task-status-badge";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 const difficultyClasses: Record<TaskDifficulty, string> = {
   easy: "bg-emerald-50 text-emerald-700",
@@ -37,6 +38,7 @@ function actionLabel(task: ProgrammingTaskSummary) {
 }
 
 function CardContent({ task }: { task: ProgrammingTaskSummary }) {
+  const { t } = useLanguage();
   const practiceLevel = getTaskPracticeLevel(task.id);
   const isPrimaryAction =
     task.status === "not_started" || task.status === "in_progress";
@@ -57,10 +59,10 @@ function CardContent({ task }: { task: ProgrammingTaskSummary }) {
 
       <div className="mt-4 min-w-0">
         <h2 className="text-lg font-extrabold tracking-normal text-[#101426]">
-          {task.title}
+          {t(task.title)}
         </h2>
         <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">
-          {task.description}
+          {t(task.description)}
         </p>
       </div>
 

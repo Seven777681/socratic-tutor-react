@@ -3,6 +3,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Float,
     Index,
     Integer,
     MetaData,
@@ -34,6 +35,136 @@ accounts = Table(
     Column("password_hash", String(255), nullable=False),
     Column("role", String(32), nullable=False, server_default="student"),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
+
+auth_sessions = Table(
+    "auth_sessions",
+    metadata,
+    Column("id", String(36), primary_key=True),
+    Column("account_id", String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False),
+    Column("token_hash", String(64), nullable=False, unique=True),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("last_used_at", DateTime(timezone=True)),
+)
+
+task_memories = Table(
+    "task_memories",
+    metadata,
+    Column("id", String(36), primary_key=True),
+    Column("account_id", String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False),
+    Column("task_id", String(120), nullable=False),
+    Column("current_focus", String(255)),
+    Column("active_misconception", String(255)),
+    Column("hint_level", Integer, nullable=False, default=0),
+    Column("attempts_on_focus", Integer, nullable=False, default=0),
+    Column("conversation_summary", Text),
+    Column("last_student_message", Text),
+    Column("last_tutor_message", Text),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("account_id", "task_id", name="uq_task_memory_account_task"),
+)
+
+memory_events = Table(
+    "memory_events",
+    metadata,
+    Column("id", String(36), primary_key=True),
+    Column("account_id", String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False),
+    Column("task_id", String(120)),
+    Column("memory_type", String(64), nullable=False),
+    Column("event_name", String(100), nullable=False),
+    Column("evidence", JSON),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+conversation_messages = Table(
+    "conversation_messages",
+    metadata,
+    Column("id", String(36), primary_key=True),
+    Column("account_id", String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False),
+    Column("task_id", String(120), nullable=False),
+    Column("conversation_id", String(180), nullable=False),
+    Column("source_message_id", String(180), nullable=False),
+    Column("role", String(20), nullable=False),
+    Column("content", Text, nullable=False),
+    Column("stage", String(32)),
+    Column("sequence_number", Integer, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint(
+        "account_id",
+        "conversation_id",
+        "source_message_id",
+        name="uq_conversation_message_source",
+    ),
+)
+
+user_profiles = Table(
+    "user_profiles",
+    metadata,
+    Column("id", String(36), primary_key=True),
+    Column("account_id", String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False, unique=True),
+    Column("programming_level", String(32)),
+    Column("preferred_language", String(32), nullable=False, server_default="python"),
+    Column("preferred_explanation_style", String(64)),
+    Column("known_concepts", JSON, nullable=False),
+    Column("struggling_concepts", JSON, nullable=False),
+    Column("profile_summary", Text),
+    Column("evidence_count", Integer, nullable=False, default=0),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
+profile_observations = Table(
+    "profile_observations",
+    metadata,
+    Column("id", String(36), primary_key=True),
+    Column("account_id", String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False),
+    Column("task_id", String(120), nullable=False),
+    Column("conversation_id", String(180), nullable=False),
+    Column("source_message_id", String(180), nullable=False),
+    Column("observation_key", String(64), nullable=False, unique=True),
+    Column("observation_type", String(32), nullable=False),
+    Column("concept", String(120)),
+    Column("value", String(120), nullable=False),
+    Column("confidence", Float, nullable=False),
+    Column("evidence", Text, nullable=False),
+    Column("status", String(32), nullable=False, server_default="candidate"),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+concept_masteries = Table(
+    "concept_masteries",
+    metadata,
+    Column("id", String(36), primary_key=True),
+    Column("account_id", String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False),
+    Column("concept", String(120), nullable=False),
+    Column("mastery_score", Float, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("positive_evidence_count", Integer, nullable=False, default=0),
+    Column("negative_evidence_count", Integer, nullable=False, default=0),
+    Column("total_evidence_count", Integer, nullable=False, default=0),
+    Column("last_observed_at", DateTime(timezone=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("account_id", "concept", name="uq_concept_mastery_account_concept"),
+)
+
+profile_score_events = Table(
+    "profile_score_events",
+    metadata,
+    Column("id", String(36), primary_key=True),
+    Column("account_id", String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False),
+    Column("concept", String(120), nullable=False),
+    Column("observation_key", String(64), nullable=False, unique=True),
+    Column("evidence_type", String(32), nullable=False),
+    Column("confidence", Float, nullable=False),
+    Column("score_before", Float, nullable=False),
+    Column("score_delta", Float, nullable=False),
+    Column("score_after", Float, nullable=False),
+    Column("status_before", String(32), nullable=False),
+    Column("status_after", String(32), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
 )
 
 study_sessions = Table(
@@ -129,12 +260,27 @@ code_runs = Table(
 
 Index("ix_tutor_messages_user_code_created_at", tutor_messages.c.user_code, tutor_messages.c.created_at)
 Index("ix_tutor_messages_attempt_question_type", tutor_messages.c.attempt_id, tutor_messages.c.question_type)
+Index(
+    "ix_conversation_messages_recent",
+    conversation_messages.c.account_id,
+    conversation_messages.c.task_id,
+    conversation_messages.c.conversation_id,
+    conversation_messages.c.sequence_number,
+)
 
 
 TABLES = {
     table.name: table
     for table in (
         accounts,
+        auth_sessions,
+        task_memories,
+        memory_events,
+        conversation_messages,
+        user_profiles,
+        profile_observations,
+        concept_masteries,
+        profile_score_events,
         users,
         study_sessions,
         task_attempts,

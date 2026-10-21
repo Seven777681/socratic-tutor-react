@@ -12,11 +12,11 @@ import type {
   SendVerificationCodeResponse,
 } from "@/types/auth";
 import { isValidUsername } from "@/lib/auth/username-utils";
+import { saveAuthSession } from "@/lib/auth/client-auth";
 
 const initialValues: RegisterFormValues = {
   username: "",
   verificationCode: "",
-  displayName: "",
   password: "",
   confirmPassword: "",
 };
@@ -32,12 +32,6 @@ function validateRegister(values: RegisterFormValues): RegisterFormErrors {
 
   if (!values.verificationCode.trim()) {
     errors.verificationCode = "Please enter the verification code.";
-  }
-
-  if (!values.displayName.trim()) {
-    errors.displayName = "Please enter your display name.";
-  } else if (values.displayName.trim().length < 2) {
-    errors.displayName = "Display name must be at least 2 characters.";
   }
 
   if (!values.password) {
@@ -91,7 +85,6 @@ export function RegisterForm() {
     () =>
       values.username.trim().length > 0 &&
       values.verificationCode.trim().length > 0 &&
-      values.displayName.trim().length >= 2 &&
       values.password.length >= 6 &&
       values.confirmPassword === values.password &&
       hasSentCode,
@@ -217,8 +210,7 @@ export function RegisterForm() {
         return;
       }
 
-      window.sessionStorage.setItem("socratic-auth-user", JSON.stringify(result.user));
-      window.sessionStorage.setItem("socratic-auth-token", result.token);
+      saveAuthSession(result.user, result.token);
       setIsCreated(true);
       setSuccessMessage("Account created. Redirecting to dashboard...");
 
@@ -306,18 +298,6 @@ export function RegisterForm() {
             : "Send a code to your username first."}
         </p>
       </div>
-
-      <FormField
-        id="register-display-name"
-        label="Display Name"
-        type="text"
-        value={values.displayName}
-        onChange={(event) => updateField("displayName", event.target.value)}
-        placeholder="Enter your display name"
-        autoComplete="name"
-        disabled={isLoading}
-        error={errors.displayName}
-      />
 
       <PasswordInput
         id="register-password"

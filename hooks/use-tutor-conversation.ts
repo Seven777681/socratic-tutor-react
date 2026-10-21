@@ -150,12 +150,6 @@ export function useTutorConversation({
   const latestSyncPayloadRef = useRef<ConversationSyncPayload | null>(null);
   useEffect(() => {
     const initialStage = stage;
-    if (latestRunResult?.id) {
-      window.sessionStorage.setItem(
-        handledRunStorageKey(taskId),
-        latestRunResult.id,
-      );
-    }
     const stored = loadTutorConversation(taskId);
     if (stored) {
       const storedMessages = stored.messages.filter(
@@ -338,7 +332,12 @@ export function useTutorConversation({
   );
 
   useEffect(() => {
-    if (!latestRunResult) {
+    if (
+      !latestRunResult ||
+      hydratedTaskId !== taskId ||
+      conversation.taskId !== taskId ||
+      status === "thinking"
+    ) {
       return;
     }
 
@@ -353,7 +352,19 @@ export function useTutorConversation({
       stage,
       updatedAt: new Date().toISOString(),
     }));
-  }, [latestRunResult, stage, taskId]);
+    void requestTutorResponse({
+      studentMessage: "",
+      action: latestRunResult.status === "success" ? "explain_success" : "debug",
+    });
+  }, [
+    conversation.taskId,
+    hydratedTaskId,
+    latestRunResult,
+    requestTutorResponse,
+    stage,
+    status,
+    taskId,
+  ]);
 
   const sendMessage = useCallback(
     async (message: string) => {
