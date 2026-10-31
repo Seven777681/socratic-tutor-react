@@ -275,8 +275,17 @@ export function TasksPageContent({
 
           <div className="flex items-center justify-between gap-4">
             <p className="text-sm font-semibold text-slate-500">
-              Showing <span className="text-[#101426]">{filteredTasks.length}</span> of{" "}
-              <span className="text-[#101426]">{tasksInSelectedDifficulty}</span> tasks in this difficulty
+              {language === "zh" ? (
+                <>
+                  当前显示 <span className="text-[#101426]">{filteredTasks.length}</span> /{" "}
+                  <span className="text-[#101426]">{tasksInSelectedDifficulty}</span> 道该难度题目
+                </>
+              ) : (
+                <>
+                  Showing <span className="text-[#101426]">{filteredTasks.length}</span> of{" "}
+                  <span className="text-[#101426]">{tasksInSelectedDifficulty}</span> tasks in this difficulty
+                </>
+              )}
             </p>
           </div>
         </>
