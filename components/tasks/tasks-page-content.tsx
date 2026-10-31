@@ -13,6 +13,7 @@ import type {
 import { beginnerTaskOrder } from "@/data/course-content";
 import { difficultyRank, topicLabels } from "@/components/tasks/task-formatters";
 import { TaskFilterBar } from "@/components/tasks/task-filter-bar";
+import { TaskDifficultyTabs } from "@/components/tasks/task-difficulty-tabs";
 import { TaskGrid } from "@/components/tasks/task-grid";
 import { TaskStats } from "@/components/tasks/task-stats";
 import { TasksEmptyState } from "@/components/tasks/tasks-empty-state";
@@ -48,7 +49,7 @@ const sortValues: TaskSort[] = [
 const defaultFilters: TaskFilters = {
   query: "",
   topic: "all",
-  depth: "all",
+  depth: "easy",
   status: "all",
   sort: "recommended",
 };
@@ -68,7 +69,10 @@ function getInitialFilters(searchParams: URLSearchParams): TaskFilters {
   return {
     ...defaultFilters,
     topic: readParam(searchParams.get("topic"), topicValues),
-    depth: readParam(searchParams.get("depth"), difficultyValues),
+    depth:
+      readParam(searchParams.get("depth"), difficultyValues) === "all"
+        ? "easy"
+        : readParam(searchParams.get("depth"), difficultyValues),
     status: readParam(searchParams.get("status"), statusValues),
     sort: readParam(searchParams.get("sort"), sortValues) === "all"
       ? "recommended"
@@ -80,7 +84,7 @@ function hasFilters(filters: TaskFilters) {
   return (
     filters.query.trim() !== "" ||
     filters.topic !== "all" ||
-    filters.depth !== "all" ||
+    filters.depth !== "easy" ||
     filters.status !== "all" ||
     filters.sort !== "recommended"
   );
@@ -220,6 +224,13 @@ export function TasksPageContent({
     [allTasks, filters],
   );
 
+  const selectedDifficulty =
+    filters.depth === "all" ? "easy" : filters.depth;
+  const tasksInSelectedDifficulty = useMemo(
+    () => allTasks.filter((task) => task.thinkingDepth === selectedDifficulty).length,
+    [allTasks, selectedDifficulty],
+  );
+
   const activeStatus =
     filters.status === "in_progress" ||
     filters.status === "completed" ||
@@ -248,6 +259,13 @@ export function TasksPageContent({
             }
           />
 
+          <TaskDifficultyTabs
+            value={selectedDifficulty}
+            onChange={(depth) =>
+              setFilters((current) => ({ ...current, depth }))
+            }
+          />
+
           <TaskFilterBar
             filters={filters}
             hasActiveFilters={hasActiveFilters}
@@ -258,7 +276,7 @@ export function TasksPageContent({
           <div className="flex items-center justify-between gap-4">
             <p className="text-sm font-semibold text-slate-500">
               Showing <span className="text-[#101426]">{filteredTasks.length}</span> of{" "}
-              <span className="text-[#101426]">{allTasks.length}</span> beginner tasks
+              <span className="text-[#101426]">{tasksInSelectedDifficulty}</span> tasks in this difficulty
             </p>
           </div>
         </>

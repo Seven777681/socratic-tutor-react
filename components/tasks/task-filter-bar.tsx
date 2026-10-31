@@ -1,5 +1,4 @@
 import type {
-  TaskDifficulty,
   TaskFilters,
   TaskSort,
   TaskStatus,
@@ -16,16 +15,6 @@ const topicOptions: Array<{ value: TaskTopic | "all"; label: string }> = [
   { value: "functions", label: "Functions" },
   { value: "lists", label: "Lists" },
   { value: "strings", label: "Strings" },
-];
-
-const difficultyOptions: Array<{
-  value: TaskDifficulty | "all";
-  label: string;
-}> = [
-  { value: "all", label: "All Practice Levels" },
-  { value: "easy", label: "Follow" },
-  { value: "medium", label: "Apply / Combine" },
-  { value: "hard", label: "Solve" },
 ];
 
 const statusOptions: Array<{ value: TaskStatus | "all"; label: string }> = [
@@ -66,14 +55,6 @@ export function TaskFilterBar({
           value={filters.topic}
           options={topicOptions}
           onChange={(topic) => onFiltersChange({ ...filters, topic })}
-        />
-        <TaskFilterSelect
-          label="Filter by practice level"
-          value={filters.depth}
-          options={difficultyOptions}
-          onChange={(depth) =>
-            onFiltersChange({ ...filters, depth })
-          }
         />
         <TaskFilterSelect
           label="Filter by status"
