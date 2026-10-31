@@ -1,16 +1,10 @@
-import json
 import os
 import sys
-import threading
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
 from database import database
 
-_LOCK = threading.Lock()
-_COUNTERS = {}
-_LOG_PATH = Path(os.getenv("SOCRATIC_STUDY_LOG", Path(__file__).parent / "logs" / "user-study.jsonl"))
 _UUID_NAMESPACE = uuid.UUID("a57f741c-1ed5-45d2-80a4-502b416f50a9")
 _STUDY_SESSION_ID = None
 
@@ -141,6 +135,17 @@ def _write_to_database(*, session_id: str, task_id: str, state: dict, tutor_ques
     client = _get_database()
     resolved_study_session_id = _get_study_session_id(study_session_id)
     attempt_id = _get_attempt_id(client, resolved_study_session_id, task_id)
+    existing_attempts = (
+        client.table("task_attempts")
+        .select("planning_revision_count,code_attempt_count,started_at")
+        .eq("id", attempt_id)
+        .limit(1)
+        .execute()
+        .data
+    )
+    existing_attempt = existing_attempts[0] if existing_attempts else {}
+    planning_revision_count = int(existing_attempt.get("planning_revision_count") or 0)
+    code_attempt_count = int(existing_attempt.get("code_attempt_count") or 0)
     now = record["timestamp"]
     stage = record["stage"] or "plan"
     client.table("task_attempts").upsert({
@@ -152,9 +157,9 @@ def _write_to_database(*, session_id: str, task_id: str, state: dict, tutor_ques
         "status": "completed" if stage == "reflect" and state.get("latest_run_status") == "success" else "active",
         "student_plan": record["student_plan"],
         "final_code": record["student_code"],
-        "planning_revision_count": record["planning_revision_count"],
-        "code_attempt_count": record["code_attempt_count"],
-        "started_at": now,
+        "planning_revision_count": planning_revision_count,
+        "code_attempt_count": code_attempt_count,
+        "started_at": existing_attempt.get("started_at") or now,
     }).execute()
 
     messages = list(state.get("messages") or [])
@@ -202,10 +207,10 @@ def _write_to_database(*, session_id: str, task_id: str, state: dict, tutor_ques
 
     if state.get("latest_run_status"):
         tests = state.get("latest_run_tests") or []
-        run_source_id = state.get("latest_run_id") or f'{record["code_attempt_count"]}:{record["student_code"]}'
+        run_source_id = state.get("latest_run_id") or f'{code_attempt_count}:{record["student_code"]}'
         _upsert_code_run_compatibly(client, {
             "id": _stable_uuid("code-run", attempt_id, run_source_id), "attempt_id": attempt_id,
-            "run_number": record["code_attempt_count"], "code_snapshot": record["student_code"],
+            "run_number": code_attempt_count, "code_snapshot": record["student_code"],
             "status": state.get("latest_run_status"), "stdout": state.get("latest_run_stdout") or "",
             "stderr": state.get("latest_run_stderr") or "", "error_type": state.get("latest_error_type"),
             "passed_tests": sum(1 for test in tests if test.get("passed")), "total_tests": len(tests),
@@ -447,31 +452,24 @@ def save_code_run(*, task_id: str, code: str, result: dict, study_session_id: st
 
 def log_intervention(*, session_id: str, task_id: str, state: dict, tutor_question: str, study_session_id: str | None = None):
     """Persist structured study data without recording model chain-of-thought."""
-    key = (session_id, task_id)
-    with _LOCK:
-        counters = _COUNTERS.setdefault(key, {"planning": 0, "code": 0})
-        if state.get("stage") == "plan" and state.get("student_answer", "").strip():
-            counters["planning"] += 1
-        if state.get("latest_run_status"):
-            counters["code"] += 1
-        record = {
-            "participant_or_session_id": session_id, "task_id": task_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(), "stage": state.get("stage", ""),
-            "student_plan": state.get("plan_form", {}), "student_code": state.get("student_code", ""),
-            "execution_result": state.get("execution_result", ""),
-            "detected_misconception": state.get("misconception", ""),
-            "agent": "Agent 1" if state.get("stage") == "plan" else "Agent 2",
-            "hint_level": state.get("hint_level"), "intervention_path": state.get("intervention_path"),
-            "tutor_question": tutor_question, "student_response": state.get("student_answer", ""),
-            "planning_revision_count": counters["planning"], "code_attempt_count": counters["code"],
-            "pedagogical_action": state.get("pedagogical_action") or state.get("selected_action"),
-        }
-        _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with _LOG_PATH.open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(record, ensure_ascii=False) + "\n")
-        try:
-            _write_to_database(session_id=session_id, task_id=task_id, state=state,
-                               tutor_question=tutor_question, record=record,
-                               study_session_id=study_session_id)
-        except Exception as error:
-            print(f"Study database logging failed: {error}", file=sys.stderr)
+    record = {
+        "participant_or_session_id": session_id, "task_id": task_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(), "stage": state.get("stage", ""),
+        "student_plan": state.get("plan_form", {}), "student_code": state.get("student_code", ""),
+        "execution_result": state.get("execution_result", ""),
+        "detected_misconception": state.get("misconception", ""),
+        "agent": "Agent 1" if state.get("stage") == "plan" else "Agent 2",
+        "hint_level": state.get("hint_level"), "intervention_path": state.get("intervention_path"),
+        "tutor_question": tutor_question, "student_response": state.get("student_answer", ""),
+        "pedagogical_action": state.get("pedagogical_action") or state.get("selected_action"),
+    }
+    try:
+        _write_to_database(session_id=session_id, task_id=task_id, state=state,
+                           tutor_question=tutor_question, record=record,
+                           study_session_id=study_session_id)
+        print(
+            f"STUDY_INTERVENTION_SAVED task_id={task_id} stage={record['stage']}",
+            flush=True,
+        )
+    except Exception as error:
+        print(f"Study database logging failed: {error}", file=sys.stderr)

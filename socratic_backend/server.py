@@ -17,9 +17,7 @@ import hmac
 import random
 import re
 import json
-import subprocess
 import sys
-import tempfile
 import time
 import uuid
 import secrets
@@ -34,16 +32,15 @@ load_dotenv(Path(__file__).with_name(".env"))
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from study_logger import complete_study_task, log_intervention, save_assessment_plan, save_assessment_score, save_code_run, save_task_draft, save_tutor_conversation_snapshot
+from study_logger import complete_study_task, log_intervention, save_assessment_plan, save_assessment_score, save_task_draft, save_tutor_conversation_snapshot
 from llm_base import base_llm_call, model as scoring_model
 
 from tutor_graph import graph
 
-from database import check_database, database, init_database
+from database import check_database, database
 from memory import MemoryManager
 
 app = FastAPI(title="Socratic Tutor Backend")
-init_database()
 memory_manager = MemoryManager()
 
 # Server-to-server call from the Next.js API route doesn't need CORS, but we
@@ -525,52 +522,15 @@ RUN_TIMEOUT_SECONDS = 5.0
 MAX_OUTPUT_CHARS = 4000
 
 
-def _execute_python(code: str, stdin: str, timeout_sec: float = RUN_TIMEOUT_SECONDS) -> dict:
-    """Run student code as a real Python subprocess and capture the result."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".py", delete=False, encoding="utf-8"
-    ) as tmp_file:
-        tmp_file.write(code)
-        script_path = tmp_file.name
+CODE_EXECUTION_UNAVAILABLE = (
+    "Student Python execution is temporarily unavailable while a secure, "
+    "isolated code runner is being prepared. Other tutoring features remain available."
+)
 
-    start = time.time()
-    try:
-        try:
-            proc = subprocess.run(
-                [sys.executable, "-I", script_path],
-                input=stdin,
-                capture_output=True,
-                text=True,
-                timeout=timeout_sec,
-            )
-            elapsed_ms = int((time.time() - start) * 1000)
-            return {
-                "stdout": proc.stdout[-MAX_OUTPUT_CHARS:],
-                "stderr": proc.stderr[-MAX_OUTPUT_CHARS:],
-                "returncode": proc.returncode,
-                "elapsedMs": elapsed_ms,
-                "timedOut": False,
-            }
-        except subprocess.TimeoutExpired as exc:
-            elapsed_ms = int((time.time() - start) * 1000)
-            stdout = exc.stdout or ""
-            stderr = exc.stderr or ""
-            if isinstance(stdout, bytes):
-                stdout = stdout.decode("utf-8", "replace")
-            if isinstance(stderr, bytes):
-                stderr = stderr.decode("utf-8", "replace")
-            return {
-                "stdout": stdout[-MAX_OUTPUT_CHARS:],
-                "stderr": stderr[-MAX_OUTPUT_CHARS:],
-                "returncode": None,
-                "elapsedMs": elapsed_ms,
-                "timedOut": True,
-            }
-    finally:
-        try:
-            os.unlink(script_path)
-        except OSError:
-            pass
+
+def _execute_python(code: str, stdin: str, timeout_sec: float = RUN_TIMEOUT_SECONDS) -> dict:
+    """Prevent accidental re-enabling of untrusted in-process code execution."""
+    raise HTTPException(status_code=503, detail=CODE_EXECUTION_UNAVAILABLE)
 
 
 def _extract_exception_title(stderr: str) -> Optional[str]:
@@ -602,6 +562,10 @@ def _classify_error(stderr: str):
 
 @app.post("/api/code/run", response_model=CodeRunResponse)
 def run_code(req: CodeRunRequest):
+    raise HTTPException(status_code=503, detail=CODE_EXECUTION_UNAVAILABLE)
+
+    # Retained temporarily so the response models and prior grading behavior can
+    # be restored after code execution moves to a dedicated sandbox service.
     run_id = f"run-{int(time.time() * 1000)}-{random.randint(0, 1000)}"
     created_at = datetime.now(timezone.utc).isoformat()
 
@@ -1124,8 +1088,7 @@ def start_study_session(req: StudySessionStartRequest):
 
 @app.post("/api/study/run")
 def record_study_run(req: StudyRunRecordRequest):
-    save_code_run(task_id=req.taskId, code=req.code, result=req.result, study_session_id=req.studySessionId)
-    return {"saved": True}
+    raise HTTPException(status_code=503, detail=CODE_EXECUTION_UNAVAILABLE)
 
 
 @app.post("/api/study/draft")

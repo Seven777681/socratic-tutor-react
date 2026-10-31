@@ -5,34 +5,82 @@ from typing import Any
 
 from dotenv import load_dotenv
 from sqlalchemy import DateTime, create_engine, delete, func, insert, select, text, update
+from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.mysql import insert as mysql_insert
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.pool import NullPool
 
-from models import TABLES, metadata
+from models import TABLES
 
 
 load_dotenv(Path(__file__).with_name(".env"))
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+
+def normalize_database_url(value: str) -> str:
+    """Use the installed psycopg 3 driver for standard PostgreSQL URLs."""
+    if value.startswith("postgres://"):
+        return "postgresql+psycopg://" + value.removeprefix("postgres://")
+    if value.startswith("postgresql://"):
+        return "postgresql+psycopg://" + value.removeprefix("postgresql://")
+    return value
+
+
+def configure_postgresql_tls(value: str) -> str:
+    """Require certificate verification on Vercel when a Supabase CA is configured."""
+    url = make_url(value)
+    if url.get_backend_name() != "postgresql":
+        return value
+
+    certificate = os.getenv("DATABASE_SSL_ROOT_CERT", "").strip()
+    if not certificate:
+        if os.getenv("VERCEL"):
+            raise RuntimeError(
+                "DATABASE_SSL_ROOT_CERT is required for PostgreSQL on Vercel; "
+                "download the project CA certificate from Supabase Database Settings"
+            )
+        return value
+
+    certificate_path = Path(certificate)
+    if not certificate_path.is_absolute():
+        certificate_path = Path(__file__).resolve().parent / certificate_path
+    certificate_path = certificate_path.resolve()
+    if not certificate_path.is_file():
+        raise RuntimeError(f"DATABASE_SSL_ROOT_CERT does not exist: {certificate_path}")
+
+    query = dict(url.query)
+    query.update(sslmode="verify-full", sslrootcert=str(certificate_path))
+    return url.set(query=query).render_as_string(hide_password=False)
+
+
+DATABASE_URL = normalize_database_url(os.getenv("DATABASE_URL", ""))
 if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not configured in socratic_backend/.env")
+    raise RuntimeError("DATABASE_URL is not configured")
+DATABASE_URL = configure_postgresql_tls(DATABASE_URL)
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-    future=True,
-)
+_engine_options = {
+    "pool_pre_ping": True,
+    "future": True,
+}
 
+# Vercel functions can scale to many short-lived instances. Avoid keeping one
+# idle database connection pool per instance; the database/provider should supply
+# connection pooling when needed.
+if os.getenv("VERCEL"):
+    _engine_options["poolclass"] = NullPool
+else:
+    _engine_options["pool_recycle"] = 3600
 
-def init_database() -> None:
-    metadata.create_all(engine)
+engine = create_engine(DATABASE_URL, **_engine_options)
 
 
 def check_database() -> dict[str, str]:
     with engine.connect() as connection:
-        row = connection.execute(
-            text("SELECT DATABASE() AS database_name, VERSION() AS version")
-        ).mappings().one()
+        query = (
+            "SELECT current_database() AS database_name, version() AS version"
+            if engine.dialect.name == "postgresql"
+            else "SELECT DATABASE() AS database_name, VERSION() AS version"
+        )
+        row = connection.execute(text(query)).mappings().one()
     return dict(row)
 
 
@@ -44,7 +92,7 @@ def _as_datetime(value: Any) -> Any:
         parsed = datetime.fromisoformat(normalized)
     except ValueError:
         return value
-    if parsed.tzinfo is not None:
+    if parsed.tzinfo is not None and engine.dialect.name != "postgresql":
         parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
     return parsed
 
@@ -166,14 +214,28 @@ class TableQuery:
             source_rows = self.rows if isinstance(self.rows, list) else [self.rows]
             for row in source_rows:
                 normalized = _normalize_row(self.table, row)
-                statement = mysql_insert(self.table).values(**normalized)
+                statement = (
+                    postgresql_insert(self.table).values(**normalized)
+                    if engine.dialect.name == "postgresql"
+                    else mysql_insert(self.table).values(**normalized)
+                )
                 update_values = {
-                    key: statement.inserted[key]
+                    key: (
+                        statement.excluded[key]
+                        if engine.dialect.name == "postgresql"
+                        else statement.inserted[key]
+                    )
                     for key in normalized
                     if key not in {column.name for column in self.table.primary_key.columns}
                 }
                 if update_values:
-                    statement = statement.on_duplicate_key_update(**update_values)
+                    if engine.dialect.name == "postgresql":
+                        statement = statement.on_conflict_do_update(
+                            index_elements=[column.name for column in self.table.primary_key.columns],
+                            set_=update_values,
+                        )
+                    else:
+                        statement = statement.on_duplicate_key_update(**update_values)
                 connection.execute(statement)
             return DatabaseResponse(data=source_rows)
 

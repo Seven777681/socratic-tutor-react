@@ -11,6 +11,7 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    Uuid,
     func,
 )
 
@@ -20,7 +21,7 @@ metadata = MetaData()
 users = Table(
     "users",
     metadata,
-    Column("id", String(36), primary_key=True),
+    Column("id", Uuid(as_uuid=False), primary_key=True),
     Column("user_code", String(32), nullable=False, unique=True),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
@@ -170,8 +171,8 @@ profile_score_events = Table(
 study_sessions = Table(
     "study_sessions",
     metadata,
-    Column("id", String(36), primary_key=True),
-    Column("user_id", String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+    Column("id", Uuid(as_uuid=False), primary_key=True),
+    Column("user_id", Uuid(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
     Column("status", String(32), nullable=False, index=True),
     Column("started_at", DateTime(timezone=True), nullable=False),
     Column("completed_at", DateTime(timezone=True)),
@@ -181,8 +182,8 @@ study_sessions = Table(
 task_attempts = Table(
     "task_attempts",
     metadata,
-    Column("id", String(36), primary_key=True),
-    Column("session_id", String(36), ForeignKey("study_sessions.id", ondelete="CASCADE"), nullable=False),
+    Column("id", Uuid(as_uuid=False), primary_key=True),
+    Column("session_id", Uuid(as_uuid=False), ForeignKey("study_sessions.id", ondelete="CASCADE"), nullable=False),
     Column("task_id", String(120), nullable=False),
     Column("entry_path", String(32)),
     Column("current_stage", String(32)),
@@ -199,9 +200,9 @@ task_attempts = Table(
 tutor_messages = Table(
     "tutor_messages",
     metadata,
-    Column("id", String(36), primary_key=True),
-    Column("attempt_id", String(36), ForeignKey("task_attempts.id", ondelete="CASCADE"), nullable=False),
-    Column("user_id", String(36), ForeignKey("users.id", ondelete="SET NULL")),
+    Column("id", Uuid(as_uuid=False), primary_key=True),
+    Column("attempt_id", Uuid(as_uuid=False), ForeignKey("task_attempts.id", ondelete="CASCADE"), nullable=False),
+    Column("user_id", Uuid(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL")),
     Column("user_code", String(32)),
     Column("sequence_number", Integer, nullable=False),
     Column("role", String(32), nullable=False),
@@ -227,8 +228,8 @@ tutor_messages = Table(
 interaction_events = Table(
     "interaction_events",
     metadata,
-    Column("id", String(36), primary_key=True),
-    Column("attempt_id", String(36), ForeignKey("task_attempts.id", ondelete="CASCADE"), nullable=False),
+    Column("id", Uuid(as_uuid=False), primary_key=True),
+    Column("attempt_id", Uuid(as_uuid=False), ForeignKey("task_attempts.id", ondelete="CASCADE"), nullable=False),
     Column("sequence_number", Integer, nullable=False),
     Column("event_name", String(120), nullable=False),
     Column("stage", String(32)),
@@ -242,8 +243,8 @@ interaction_events = Table(
 code_runs = Table(
     "code_runs",
     metadata,
-    Column("id", String(36), primary_key=True),
-    Column("attempt_id", String(36), ForeignKey("task_attempts.id", ondelete="CASCADE"), nullable=False),
+    Column("id", Uuid(as_uuid=False), primary_key=True),
+    Column("attempt_id", Uuid(as_uuid=False), ForeignKey("task_attempts.id", ondelete="CASCADE"), nullable=False),
     Column("run_number", Integer, nullable=False),
     Column("code_snapshot", Text, nullable=False),
     Column("status", String(32)),
