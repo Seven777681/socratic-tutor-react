@@ -21,6 +21,7 @@ import {
   saveTutorConversation,
 } from "@/hooks/use-tutor-storage";
 import { getParticipantTaskStorageKey } from "@/lib/participant-storage";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 const INTERNAL_TUTOR_MODE: TutorMode = "run_and_reflect";
 
@@ -141,6 +142,7 @@ export function useTutorConversation({
   onPlanInteraction?: (review: TutorPlanInteraction) => void;
   onHintLevelChange?: (hintLevel: number) => void;
 }) {
+  const { language: uiLanguage, t } = useLanguage();
   const [conversation, setConversation] = useState<TutorConversation>(() =>
     createConversation({ taskId, stage }),
   );
@@ -258,6 +260,7 @@ export function useTutorConversation({
         }
 
         const response = await getTutorResponse({
+          uiLanguage,
           taskId,
           taskTitle,
           taskDescription,
@@ -303,11 +306,12 @@ export function useTutorConversation({
         });
       } catch (error) {
         setStatus("ready");
-        setErrorMessage(
-          error instanceof Error
-            ? `${error.message} 你的消息已保留，请重试。`
-            : "AI 导师暂时无法回复。你的消息已保留，请重试。",
-        );
+        setErrorMessage(error instanceof Error
+          ? `${error.message} ${t("Your message was kept. Please try again.", "你的消息已保留，请重试。")}`
+          : t(
+            "The AI tutor cannot respond right now. Your message was kept. Please try again.",
+            "AI 导师暂时无法回复。你的消息已保留，请重试。",
+          ));
       }
     },
     [
@@ -328,6 +332,8 @@ export function useTutorConversation({
       taskDescription,
       taskPedagogy,
       taskTitle,
+      t,
+      uiLanguage,
     ],
   );
 

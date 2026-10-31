@@ -88,6 +88,7 @@ class ConversationMessage(BaseModel):
 
 
 class TutorRequest(BaseModel):
+    uiLanguage: str = "en"
     taskId: str
     taskTitle: Optional[str] = None
     taskDescription: Optional[str] = None
@@ -351,6 +352,7 @@ def get_tutor_content(req: TutorRequest, account_id: str):
         "",
     )
     initial_state = {
+        "response_language": "zh" if req.uiLanguage == "zh" else "en",
         "task_id": req.taskId,
         "problem_content": problem,
         "action": req.action,

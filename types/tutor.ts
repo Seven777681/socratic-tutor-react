@@ -104,6 +104,7 @@ export interface TutorConversation {
 }
 
 export interface TutorRequest {
+  uiLanguage?: "en" | "zh";
   taskId: string;
   studySessionId?: string | null;
   taskTitle?: string;

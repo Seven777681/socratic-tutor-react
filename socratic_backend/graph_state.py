@@ -7,6 +7,7 @@ class TutorState(TypedDict, total=False):
     action: str
     stage: str
     mode: str
+    response_language: str
 
     plan_form: Dict[str, Any]
     student_answer: str

@@ -86,7 +86,7 @@ export function CodeEditorPanel({
   onEntryPathChange,
   planningMode = "required",
 }: CodeEditorPanelProps) {
-  const { language: uiLanguage } = useLanguage();
+  const { language: uiLanguage, t } = useLanguage();
   const sourceKnowledge = getTaskKnowledge(task);
   const knowledge = uiLanguage === "zh"
     ? {
@@ -465,7 +465,7 @@ export function CodeEditorPanel({
     if (!aiTutorEnabled) {
       const studySessionId = window.sessionStorage.getItem("socratic-study-session-id");
       if (!studySessionId) {
-        window.alert("No participant session was found. Please return to the login page.");
+        window.alert(t("No participant session was found. Please return to the login page."));
         return;
       }
       const response = await fetch("/api/assessment/plan", {
@@ -481,7 +481,7 @@ export function CodeEditorPanel({
         }),
       });
       if (!response.ok) {
-        window.alert("Your plan could not be saved. Please try again.");
+        window.alert(t("Your plan could not be saved. Please try again."));
         return;
       }
       const saved = await response.json();
@@ -589,7 +589,7 @@ export function CodeEditorPanel({
         invalidateStudyProgress();
         window.location.assign(nextTask?.href ?? "/tasks");
       } catch {
-        window.alert("Your assessment could not be saved. Please keep this page open and try again.");
+        window.alert(t("Your assessment could not be saved. Please keep this page open and try again."));
       } finally {
         setIsGeneratingReflection(false);
       }
@@ -657,6 +657,7 @@ export function CodeEditorPanel({
     task.pedagogy,
     task.title,
     taskId,
+    t,
     updateState,
   ]);
 
@@ -688,11 +689,12 @@ export function CodeEditorPanel({
       invalidateStudyProgress();
       window.location.assign(nextTask?.href ?? "/tasks");
     } catch (error) {
-      window.alert(
-        error instanceof Error
-          ? `Your work is saved locally, but the task was not marked complete: ${error.message}`
-          : "Your work is saved locally, but the task was not marked complete. Please try again.",
-      );
+      window.alert(error instanceof Error
+        ? t(
+          `Your work is saved locally, but the task was not marked complete: ${error.message}`,
+          `你的内容已保存在本地，但题目未能标记为完成：${error.message}`,
+        )
+        : t("Your work is saved locally, but the task was not marked complete. Please try again."));
     } finally {
       setIsGeneratingReflection(false);
     }
@@ -703,6 +705,7 @@ export function CodeEditorPanel({
     learningState.planningDraft,
     nextTask,
     taskId,
+    t,
   ]);
 
   const isReflectionComplete = useMemo(

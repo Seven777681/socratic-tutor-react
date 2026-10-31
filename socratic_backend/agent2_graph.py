@@ -34,6 +34,7 @@ class Agent2State(TypedDict, total=False):
     intervention_guidance: Dict[str, Any]
     intervention_path: InterventionPath
     final_question: str
+    response_language: str
     learner_state: Dict[str, Any]
     student_answer: str
     validation: Dict[str, Any]
@@ -191,11 +192,17 @@ def generate_socratic_question_node(state: Agent2State) -> Dict[str, str]:
         else "Target exactly one missing idea.",
     )
 
+    response_language = state.get("response_language", "en")
+    language_requirement = (
+        "Always respond in natural, concise Simplified Chinese."
+        if response_language == "zh"
+        else "Always respond in natural, concise English."
+    )
     prompt = f"""
 You are Agent 2, the Socratic Questioning Agent and the only student-facing
 question generator.
 
-Language requirement: Always respond in natural, concise Simplified Chinese.
+Language requirement: {language_requirement}
 Keep Python identifiers, code, input examples, and error messages unchanged.
 
 Stage: {state.get('stage', 'coding')}
