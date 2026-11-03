@@ -56,4 +56,115 @@ body {
       transform: translateY(0);
     }
   }
+
+  @keyframes loginRise {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes loginRobotFloat {
+    0%, 100% { transform: translateY(0) rotate(-0.5deg); }
+    50% { transform: translateY(-12px) rotate(0.7deg); }
+  }
+
+  @keyframes loginCardFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  @keyframes loginTokenPulse {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50% { opacity: 0.9; transform: scale(1.06); }
+  }
+
+  @keyframes loginOrbDrift {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(18px, -12px, 0) scale(1.06); }
+  }
+
+  .login-content-enter { animation: loginRise 520ms ease-out both; }
+  .login-rise { opacity: 0; animation: loginRise 620ms cubic-bezier(.22,1,.36,1) both; }
+  .login-delay-1 { animation-delay: 60ms; }
+  .login-delay-2 { animation-delay: 130ms; }
+  .login-delay-3 { animation-delay: 200ms; }
+  .login-delay-4 { animation-delay: 280ms; }
+  .login-delay-5 { animation-delay: 350ms; }
+  .login-robot { animation: loginRobotFloat 5.5s ease-in-out infinite; }
+  .login-feature-card { animation: loginCardFloat 4.8s ease-in-out infinite; }
+  .login-feature-card:nth-of-type(2) { animation-delay: -1.4s; }
+  .login-feature-card:nth-of-type(3) { animation-delay: -2.8s; }
+  .login-code-token { animation: loginTokenPulse 3.6s ease-in-out infinite; }
+  .login-code-token:nth-child(2n) { animation-delay: -1.8s; }
+  .login-orb { animation: loginOrbDrift 9s ease-in-out infinite; }
+  .login-orb-two { animation-delay: -3s; }
+  .login-orb-three { animation-delay: -6s; }
+}
+
+.login-interactive {
+  --login-pointer-x: 0px;
+  --login-pointer-y: 0px;
+  --login-pointer-x-soft: 0px;
+  --login-pointer-y-soft: 0px;
+  --login-glow-x: 50%;
+  --login-glow-y: 50%;
+}
+
+.login-cursor-glow {
+  left: calc(var(--login-glow-x) - 210px);
+  top: calc(var(--login-glow-y) - 210px);
+  transition: left 180ms ease-out, top 180ms ease-out;
+}
+
+.login-scene {
+  transform: translate3d(var(--login-pointer-x), var(--login-pointer-y), 0);
+  transition: transform 220ms ease-out;
+}
+
+.login-form-stage {
+  transform: translate3d(var(--login-pointer-x-soft), var(--login-pointer-y-soft), 0);
+  transition: transform 260ms ease-out;
+}
+
+.login-form-card {
+  transition: border-color 300ms ease, box-shadow 300ms ease, transform 300ms ease;
+}
+
+.login-form-card:hover {
+  border-color: rgba(199, 193, 255, 0.95);
+  box-shadow: 0 34px 100px rgba(78, 91, 130, 0.2);
+}
+
+.login-primary-button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-125%) skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.32), transparent);
+  transition: transform 650ms ease;
+}
+
+.login-primary-button:not(:disabled):hover::before {
+  transform: translateX(125%) skewX(-18deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-rise,
+  .login-content-enter {
+    opacity: 1;
+  }
+
+  .login-scene,
+  .login-form-stage {
+    transform: none;
+    transition: none;
+  }
+
+  .login-cursor-glow,
+  .login-robot,
+  .login-feature-card,
+  .login-code-token,
+  .login-orb {
+    animation: none;
+    transition: none;
+  }
 }

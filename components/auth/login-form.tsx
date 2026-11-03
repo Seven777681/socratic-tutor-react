@@ -186,7 +186,7 @@ export function LoginForm() {
         type="submit"
         disabled={!isFormComplete || isLoading}
         aria-busy={isLoading}
-        className="group flex h-[52px] w-full items-center justify-center gap-3 rounded-xl bg-[linear-gradient(90deg,#6657f5,#4678ff)] px-5 text-base font-bold text-white shadow-lg shadow-indigo-200/80 transition duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-200 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-none disabled:bg-[#ebeaff] disabled:text-[#7b7595] disabled:shadow-none disabled:hover:translate-y-0"
+        className="login-primary-button group relative flex h-[52px] w-full items-center justify-center gap-3 overflow-hidden rounded-xl bg-[linear-gradient(90deg,#6657f5,#4678ff)] px-5 text-base font-bold text-white shadow-lg shadow-indigo-200/80 transition duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-200 focus:outline-none focus:ring-4 focus:ring-[#6255f6]/15 disabled:cursor-not-allowed disabled:translate-y-0 disabled:bg-none disabled:bg-[#ebeaff] disabled:text-[#7b7595] disabled:shadow-none disabled:hover:translate-y-0"
       >
         {isLoading ? (
           <>

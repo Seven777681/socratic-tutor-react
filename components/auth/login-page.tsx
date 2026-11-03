@@ -1,21 +1,55 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useRef, type PointerEvent } from "react";
 import { BrandPanel } from "@/components/auth/brand-panel";
 import { LanguageSelector } from "@/components/auth/language-selector";
 import { LoginForm } from "@/components/auth/login-form";
 
 export function LoginPage() {
+  const pageRef = useRef<HTMLElement>(null);
+
+  const updatePointer = (event: PointerEvent<HTMLElement>) => {
+    const page = pageRef.current;
+    if (!page) return;
+    const bounds = page.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) / bounds.width - 0.5;
+    const y = (event.clientY - bounds.top) / bounds.height - 0.5;
+    page.style.setProperty("--login-pointer-x", `${x * 18}px`);
+    page.style.setProperty("--login-pointer-y", `${y * 14}px`);
+    page.style.setProperty("--login-pointer-x-soft", `${x * -10}px`);
+    page.style.setProperty("--login-pointer-y-soft", `${y * -8}px`);
+    page.style.setProperty("--login-glow-x", `${event.clientX - bounds.left}px`);
+    page.style.setProperty("--login-glow-y", `${event.clientY - bounds.top}px`);
+  };
+
+  const resetPointer = () => {
+    const page = pageRef.current;
+    if (!page) return;
+    page.style.setProperty("--login-pointer-x", "0px");
+    page.style.setProperty("--login-pointer-y", "0px");
+    page.style.setProperty("--login-pointer-x-soft", "0px");
+    page.style.setProperty("--login-pointer-y-soft", "0px");
+  };
+
   return (
-    <main className="relative min-h-[100dvh] overflow-x-hidden bg-[linear-gradient(135deg,#f7f8ff_0%,#eef2ff_52%,#f8fbff_100%)] text-slate-950">
+    <main
+      ref={pageRef}
+      onPointerMove={updatePointer}
+      onPointerLeave={resetPointer}
+      className="login-interactive relative min-h-[100dvh] overflow-x-hidden bg-[linear-gradient(135deg,#f7f8ff_0%,#eef2ff_52%,#f8fbff_100%)] text-slate-950"
+    >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-28 -top-28 h-[380px] w-[380px] rounded-full bg-[#b9a8ff]/35 blur-3xl" />
-        <div className="absolute -bottom-32 -right-20 h-[420px] w-[420px] rounded-full bg-[#9fd8ff]/32 blur-3xl" />
-        <div className="absolute left-[42%] top-[18%] hidden h-[260px] w-[260px] rounded-full bg-white/50 blur-3xl md:block" />
+        <div className="login-cursor-glow absolute h-[420px] w-[420px] rounded-full bg-[#8172ff]/15 blur-3xl" />
+        <div className="login-orb login-orb-one absolute -left-28 -top-28 h-[380px] w-[380px] rounded-full bg-[#b9a8ff]/35 blur-3xl" />
+        <div className="login-orb login-orb-two absolute -bottom-32 -right-20 h-[420px] w-[420px] rounded-full bg-[#9fd8ff]/32 blur-3xl" />
+        <div className="login-orb login-orb-three absolute left-[42%] top-[18%] hidden h-[260px] w-[260px] rounded-full bg-white/50 blur-3xl md:block" />
         <div className="absolute inset-0 opacity-[0.32] [background-image:linear-gradient(rgba(98,85,246,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(98,85,246,0.08)_1px,transparent_1px)] [background-size:42px_42px]" />
       </div>
 
-      <div className="relative mx-auto grid w-full max-w-[1720px] gap-8 px-5 pb-10 pt-7 sm:px-8 md:grid-cols-[minmax(0,44fr)_minmax(0,56fr)] md:gap-12 md:px-12 md:pb-12 md:pt-8 lg:gap-16 lg:px-16 xl:px-[72px]">
-        <BrandPanel />
+      <div className="login-content-enter relative mx-auto grid w-full max-w-[1720px] gap-8 px-5 pb-10 pt-7 sm:px-8 md:grid-cols-[minmax(0,44fr)_minmax(0,56fr)] md:gap-12 md:px-12 md:pb-12 md:pt-8 lg:gap-16 lg:px-16 xl:px-[72px]">
+        <BrandPanel interactive />
 
         <section className="flex min-w-0 flex-col md:items-center md:justify-center">
           <div className="flex w-full max-w-[520px] flex-col md:items-stretch">
@@ -23,9 +57,9 @@ export function LoginPage() {
               <LanguageSelector />
             </div>
 
-            <div className="relative">
+            <div className="login-form-stage relative">
               <div className="absolute inset-4 -z-10 rounded-[28px] bg-[#6657f5]/18 blur-3xl" />
-              <div className="w-full rounded-[24px] border border-white/80 bg-white/90 px-6 py-7 shadow-[0_28px_90px_rgba(78,91,130,0.16)] backdrop-blur sm:px-10 md:px-10 md:py-9 xl:px-12">
+              <div className="login-form-card w-full rounded-[24px] border border-white/80 bg-white/90 px-6 py-7 shadow-[0_28px_90px_rgba(78,91,130,0.16)] backdrop-blur sm:px-10 md:px-10 md:py-9 xl:px-12">
                 <div className="mb-7 text-center">
                   <span className="inline-flex rounded-full border border-indigo-100 bg-[#eceaff] px-3 py-1 text-xs font-extrabold text-[#6255f6]">
                     Multi-Agent Coding Tutor

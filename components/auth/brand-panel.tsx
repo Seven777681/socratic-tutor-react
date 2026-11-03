@@ -88,6 +88,7 @@ export function BrandPanel({
   features = featureCards,
   illustrationMinHeightClassName = "min-h-[360px] lg:min-h-[410px]",
   illustrationImageClassName = "max-w-[560px]",
+  interactive = false,
 }: {
   title?: string;
   highlight?: string;
@@ -95,11 +96,12 @@ export function BrandPanel({
   features?: BrandFeatureCard[];
   illustrationMinHeightClassName?: string;
   illustrationImageClassName?: string;
+  interactive?: boolean;
 }) {
   return (
     <section className="flex min-h-[calc(100dvh-96px)] text-slate-950 md:py-2">
       <div className="mx-auto flex w-full max-w-[660px] flex-col lg:mx-0">
-        <div className="flex items-center gap-3 self-start">
+        <div className={interactive ? "login-rise login-delay-1 flex items-center gap-3 self-start" : "flex items-center gap-3 self-start"}>
           <RobotLogo />
           <p className="text-lg font-bold tracking-normal text-slate-950 lg:text-xl">
             Socratic <span className="text-[#6255f6]">AI</span> Tutor
@@ -107,7 +109,7 @@ export function BrandPanel({
         </div>
 
         <div className="flex flex-1 flex-col justify-center py-7 md:-mt-2 md:py-8 lg:-mt-4">
-          <div className="mb-4 flex w-fit flex-wrap gap-2 rounded-full border border-indigo-100 bg-white/60 px-3 py-1.5 text-xs font-extrabold text-[#6255f6] shadow-sm shadow-indigo-100/70 backdrop-blur">
+          <div className={`${interactive ? "login-rise login-delay-2 " : ""}mb-4 flex w-fit flex-wrap gap-2 rounded-full border border-indigo-100 bg-white/60 px-3 py-1.5 text-xs font-extrabold text-[#6255f6] shadow-sm shadow-indigo-100/70 backdrop-blur`}>
             <span>Question Bank</span>
             <span className="text-slate-300">·</span>
             <span>Multi-Agent Tutor</span>
@@ -115,22 +117,22 @@ export function BrandPanel({
             <span>Socratic Guidance</span>
           </div>
 
-          <h1 className="max-w-[620px] text-[42px] font-extrabold leading-[1.08] tracking-normal text-slate-950 sm:text-[48px] lg:text-[56px] xl:text-[62px]">
+          <h1 className={`${interactive ? "login-rise login-delay-3 " : ""}max-w-[620px] text-[42px] font-extrabold leading-[1.08] tracking-normal text-slate-950 sm:text-[48px] lg:text-[56px] xl:text-[62px]`}>
             {title}
             <span className="mt-1 block bg-[linear-gradient(90deg,#725cff,#4b78ff)] bg-clip-text text-transparent">
               {highlight}
             </span>
           </h1>
 
-          <p className="mt-5 max-w-[520px] text-[17px] leading-[1.65] text-slate-600 lg:text-lg">
+          <p className={`${interactive ? "login-rise login-delay-4 " : ""}mt-5 max-w-[520px] text-[17px] leading-[1.65] text-slate-600 lg:text-lg`}>
             {description}
           </p>
 
-          <div className={`relative mt-6 hidden w-full items-center justify-center md:flex lg:mt-7 ${illustrationMinHeightClassName}`}>
+          <div className={`${interactive ? "login-scene login-rise login-delay-5 " : ""}relative mt-6 hidden w-full items-center justify-center md:flex lg:mt-7 ${illustrationMinHeightClassName}`}>
             {codeTokens.map((token) => (
               <span
                 key={token.label}
-                className={`absolute rounded-full border border-indigo-100 bg-white/55 px-3 py-1 text-xs font-extrabold text-[#6255f6]/55 shadow-sm backdrop-blur ${token.className}`}
+                className={`${interactive ? "login-code-token " : ""}absolute rounded-full border border-indigo-100 bg-white/55 px-3 py-1 text-xs font-extrabold text-[#6255f6]/55 shadow-sm backdrop-blur ${token.className}`}
               >
                 {token.label}
               </span>
@@ -141,13 +143,13 @@ export function BrandPanel({
               width={1200}
               height={800}
               priority
-              className={`h-auto w-full object-contain drop-shadow-[0_30px_48px_rgba(95,102,245,0.16)] ${illustrationImageClassName}`}
+              className={`${interactive ? "login-robot " : ""}h-auto w-full object-contain drop-shadow-[0_30px_48px_rgba(95,102,245,0.16)] ${illustrationImageClassName}`}
             />
 
             {features.map((feature) => (
               <article
                 key={feature.title}
-                className={`absolute w-[230px] rounded-2xl border border-white/75 bg-white/75 px-4 py-3 shadow-[0_16px_38px_rgba(78,91,130,0.12)] backdrop-blur ${feature.className}`}
+                className={`${interactive ? "login-feature-card " : ""}absolute w-[230px] rounded-2xl border border-white/75 bg-white/75 px-4 py-3 shadow-[0_16px_38px_rgba(78,91,130,0.12)] backdrop-blur ${feature.className}`}
               >
                 <div className="flex items-center gap-2.5">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#eceaff] text-[#6255f6]">
