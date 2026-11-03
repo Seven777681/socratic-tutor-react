@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import type { SendVerificationCodeRequest } from "@/types/auth";
-import { isValidUsername } from "@/lib/auth/username-utils";
-import {
-  getMockVerificationCode,
-  saveVerificationCode,
-} from "@/lib/server/mock-auth-store";
+import { isValidEmail, normalizeUsername } from "@/lib/auth/username-utils";
+
+const BACKEND_URL = process.env.SOCRATIC_BACKEND_URL || "http://127.0.0.1:8001";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as Partial<SendVerificationCodeRequest>;
-  const username = body.username?.trim() ?? "";
+  const username = normalizeUsername(body.username ?? "");
+  const uiLanguage = body.uiLanguage === "zh" ? "zh" : "en";
 
   if (!username) {
     return NextResponse.json(
@@ -17,26 +16,34 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!isValidUsername(username)) {
+  if (!isValidEmail(username)) {
     return NextResponse.json(
       {
         success: false,
-        message: "Username must be a valid email address or phone number.",
+        message: "Please enter a valid email address. Phone verification is not available yet.",
       },
       { status: 400 },
     );
   }
 
-  saveVerificationCode(username);
-
-  if (process.env.NODE_ENV === "development") {
-    console.info(
-      `Mock verification code for development: ${getMockVerificationCode()}`,
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/auth/verification-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, uiLanguage }),
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    return NextResponse.json(
+      response.ok
+        ? data
+        : { success: false, message: data.detail ?? "Unable to send verification code right now." },
+      { status: response.status },
+    );
+  } catch {
+    return NextResponse.json(
+      { success: false, message: "Email verification service is unavailable." },
+      { status: 503 },
     );
   }
-
-  return NextResponse.json({
-    success: true,
-    message: "Verification code sent.",
-  });
 }

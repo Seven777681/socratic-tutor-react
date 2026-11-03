@@ -23,6 +23,7 @@ export interface RegisterRequest {
 
 export interface SendVerificationCodeRequest {
   username: string;
+  uiLanguage?: "en" | "zh";
 }
 
 export interface SendVerificationCodeResponse {

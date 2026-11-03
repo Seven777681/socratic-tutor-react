@@ -11,8 +11,9 @@ import type {
   RegisterFormValues,
   SendVerificationCodeResponse,
 } from "@/types/auth";
-import { isValidUsername } from "@/lib/auth/username-utils";
+import { isValidEmail } from "@/lib/auth/username-utils";
 import { saveAuthSession } from "@/lib/auth/client-auth";
+import { useLanguage } from "@/components/i18n/language-provider";
 
 const initialValues: RegisterFormValues = {
   username: "",
@@ -26,8 +27,8 @@ function validateRegister(values: RegisterFormValues): RegisterFormErrors {
 
   if (!values.username.trim()) {
     errors.username = "Please enter your username.";
-  } else if (!isValidUsername(values.username)) {
-    errors.username = "Username must be a valid email address or phone number.";
+  } else if (!isValidEmail(values.username)) {
+    errors.username = "Please enter a valid email address.";
   }
 
   if (!values.verificationCode.trim()) {
@@ -51,6 +52,7 @@ function validateRegister(values: RegisterFormValues): RegisterFormErrors {
 
 export function RegisterForm() {
   const router = useRouter();
+  const { language: uiLanguage } = useLanguage();
   const [values, setValues] = useState<RegisterFormValues>(initialValues);
   const [errors, setErrors] = useState<RegisterFormErrors>({});
   const [formError, setFormError] = useState("");
@@ -73,7 +75,7 @@ export function RegisterForm() {
     return () => window.clearTimeout(timer);
   }, [resendSeconds]);
 
-  const isUsernameValid = isValidUsername(values.username);
+  const isUsernameValid = isValidEmail(values.username);
   const canSendCode =
     values.username.trim().length > 0 &&
     isUsernameValid &&
@@ -124,10 +126,10 @@ export function RegisterForm() {
       return;
     }
 
-    if (!isValidUsername(values.username)) {
+    if (!isValidEmail(values.username)) {
       setErrors((current) => ({
         ...current,
-        username: "Username must be a valid email address or phone number.",
+        username: "Please enter a valid email address.",
       }));
       return;
     }
@@ -142,7 +144,7 @@ export function RegisterForm() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ username: values.username }),
+        body: JSON.stringify({ username: values.username, uiLanguage }),
       });
       const result = (await response.json()) as SendVerificationCodeResponse;
 
@@ -244,12 +246,12 @@ export function RegisterForm() {
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_128px] sm:items-end">
           <FormField
             id="register-username"
-            label="Username"
-            type="text"
+            label="Email"
+            type="email"
             value={values.username}
             onChange={(event) => updateField("username", event.target.value)}
-            placeholder="Enter your email or phone number"
-            autoComplete="username"
+            placeholder="Enter your email address"
+            autoComplete="email"
             disabled={isLoading || isSendingCode}
             error={errors.username}
             icon={
@@ -275,7 +277,7 @@ export function RegisterForm() {
           </button>
         </div>
         <p className="mt-1.5 text-[11px] font-semibold leading-5 text-slate-500">
-          Use your email or phone number as your username.
+          We will send a 6-digit verification code to this email.
         </p>
       </div>
 
@@ -294,8 +296,8 @@ export function RegisterForm() {
         />
         <p className="mt-1.5 text-[11px] font-semibold leading-5 text-slate-500">
           {hasSentCode
-            ? "Verification code sent. Use 123456 in this prototype."
-            : "Send a code to your username first."}
+            ? "Verification code sent. Check your inbox and spam folder."
+            : "Send a code to your email first."}
         </p>
       </div>
 

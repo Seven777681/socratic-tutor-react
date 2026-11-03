@@ -682,6 +682,21 @@ const englishToChinese: Record<string, string> = {
   "No participant session was found. Please return to the login page.": "未找到参与者会话，请返回登录页面。",
   "Your assessment could not be saved. Please keep this page open and try again.": "评估无法保存，请保持本页面打开并重试。",
   "Your work is saved locally, but the task was not marked complete. Please try again.": "你的内容已保存在本地，但题目未能标记为完成，请重试。",
+  Email: "邮箱",
+  "Enter your email address": "请输入邮箱地址",
+  "Please enter a valid email address.": "请输入有效的邮箱地址。",
+  "Please enter a valid email address. Phone verification is not available yet.": "请输入有效的邮箱地址，手机号验证暂未开放。",
+  "We will send a 6-digit verification code to this email.": "我们会向该邮箱发送 6 位验证码。",
+  "Verification code sent. Check your inbox and spam folder.": "验证码已发送，请检查收件箱和垃圾邮件文件夹。",
+  "Send a code to your email first.": "请先向邮箱发送验证码。",
+  "Verification code sent. Check your email.": "验证码已发送，请检查邮箱。",
+  "Email verification is not configured.": "邮箱验证尚未配置。",
+  "Email delivery is not configured.": "邮件发送服务尚未配置。",
+  "The verification email could not be sent.": "验证码邮件发送失败。",
+  "Email verification service is unavailable.": "邮箱验证服务暂时不可用。",
+  "Invalid verification code.": "验证码无效。",
+  "Verification code has expired. Please request a new one.": "验证码已过期，请重新获取。",
+  "Too many incorrect attempts. Please request a new code.": "错误次数过多，请重新获取验证码。",
 };
 
 const chineseToEnglish = Object.fromEntries(

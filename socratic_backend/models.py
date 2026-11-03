@@ -49,6 +49,21 @@ auth_sessions = Table(
     Column("last_used_at", DateTime(timezone=True)),
 )
 
+verification_codes = Table(
+    "verification_codes",
+    metadata,
+    Column("id", String(36), primary_key=True),
+    Column("destination", String(255), nullable=False, index=True),
+    Column("purpose", String(32), nullable=False),
+    Column("code_hash", String(64), nullable=False),
+    Column("attempts", Integer, nullable=False, default=0),
+    Column("max_attempts", Integer, nullable=False, default=5),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    Column("last_sent_at", DateTime(timezone=True), nullable=False),
+    Column("used_at", DateTime(timezone=True)),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
+
 task_memories = Table(
     "task_memories",
     metadata,
@@ -275,6 +290,7 @@ TABLES = {
     for table in (
         accounts,
         auth_sessions,
+        verification_codes,
         task_memories,
         memory_events,
         conversation_messages,

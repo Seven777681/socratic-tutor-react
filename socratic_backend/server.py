@@ -39,6 +39,13 @@ from tutor_graph import graph
 
 from database import check_database, database
 from memory import MemoryManager
+from auth_verification import (
+    VerificationError,
+    consume_registration_code,
+    normalize_email,
+    send_registration_code,
+    verify_registration_code,
+)
 
 app = FastAPI(title="Socratic Tutor Backend")
 memory_manager = MemoryManager()
@@ -171,7 +178,13 @@ class AuthLoginRequest(BaseModel):
 
 class AuthRegisterRequest(BaseModel):
     username: str
+    verificationCode: str
     password: str
+
+
+class AuthVerificationCodeRequest(BaseModel):
+    username: str
+    uiLanguage: str = "en"
 
 
 class AuthDisplayNameRequest(BaseModel):
@@ -783,12 +796,16 @@ def _next_student_display_name() -> str:
 
 @app.post("/api/auth/register")
 def register_account(req: AuthRegisterRequest):
-    username = req.username.strip().lower()
+    username = normalize_email(req.username)
     if not username or len(req.password) < 6:
         raise HTTPException(status_code=400, detail="Invalid registration details.")
     existing = database.table("accounts").select("id").eq("username", username).limit(1).execute().data
     if existing:
         raise HTTPException(status_code=409, detail="This username is already registered.")
+    try:
+        verification_record_id = verify_registration_code(username, req.verificationCode)
+    except VerificationError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.message) from error
     row = {
         "id": str(uuid.uuid4()),
         "username": username,
@@ -798,12 +815,22 @@ def register_account(req: AuthRegisterRequest):
         "role": "student",
     }
     database.table("accounts").insert(row).execute()
+    consume_registration_code(verification_record_id)
     return {
         "success": True,
         "message": "Account created.",
         "user": _auth_user(row),
         "token": _issue_auth_token(row["id"]),
     }
+
+
+@app.post("/api/auth/verification-code")
+def send_auth_verification_code(req: AuthVerificationCodeRequest):
+    try:
+        send_registration_code(req.username, req.uiLanguage)
+    except VerificationError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.message) from error
+    return {"success": True, "message": "Verification code sent. Check your email."}
 
 
 @app.post("/api/auth/login")

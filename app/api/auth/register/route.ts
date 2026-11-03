@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
 import type { RegisterRequest } from "@/types/auth";
-import { isValidUsername } from "@/lib/auth/username-utils";
-import {
-  validateVerificationCode,
-} from "@/lib/server/mock-auth-store";
+import { isValidEmail, normalizeUsername } from "@/lib/auth/username-utils";
 
 const BACKEND_URL = process.env.SOCRATIC_BACKEND_URL || "http://127.0.0.1:8001";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as Partial<RegisterRequest>;
-  const username = body.username?.trim() ?? "";
+  const username = normalizeUsername(body.username ?? "");
   const verificationCode = body.verificationCode?.trim() ?? "";
   const password = body.password ?? "";
   const confirmPassword = body.confirmPassword ?? "";
@@ -21,11 +18,11 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!isValidUsername(username)) {
+  if (!isValidEmail(username)) {
     return NextResponse.json(
       {
         success: false,
-        message: "Username must be a valid email address or phone number.",
+        message: "Please enter a valid email address. Phone verification is not available yet.",
       },
       { status: 400 },
     );
@@ -34,15 +31,6 @@ export async function POST(request: Request) {
   if (!verificationCode) {
     return NextResponse.json(
       { success: false, message: "Please enter the verification code." },
-      { status: 400 },
-    );
-  }
-
-  const codeError = validateVerificationCode(username, verificationCode);
-
-  if (codeError) {
-    return NextResponse.json(
-      { success: false, message: codeError },
       { status: 400 },
     );
   }
@@ -65,7 +53,7 @@ export async function POST(request: Request) {
     const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, verificationCode, password }),
       cache: "no-store",
     });
     const data = await response.json().catch(() => ({}));
