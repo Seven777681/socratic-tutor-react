@@ -29,6 +29,8 @@ export type QuestionBankModuleId =
   | "function_design"
   | "integrated_challenges";
 
+export type PlanningRequirement = "not_required" | "optional" | "required";
+
 export type TaskTopic =
   | "variables"
   | "conditionals"
@@ -67,6 +69,7 @@ export interface ProgrammingTaskSummary {
   thinkingDepth: TaskDifficulty;
   questionSetId?: string;
   questionSetTitle?: string;
+  planningRequirement?: PlanningRequirement;
   createdAt: string;
   updatedAt: string;
   href: string;
@@ -123,6 +126,7 @@ export interface ProgrammingTaskDetail {
   thinkingDepth: TaskDifficulty;
   questionSetId?: string;
   questionSetTitle?: string;
+  planningRequirement?: PlanningRequirement;
   progress: number;
   language: "python";
   learningObjectives: string[];

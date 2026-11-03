@@ -22,6 +22,7 @@ import { getTaskSummaries } from "@/lib/task-catalog";
 import { getStudyProgress } from "@/services/study-progress";
 import { useLanguage } from "@/components/i18n/language-provider";
 import { taskLocalizationsZh } from "@/data/task-localizations-zh";
+import { ComputationalThinkingRadar } from "@/components/tasks/computational-thinking-radar";
 
 const topicValues: TaskTopic[] = [
   "variables",
@@ -258,6 +259,8 @@ export function TasksPageContent({
               setFilters((current) => ({ ...current, status }))
             }
           />
+
+          <ComputationalThinkingRadar tasks={allTasks} />
 
           <TaskDifficultyTabs
             value={selectedDifficulty}

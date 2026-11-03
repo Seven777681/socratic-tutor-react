@@ -155,6 +155,21 @@ class AssessmentScoreResponse(BaseModel):
     scoringStatus: str
 
 
+class QuestionSetTaskDefinition(BaseModel):
+    id: str
+    title: str
+    description: str = ""
+    planningRequirement: str = "optional"
+
+
+class QuestionSetScoreRequest(BaseModel):
+    questionSetId: str
+    questionSetTitle: str
+    taskIds: List[str]
+    tasks: List[QuestionSetTaskDefinition] = []
+    studySessionId: str
+
+
 class AssessmentPlanRequest(BaseModel):
     taskId: str
     studySessionId: str
@@ -943,25 +958,217 @@ def _extract_json_object(text: str) -> dict:
     return json.loads(cleaned[start:end + 1])
 
 
+CT_DIMENSIONS = [
+    "decomposition",
+    "algorithmic_thinking",
+    "abstraction",
+    "pattern_recognition",
+    "evaluation",
+    "debugging",
+]
+
+CT_SCORING_RUBRIC = """You are an evidence-based computational-thinking assessment rater. Score only the supplied artifacts and never reward polish without evidence.
+
+Evaluate six dimensions. Give each dimension an integer score from 0 to 5, for a maximum total of 30:
+1. decomposition: separates the problem into coherent, executable subproblems or steps.
+2. algorithmic_thinking: specifies a correct ordered process, state initialization, traversal, comparison, update, and output.
+3. abstraction: identifies essential state and general rules without irrelevant or task-specific clutter.
+4. pattern_recognition: identifies or applies reusable patterns across tasks. Do not infer transfer from one correct answer alone.
+5. evaluation: predicts or checks behavior, considers examples and edge cases, interprets test outcomes, and verifies requirements.
+6. debugging: uses observed failure evidence to locate a cause, makes a targeted revision, and checks whether the revision fixes it. Final correctness alone is not debugging evidence.
+
+Use this scale: 0=no evidence or fundamentally incorrect; 1=minimal fragment; 2=partial with major gaps; 3=adequate core evidence; 4=strong and mostly complete; 5=clear, complete, consistent, and transferable.
+
+The supplied evidence_profile is authoritative. A missing plan on a task whose planning_requirement is optional or not_required must never cause a deduction. Do not equate missing observation with weak ability. If a dimension is marked insufficient_evidence, explain what future evidence is needed rather than inventing a score. Debugging must not be penalized when no failure or revision opportunity was observed.
+
+Return JSON only. For every dimension return: score, summary_en, summary_zh, observations, plan_evidence, code_evidence, run_evidence, deductions, missing_for_next_score_en, missing_for_next_score_zh, and confidence (low/medium/high). Also return overall_strengths_en, overall_strengths_zh, overall_limitations_en, overall_limitations_zh, cross_artifact_consistency, next_steps_en, and next_steps_zh. English and Simplified Chinese fields must express the same evidence-based meaning. Distinguish observation from inference and explicitly state when evidence is unavailable. Do not include chain-of-thought."""
+
+
+def _normalize_ct_score(
+    raw: dict,
+    *,
+    scope: str,
+    evidence_profile: Optional[dict] = None,
+) -> dict:
+    dimensions = raw.get("dimensions") if isinstance(raw.get("dimensions"), dict) else {}
+    evidence_profile = evidence_profile or {
+        name: {"status": "scored", "coverage": 1.0, "reason": "Assessment task directly observes this dimension."}
+        for name in CT_DIMENSIONS
+    }
+    normalized = {}
+    for name in CT_DIMENSIONS:
+        detail = dimensions.get(name) if isinstance(dimensions.get(name), dict) else {}
+        evidence = evidence_profile.get(name) or {}
+        status = evidence.get("status", "insufficient_evidence")
+        coverage = max(0.0, min(1.0, float(evidence.get("coverage", 0) or 0)))
+        try:
+            dimension_score = int(detail.get("score", detail.get("level", 0)))
+        except (TypeError, ValueError):
+            dimension_score = 0
+        score_value = (
+            max(0, min(5, dimension_score))
+            if status in {"scored", "provisional"}
+            else None
+        )
+        normalized[name] = {
+            **detail,
+            "score": score_value,
+            "max_score": 5,
+            "status": status,
+            "evidence_coverage": round(coverage, 2),
+            "status_reason": evidence.get("reason", ""),
+            "confidence": (
+                "low"
+                if status in {"insufficient_evidence", "not_applicable"}
+                else detail.get("confidence")
+                if detail.get("confidence") in {"low", "medium", "high"}
+                else "low"
+            ),
+        }
+    assessed = [item for item in normalized.values() if item["score"] is not None]
+    total = sum(item["score"] for item in assessed)
+    total_max = len(assessed) * 5
+    overall_status = (
+        "insufficient_evidence"
+        if not assessed
+        else "scored"
+        if len(assessed) == len(CT_DIMENSIONS) and all(item["status"] == "scored" for item in assessed)
+        else "provisional"
+    )
+    return {
+        "rubric_version": "ct-rubric-v4-fair-evidence",
+        "scoring_model": scoring_model,
+        "scoring_status": "scored",
+        "scope": scope,
+        "dimensions": normalized,
+        "total": total,
+        "total_max": total_max,
+        "percentage": round(total / total_max * 100) if total_max else 0,
+        "overall_status": overall_status,
+        "assessed_dimensions": len(assessed),
+        "total_dimensions": len(CT_DIMENSIONS),
+        "overall_strengths": raw.get("overall_strengths") or [],
+        "overall_limitations": raw.get("overall_limitations") or [],
+        "cross_artifact_consistency": raw.get("cross_artifact_consistency") or "",
+        "next_steps": raw.get("next_steps") or [],
+        "overall_strengths_en": raw.get("overall_strengths_en") or raw.get("overall_strengths") or [],
+        "overall_strengths_zh": raw.get("overall_strengths_zh") or raw.get("overall_strengths") or [],
+        "overall_limitations_en": raw.get("overall_limitations_en") or raw.get("overall_limitations") or [],
+        "overall_limitations_zh": raw.get("overall_limitations_zh") or raw.get("overall_limitations") or [],
+        "next_steps_en": raw.get("next_steps_en") or raw.get("next_steps") or [],
+        "next_steps_zh": raw.get("next_steps_zh") or raw.get("next_steps") or [],
+        "evidence_policy": "observed_artifacts_only",
+    }
+
+
+def _score_ct_artifacts(
+    artifacts: dict,
+    *,
+    scope: str,
+    evidence_profile: Optional[dict] = None,
+) -> dict:
+    raw = _extract_json_object(
+        base_llm_call(CT_SCORING_RUBRIC, json.dumps(artifacts, ensure_ascii=False))
+    )
+    return _normalize_ct_score(raw, scope=scope, evidence_profile=evidence_profile)
+
+
+def _coverage_status(coverage: float) -> str:
+    if coverage >= 0.6:
+        return "scored"
+    if coverage >= 0.3:
+        return "provisional"
+    return "insufficient_evidence"
+
+
+def _build_ct_evidence_profile(task_artifacts: list[dict]) -> dict:
+    task_count = max(1, len(task_artifacts))
+
+    def has_plan(task: dict) -> bool:
+        plan = task.get("plan") or {}
+        return bool(
+            str(plan.get("approach") or "").strip()
+            or any(str(step or "").strip() for step in plan.get("steps", []))
+        )
+
+    planning_opportunities = [
+        task for task in task_artifacts
+        if task.get("planning_requirement") == "required" or has_plan(task)
+    ]
+    plan_evidence_count = sum(1 for task in planning_opportunities if has_plan(task))
+    decomposition_coverage = (
+        plan_evidence_count / len(planning_opportunities)
+        if planning_opportunities
+        else 0.0
+    )
+    code_count = sum(1 for task in task_artifacts if str(task.get("final_code") or "").strip())
+    code_coverage = code_count / task_count
+    multi_task_code_coverage = code_coverage if code_count >= 2 else 0.0
+    run_task_count = sum(1 for task in task_artifacts if task.get("run_history"))
+    evaluation_coverage = run_task_count / task_count
+
+    debugging_tasks = 0
+    for task in task_artifacts:
+        has_failed_run = any(
+            str(run.get("status") or "").lower() not in {"", "success", "passed"}
+            or bool(run.get("stderr"))
+            or bool(run.get("error_type"))
+            for run in task.get("run_history", [])
+        )
+        has_debug_dialogue = any(
+            message.get("stage") == "debug"
+            for message in task.get("tutor_evidence", [])
+        )
+        if has_failed_run or has_debug_dialogue:
+            debugging_tasks += 1
+    debugging_coverage = min(1.0, debugging_tasks / 2)
+
+    raw_profile = {
+        "decomposition": {
+            "coverage": decomposition_coverage,
+            "reason": (
+                "Only tasks requiring a plan, or tasks where the learner voluntarily submitted one, count toward decomposition evidence."
+                if planning_opportunities
+                else "This question set did not require or capture a learner plan, so missing plans are not treated as weak decomposition."
+            ),
+        },
+        "algorithmic_thinking": {
+            "coverage": code_coverage,
+            "reason": "Coverage is based on completed tasks with observable final code.",
+        },
+        "abstraction": {
+            "coverage": multi_task_code_coverage,
+            "reason": "Abstraction needs comparable code evidence from at least two related tasks.",
+        },
+        "pattern_recognition": {
+            "coverage": multi_task_code_coverage,
+            "reason": "Pattern recognition is assessed only when at least two related task solutions can be compared.",
+        },
+        "evaluation": {
+            "coverage": evaluation_coverage,
+            "reason": "Evaluation evidence comes from recorded runs, tests, predictions, or result checks.",
+        },
+        "debugging": {
+            "coverage": debugging_coverage,
+            "reason": (
+                "Coverage reflects observed failed runs or debug-stage dialogue."
+                if debugging_tasks
+                else "No failed run or debug episode was observed; absence of errors is not scored as poor debugging."
+            ),
+        },
+    }
+    return {
+        name: {**detail, "status": _coverage_status(detail["coverage"])}
+        for name, detail in raw_profile.items()
+    }
+
+
 @app.post("/api/assessment/score", response_model=AssessmentScoreResponse)
 def score_assessment(req: AssessmentScoreRequest):
     _require_active_study_session(req.studySessionId)
     if req.taskId not in {"task_1_maximum", "task_4_minimum"}:
         raise HTTPException(status_code=403, detail="Scoring is limited to pre/post assessment tasks.")
 
-    rubric = """You are a blind computational-thinking assessment rater. You do not know whether this is a pre-test or post-test. Score only the supplied artifacts and never reward polish without evidence.
-
-Evaluate six dimensions. Give each dimension an integer score from 0 to 5, for a maximum total of 30:
-1. decomposition: separates the problem into coherent, executable subproblems or steps.
-2. algorithmic_thinking: specifies a correct ordered process, state initialization, traversal, comparison, update, and output.
-3. abstraction: identifies the essential state and general rule without irrelevant or task-specific clutter.
-4. pattern_recognition: identifies or applies the reusable traverse/compare/update pattern; do not infer prior-task knowledge merely from a correct answer.
-5. evaluation: predicts or checks behavior, considers examples and edge cases, interprets test outcomes, and verifies that output meets requirements.
-6. debugging: uses observed failure evidence to locate a cause, makes a targeted revision, and checks whether the revision fixes the issue. Final correctness alone is not debugging evidence. If no failure or revision is observable, explicitly state that debugging evidence is unavailable rather than inventing it.
-
-Use this common scoring scale for every dimension: 0=no evidence or fundamentally incorrect; 1=minimal fragment; 2=partial but major gaps; 3=adequate core evidence with some gaps; 4=strong and mostly complete evidence; 5=clear, complete, consistent, and well-supported evidence.
-
-Return JSON only. For every dimension return: score, summary, observations (specific behaviors), plan_evidence (short exact excerpts or precise absence), code_evidence (specific variables/conditions/lines described), run_evidence (test outcomes and changes), deductions (each with reason and point impact), missing_for_next_score, and confidence (low/medium/high). Detailed evidence must explain both awarded credit and deductions, distinguish observed evidence from inference, and state when evidence is unavailable. Do not include chain-of-thought."""
     artifacts = json.dumps({
         "task_id": req.taskId,
         "title": req.taskTitle,
@@ -979,10 +1186,10 @@ Return JSON only. For every dimension return: score, summary, observations (spec
         },
     }, ensure_ascii=False)
     try:
-        raw = _extract_json_object(base_llm_call(rubric, artifacts))
+        score = _score_ct_artifacts(json.loads(artifacts), scope="single_assessment")
     except Exception as error:
         pending_score = {
-            "rubric_version": "ct-rubric-v2-six-dimensions",
+            "rubric_version": "ct-rubric-v4-fair-evidence",
             "scoring_model": scoring_model,
             "scoring_status": "pending_model",
             "scoring_error_type": type(error).__name__,
@@ -1004,26 +1211,195 @@ Return JSON only. For every dimension return: score, summary, observations (spec
             total=None,
             scoringStatus="pending_model",
         )
-    dimensions = raw.get("dimensions") or {}
-    required = ["decomposition", "algorithmic_thinking", "abstraction", "pattern_recognition", "evaluation", "debugging"]
-    normalized = {}
-    for name in required:
-        detail = dimensions.get(name) if isinstance(dimensions.get(name), dict) else {}
-        dimension_score = max(0, min(5, int(detail.get("score", detail.get("level", 0)))))
-        normalized[name] = {**detail, "score": dimension_score, "max_score": 5}
-    total = sum(item["score"] for item in normalized.values())
-    score = {
-        "rubric_version": "ct-rubric-v2-six-dimensions",
-        "scoring_model": scoring_model,
-        "scoring_status": "scored",
-        "dimensions": normalized,
-        "total": total,
-        "total_max": 30,
-        "overall_strengths": raw.get("overall_strengths") or [],
-        "overall_limitations": raw.get("overall_limitations") or [],
-        "cross_artifact_consistency": raw.get("cross_artifact_consistency") or "",
-        "evidence_policy": "blind_artifact_only",
-    }
+    save_assessment_score(
+        task_id=req.taskId,
+        plan=req.plan,
+        code=req.code,
+        runs=req.runs,
+        score=score,
+        study_session_id=req.studySessionId,
+    )
+    return AssessmentScoreResponse(
+        submitted=True,
+        total=score["total"],
+        scoringStatus="scored",
+    )
+
+
+def _question_set_score_events(study_session_id: str) -> list[dict]:
+    attempts = (
+        database.table("task_attempts")
+        .select("id")
+        .eq("session_id", study_session_id)
+        .execute()
+        .data
+        or []
+    )
+    attempt_ids = [row["id"] for row in attempts]
+    if not attempt_ids:
+        return []
+    rows = (
+        database.table("interaction_events")
+        .select("id,attempt_id,metadata,occurred_at")
+        .in_("attempt_id", attempt_ids)
+        .eq("event_name", "computational_thinking_question_set_score")
+        .order("occurred_at", desc=True)
+        .execute()
+        .data
+        or []
+    )
+    return [row for row in rows if isinstance(row.get("metadata"), dict)]
+
+
+@app.get("/api/ct-assessment/question-sets")
+def get_question_set_scores(studySessionId: str):
+    latest_by_question_set = {}
+    for row in _question_set_score_events(studySessionId):
+        metadata = row["metadata"]
+        question_set_id = metadata.get("question_set_id")
+        if question_set_id and question_set_id not in latest_by_question_set:
+            latest_by_question_set[question_set_id] = metadata
+    return {"scores": list(latest_by_question_set.values())}
+
+
+@app.post("/api/ct-assessment/question-sets")
+def score_question_set(req: QuestionSetScoreRequest):
+    _require_active_study_session(req.studySessionId)
+    task_ids = list(dict.fromkeys(req.taskIds))
+    if len(task_ids) < 2:
+        raise HTTPException(status_code=400, detail="A question set needs at least two tasks.")
+
+    existing_score = next(
+        (
+            row["metadata"]
+            for row in _question_set_score_events(req.studySessionId)
+            if row["metadata"].get("question_set_id") == req.questionSetId
+            and row["metadata"].get("rubric_version") == "ct-rubric-v4-fair-evidence"
+        ),
+        None,
+    )
+    if existing_score:
+        return {"score": existing_score, "cached": True}
+
+    attempts = (
+        database.table("task_attempts")
+        .select("id,task_id,student_plan,final_code,planning_revision_count,code_attempt_count,completed_at")
+        .eq("session_id", req.studySessionId)
+        .in_("task_id", task_ids)
+        .eq("status", "completed")
+        .execute()
+        .data
+        or []
+    )
+    completed_ids = {row["task_id"] for row in attempts}
+    missing = [task_id for task_id in task_ids if task_id not in completed_ids]
+    if missing:
+        raise HTTPException(
+            status_code=409,
+            detail="Complete every task in the question set before generating a score.",
+        )
+
+    attempt_ids = [row["id"] for row in attempts]
+    runs = (
+        database.table("code_runs")
+        .select("attempt_id,run_number,status,stdout,stderr,error_type,passed_tests,total_tests,test_results,created_at")
+        .in_("attempt_id", attempt_ids)
+        .order("created_at")
+        .execute()
+        .data
+        or []
+    )
+    messages = (
+        database.table("tutor_messages")
+        .select("attempt_id,role,content,stage,answer_quality,current_focus,learner_state_evidence,created_at")
+        .in_("attempt_id", attempt_ids)
+        .order("created_at")
+        .limit(120)
+        .execute()
+        .data
+        or []
+    )
+    definitions = {item.id: item for item in req.tasks}
+    runs_by_attempt: dict[str, list] = {}
+    messages_by_attempt: dict[str, list] = {}
+    for run in runs:
+        runs_by_attempt.setdefault(run["attempt_id"], []).append(run)
+    for message in messages:
+        compact = {**message, "content": str(message.get("content") or "")[:800]}
+        messages_by_attempt.setdefault(message["attempt_id"], []).append(compact)
+
+    task_artifacts = []
+    for attempt in attempts:
+        definition = definitions.get(attempt["task_id"])
+        task_artifacts.append({
+            "task_id": attempt["task_id"],
+            "title": definition.title if definition else attempt["task_id"],
+            "description": definition.description if definition else "",
+            "planning_requirement": (
+                definition.planningRequirement
+                if definition and definition.planningRequirement in {"required", "optional", "not_required"}
+                else "optional"
+            ),
+            "plan": attempt.get("student_plan") or {},
+            "final_code": attempt.get("final_code") or "",
+            "planning_revision_count": attempt.get("planning_revision_count") or 0,
+            "code_attempt_count": attempt.get("code_attempt_count") or 0,
+            "run_history": runs_by_attempt.get(attempt["id"], []),
+            "tutor_evidence": messages_by_attempt.get(attempt["id"], [])[-30:],
+        })
+
+    evidence_profile = _build_ct_evidence_profile(task_artifacts)
+    try:
+        score = _score_ct_artifacts(
+            {
+                "question_set_id": req.questionSetId,
+                "question_set_title": req.questionSetTitle,
+                "task_count": len(task_artifacts),
+                "tasks": task_artifacts,
+                "evidence_profile": evidence_profile,
+                "required_output_schema": {
+                    "dimensions": {name: {} for name in CT_DIMENSIONS},
+                    "overall_strengths": [],
+                    "overall_limitations": [],
+                    "cross_artifact_consistency": "",
+                    "next_steps": [],
+                    "overall_strengths_en": [],
+                    "overall_strengths_zh": [],
+                    "overall_limitations_en": [],
+                    "overall_limitations_zh": [],
+                    "next_steps_en": [],
+                    "next_steps_zh": [],
+                },
+            },
+            scope="question_set",
+            evidence_profile=evidence_profile,
+        )
+    except Exception as error:
+        print(f"Question-set CT scoring failed: {type(error).__name__}", file=sys.stderr)
+        raise HTTPException(status_code=503, detail="The CT scoring model is temporarily unavailable.")
+
+    score.update({
+        "question_set_id": req.questionSetId,
+        "question_set_title": req.questionSetTitle,
+        "task_ids": task_ids,
+        "task_count": len(task_ids),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    })
+    anchor = max(attempts, key=lambda row: str(row.get("completed_at") or ""))
+    event_id = str(uuid.uuid5(
+        uuid.NAMESPACE_URL,
+        f"ct-question-set:{req.studySessionId}:{req.questionSetId}:ct-rubric-v4-fair-evidence",
+    ))
+    database.table("interaction_events").upsert({
+        "id": event_id,
+        "attempt_id": anchor["id"],
+        "sequence_number": 900000,
+        "event_name": "computational_thinking_question_set_score",
+        "stage": "reflect",
+        "metadata": score,
+        "occurred_at": score["generated_at"],
+    }).execute()
+    return {"score": score, "cached": False}
 
 
 @app.get("/api/memory/debug")

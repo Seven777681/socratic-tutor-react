@@ -16,6 +16,7 @@ from run_fixed_dialogues import (
 )
 from agent_services import run_learning_state_monitor_agent
 from graph_nodes import code_diagnosis_agent, socratic_dialogue_agent
+from server import _build_ct_evidence_profile, _normalize_ct_score
 
 
 class FixedDialogueEvaluatorTests(unittest.TestCase):
@@ -132,6 +133,58 @@ class FixedDialogueEvaluatorTests(unittest.TestCase):
             invoke.call_args.args[0]["diagnosis_evidence"],
             "number is never changed in the loop body",
         )
+
+    def test_ct_question_set_score_is_clamped_and_totaled(self):
+        score = _normalize_ct_score(
+            {
+                "dimensions": {
+                    "decomposition": {"score": 8, "confidence": "high", "summary_zh": "能够拆分步骤"},
+                    "algorithmic_thinking": {"score": 3, "confidence": "medium"},
+                },
+                "overall_strengths_zh": ["步骤清晰"],
+            },
+            scope="question_set",
+        )
+        self.assertEqual(score["dimensions"]["decomposition"]["score"], 5)
+        self.assertEqual(score["dimensions"]["algorithmic_thinking"]["score"], 3)
+        self.assertEqual(score["total"], 8)
+        self.assertEqual(score["overall_strengths_zh"], ["步骤清晰"])
+
+    def test_ct_fairness_does_not_penalize_unrequired_plan_or_unseen_debugging(self):
+        profile = _build_ct_evidence_profile([
+            {
+                "planning_requirement": "not_required",
+                "plan": {},
+                "final_code": "print('Hello')",
+                "run_history": [],
+                "tutor_evidence": [],
+            },
+            {
+                "planning_requirement": "optional",
+                "plan": {},
+                "final_code": "name = input()\nprint(name)",
+                "run_history": [],
+                "tutor_evidence": [],
+            },
+        ])
+        self.assertEqual(profile["decomposition"]["status"], "insufficient_evidence")
+        self.assertEqual(profile["debugging"]["status"], "insufficient_evidence")
+
+        score = _normalize_ct_score(
+            {
+                "dimensions": {
+                    "decomposition": {"score": 0},
+                    "algorithmic_thinking": {"score": 4},
+                    "debugging": {"score": 0},
+                }
+            },
+            scope="question_set",
+            evidence_profile=profile,
+        )
+        self.assertIsNone(score["dimensions"]["decomposition"]["score"])
+        self.assertIsNone(score["dimensions"]["debugging"]["score"])
+        self.assertEqual(score["dimensions"]["algorithmic_thinking"]["score"], 4)
+        self.assertEqual(score["overall_status"], "provisional")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ import type {
   TaskDifficulty,
   TaskTopic,
 } from "@/types/task";
-import { beginnerTaskOrder } from "@/data/course-content";
+import { beginnerTaskOrder, getTaskPracticeLevel } from "@/data/course-content";
 
 export interface QuestionBankModule {
   id: QuestionBankModuleId;
@@ -975,6 +975,12 @@ function moduleFor(id: QuestionBankModuleId) {
 const generatedQuestionBankTasks: ProgrammingTaskDetail[] = seeds.map((seed, index) => {
   const module = moduleFor(seed.moduleId);
   const recommendedIndex = beginnerTaskOrder.indexOf(seed.id);
+  const practiceLevel = getTaskPracticeLevel(seed.id);
+  const planningRequirement = practiceLevel === "Follow"
+    ? "not_required" as const
+    : practiceLevel === "Apply"
+      ? "optional" as const
+      : "required" as const;
 
   return {
     id: seed.id,
@@ -998,6 +1004,7 @@ const generatedQuestionBankTasks: ProgrammingTaskDetail[] = seeds.map((seed, ind
     recommendedAgent: seed.recommendedAgent,
     questionSetId: module.id,
     questionSetTitle: module.title,
+    planningRequirement,
     createdAt: "2026-07-01T00:00:00Z",
     updatedAt: seed.id === "qb-loop-sum" ? "2026-07-02T00:00:00Z" : "2026-07-01T00:00:00Z",
     href: `/tasks/${seed.id}`,
