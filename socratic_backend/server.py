@@ -32,7 +32,7 @@ load_dotenv(Path(__file__).with_name(".env"))
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from study_logger import complete_study_task, log_intervention, save_assessment_plan, save_assessment_score, save_task_draft, save_tutor_conversation_snapshot
+from study_logger import complete_study_task, log_intervention, save_assessment_plan, save_assessment_score, save_code_run, save_task_draft, save_tutor_conversation_snapshot
 from llm_base import base_llm_call, model as scoring_model
 
 from tutor_graph import graph
@@ -1514,7 +1514,16 @@ def start_study_session(req: StudySessionStartRequest):
 
 @app.post("/api/study/run")
 def record_study_run(req: StudyRunRecordRequest):
-    raise HTTPException(status_code=503, detail=CODE_EXECUTION_UNAVAILABLE)
+    # Execution happens in an isolated browser worker. The backend only stores
+    # the already-produced result and never evaluates the submitted code.
+    _require_active_study_session(req.studySessionId)
+    save_code_run(
+        task_id=req.taskId,
+        code=req.code,
+        result=req.result,
+        study_session_id=req.studySessionId,
+    )
+    return {"saved": True}
 
 
 @app.post("/api/study/draft")
