@@ -240,9 +240,11 @@ export function useTutorConversation({
     async ({
       studentMessage,
       action,
+      idleDurationMs = 0,
     }: {
       studentMessage: string;
       action: TutorActionType;
+      idleDurationMs?: number;
     }) => {
       setStatus("thinking");
       setErrorMessage("");
@@ -275,6 +277,7 @@ export function useTutorConversation({
           },
           latestPrediction: learningContext.latestPrediction,
           hintLevel: learningContext.hintLevel,
+          idleDurationMs,
           stage,
           entryPath,
           conversationId: conversation.id,
@@ -403,7 +406,10 @@ export function useTutorConversation({
   );
 
   const triggerAction = useCallback(
-    async (action: Exclude<TutorActionType, "message">) => {
+    async (
+      action: Exclude<TutorActionType, "message">,
+      options?: { idleDurationMs?: number },
+    ) => {
       if (status === "thinking") {
         return;
       }
@@ -423,6 +429,7 @@ export function useTutorConversation({
       await requestTutorResponse({
         studentMessage: "",
         action,
+        idleDurationMs: options?.idleDurationMs,
       });
     },
     [requestTutorResponse, stage, status, taskId],

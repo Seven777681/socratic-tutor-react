@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CodeRunResult } from "@/types/code-run";
 import type {
   GuidanceStage,
@@ -18,6 +18,8 @@ import { TutorHeader } from "@/components/tutor/tutor-header";
 import { MemoryDebugPanel } from "@/components/tutor/memory-debug-panel";
 import { useTutorConversation } from "@/hooks/use-tutor-conversation";
 import { useLanguage } from "@/components/i18n/language-provider";
+
+const IDLE_NUDGE_DELAY_MS = 60_000;
 
 function getGuidanceStage({
   latestRunResult,
@@ -63,6 +65,8 @@ export function SocraticTutorPanel({
   const { t } = useLanguage();
   const [isGuidelinesOpen, setIsGuidelinesOpen] = useState(false);
   const [isClearOpen, setIsClearOpen] = useState(false);
+  const [showIdleNudge, setShowIdleNudge] = useState(false);
+  const [lastLearningActivityAt, setLastLearningActivityAt] = useState(() => Date.now());
   const stage = getGuidanceStage({
     latestRunResult,
     planningStatus: learningContext.planningStatus,
@@ -92,6 +96,40 @@ export function SocraticTutorPanel({
   });
   const lastHandledPlanReviewId = useRef(planReviewRequestId ?? 0);
   const planningHelpStartedRef = useRef(false);
+
+  const markLearningActivity = useCallback(() => {
+    setLastLearningActivityAt(Date.now());
+    setShowIdleNudge(false);
+  }, []);
+
+  useEffect(() => {
+    markLearningActivity();
+  }, [
+    conversation.updatedAt,
+    currentCode,
+    latestRunResult?.id,
+    markLearningActivity,
+    stage,
+    task.id,
+  ]);
+
+  useEffect(() => {
+    if (
+      (stage !== "code" && stage !== "debug") ||
+      status !== "ready" ||
+      entryPath === "undecided" ||
+      showIdleNudge
+    ) {
+      return;
+    }
+
+    const elapsed = Date.now() - lastLearningActivityAt;
+    const timeoutId = window.setTimeout(
+      () => setShowIdleNudge(true),
+      Math.max(0, IDLE_NUDGE_DELAY_MS - elapsed),
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [entryPath, lastLearningActivityAt, showIdleNudge, stage, status]);
 
   useEffect(() => {
     planningHelpStartedRef.current = false;
@@ -217,6 +255,44 @@ export function SocraticTutorPanel({
           messageCount={conversation.messages.length}
         />
       ) : null}
+      {showIdleNudge && (stage === "code" || stage === "debug") ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mx-4 mb-3 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 shadow-sm"
+        >
+          <p className="text-sm font-extrabold text-amber-900">
+            {t("Need a little help?", "需要一点提示吗？")}
+          </p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-amber-800/80">
+            {t(
+              "You can keep thinking, or ask the AI Tutor for one small next step.",
+              "你可以继续思考，也可以让 AI 导师只提示下一小步。",
+            )}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={status === "thinking"}
+              onClick={() => {
+                const idleDurationMs = Date.now() - lastLearningActivityAt;
+                markLearningActivity();
+                void triggerAction("idle_help", { idleDurationMs });
+              }}
+              className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-xs font-extrabold text-white transition hover:bg-amber-600 focus:outline-none focus:ring-4 focus:ring-amber-200 disabled:cursor-wait disabled:opacity-60"
+            >
+              {t("Give me one hint", "给我一个提示")}
+            </button>
+            <button
+              type="button"
+              onClick={markLearningActivity}
+              className="inline-flex h-9 items-center justify-center rounded-xl border border-amber-200 bg-white px-4 text-xs font-bold text-amber-800 transition hover:bg-amber-100 focus:outline-none focus:ring-4 focus:ring-amber-100"
+            >
+              {t("Not now", "暂时不用")}
+            </button>
+          </div>
+        </div>
+      ) : null}
       {entryPath !== "undecided" ? (
         <TutorComposer
           status={status}
@@ -225,6 +301,7 @@ export function SocraticTutorPanel({
           showHint={stage === "code" || stage === "debug"}
           hintLevel={learningContext.hintLevel}
           onHint={() => void triggerAction("smaller_hint")}
+          onActivity={markLearningActivity}
         />
       ) : null}
 

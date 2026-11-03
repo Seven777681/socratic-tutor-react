@@ -20,13 +20,14 @@ PedagogicalAction = Literal[
 InterventionPath = Literal["A", "B", "C", "D", "FALLBACK"]
 
 
-class Agent2State(TypedDict, total=False):
+class SocraticDialogueState(TypedDict, total=False):
     problem: str
     student_code: str
     conversation_history: List[Dict[str, Any]]
     stage: str
     issue_type: str
     misconception: str
+    diagnosis_evidence: str
     student_state: str
     hint_level: int
     action: PedagogicalAction
@@ -51,7 +52,7 @@ def _history_text(history: List[Dict[str, Any]]) -> str:
 
 
 def select_question_strategy_node(
-    state: Agent2State,
+    state: SocraticDialogueState,
 ) -> Dict[str, Any]:
     hint_level = max(0, min(3, int(state.get("hint_level", 0))))
     learner_state = state.get("learner_state", {})
@@ -167,7 +168,7 @@ def _question_intent(text: str) -> str:
     return ""
 
 
-def generate_socratic_question_node(state: Agent2State) -> Dict[str, str]:
+def generate_socratic_question_node(state: SocraticDialogueState) -> Dict[str, str]:
     learner_state = state.get("learner_state", {})
     latest_answer = learner_state.get("latestAnswer", {})
     validation_feedback = state.get("validation", {}).get("failedRules", [])
@@ -199,17 +200,18 @@ def generate_socratic_question_node(state: Agent2State) -> Dict[str, str]:
         else "Always respond in natural, concise English."
     )
     prompt = f"""
-You are Agent 2, the Socratic Questioning Agent and the only student-facing
+You are the Socratic Dialogue Agent and the only student-facing
 question generator.
 
 Language requirement: {language_requirement}
 Keep Python identifiers, code, input examples, and error messages unchanged.
 
 Stage: {state.get('stage', 'coding')}
-Diagnosis from Agent 1 or Agent 3:
+Diagnosis from the Problem Understanding Agent or Code Diagnosis Agent:
 - issue_type: {state.get('issue_type', 'none')}
 - misconception: {state.get('misconception', 'none')}
-Learner state from Agent 4:
+- diagnostic evidence: {state.get('diagnosis_evidence', 'none')}
+Learner state from the Learning State Monitor:
 - student_state: {state.get('student_state', 'beginner')}
 - hint_level: {state.get('hint_level', 0)}
 Selected strategy: {state.get('action', 'ASK_METACOGNITIVE')}
@@ -238,8 +240,11 @@ Strategy rules:
   executable syntax, exact identifiers, or a complete task-specific answer.
 - If issue_type is REQUEST_PLAN, ask the student to summarize the reasoning they
   developed in the Plan section before coding.
-- In debugging, use Agent 3's issue_type and misconception as the sole diagnostic
-  focus. Never ask about writing, reviewing, or translating the Plan.
+- In debugging, ground the question in the Code Diagnosis Agent's issue_type,
+  misconception, and diagnostic evidence. Treat the evidence as an internal clue:
+  never quote it as a hidden answer, claim more than it supports, identify the exact
+  fix, or reveal the corrected code. Never ask about writing, reviewing, or
+  translating the Plan.
 - For a student-requested smaller_hint, make level 1 conceptual and broad, level 2
   focused on the relevant structure, and level 3 a tiny analogous example. Use the
   learner's current code and misconception to choose the focus, but never reveal the
@@ -278,7 +283,7 @@ unless it materially improves clarity. Do not praise an incorrect answer.
     return {"final_question": _clean_question(base_llm_call(prompt, user_content))}
 
 
-def validate_question_node(state: Agent2State) -> Dict[str, Any]:
+def validate_question_node(state: SocraticDialogueState) -> Dict[str, Any]:
     question = state.get("final_question", "").strip()
     history = _history_text(state.get("conversation_history", []))
     learner_state = state.get("learner_state", {})
@@ -301,6 +306,7 @@ outline, but never executable or corrected code. Do not output chain-of-thought.
         f"Intervention path: {state.get('intervention_path')}\n"
         f"Stage: {state.get('stage')}\n"
         f"Current focus: {learner_state.get('currentFocus', state.get('issue_type'))}\n"
+        f"Diagnostic evidence: {state.get('diagnosis_evidence', '(none)')}\n"
         f"Hint level: {state.get('hint_level', 0)}\n"
         f"Latest answer: {learner_state.get('latestAnswer', {})}\n"
         f"Conversation history:\n{history}"
@@ -368,7 +374,7 @@ outline, but never executable or corrected code. Do not output chain-of-thought.
     }
 
 
-def route_after_validation(state: Agent2State):
+def route_after_validation(state: SocraticDialogueState):
     if state.get("validation", {}).get("valid", False):
         return END
     if state.get("retry_count", 0) <= 1:
@@ -379,7 +385,7 @@ def route_after_validation(state: Agent2State):
     return END
 
 
-builder = StateGraph(Agent2State)
+builder = StateGraph(SocraticDialogueState)
 builder.add_node("select_question_strategy", select_question_strategy_node)
 builder.add_node("generate_socratic_question", generate_socratic_question_node)
 builder.add_node("validate_question", validate_question_node)
@@ -388,4 +394,4 @@ builder.add_edge("select_question_strategy", "generate_socratic_question")
 builder.add_edge("generate_socratic_question", "validate_question")
 builder.add_conditional_edges("validate_question", route_after_validation)
 
-agent2_graph = builder.compile()
+socratic_dialogue_graph = builder.compile()

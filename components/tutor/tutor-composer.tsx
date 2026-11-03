@@ -14,6 +14,7 @@ export function TutorComposer({
   showHint = false,
   hintLevel = 0,
   onHint,
+  onActivity,
 }: {
   status: TutorStatus;
   placeholder: string;
@@ -21,6 +22,7 @@ export function TutorComposer({
   showHint?: boolean;
   hintLevel?: number;
   onHint?: () => void;
+  onActivity?: () => void;
 }) {
   const [draft, setDraft] = useState("");
   const trimmed = draft.trim();
@@ -65,7 +67,10 @@ export function TutorComposer({
           maxLength={MAX_MESSAGE_LENGTH}
           rows={2}
           disabled={status === "thinking"}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            onActivity?.();
+          }}
           onKeyDown={(event) => {
             if (
               event.key === "Enter" &&

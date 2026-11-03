@@ -44,9 +44,11 @@ class TutorState(TypedDict, total=False):
     confusion_level: int
     is_stuck: bool
     hint_level: int
+    idle_duration_ms: int
     student_state: str
     issue_type: str
     misconception: str
+    diagnosis_evidence: str
     pedagogical_action: str
     intervention_path: str
     final_question: str

@@ -1,12 +1,12 @@
 from graph_state import TutorState
 from agent_services import (
     evaluate_tutor_answer,
-    run_agent1_personalized,
-    run_agent3_diagnosis,
-    run_agent4_monitor,
-    run_agent5,
+    run_personalized_problem_understanding_agent,
+    run_code_diagnosis_agent,
+    run_learning_state_monitor_agent,
+    run_reflection_summary_agent,
 )
-from agent2_graph import agent2_graph
+from socratic_dialogue_graph import socratic_dialogue_graph
 from user_study_config import get_intervention
 
 
@@ -77,7 +77,7 @@ def _short_term_context_for_answer_evaluator(state: TutorState) -> list[dict]:
     return context
 
 
-def plan_agent(state: TutorState) -> TutorState:
+def problem_understanding_agent(state: TutorState) -> TutorState:
     plan_form = state.get("plan_form", {})
     steps = plan_form.get("steps", [])
     previous_answers = [
@@ -92,7 +92,7 @@ def plan_agent(state: TutorState) -> TutorState:
         previous_answers.append(latest_answer)
     accumulated_answers = "\n".join(answer for answer in previous_answers if answer.strip())
 
-    result = run_agent1_personalized(
+    result = run_personalized_problem_understanding_agent(
         problem=state.get("problem_content", ""),
         approach=plan_form.get("approach", "") or "",
         steps="\n".join(steps) if isinstance(steps, list) else str(steps or ""),
@@ -102,11 +102,23 @@ def plan_agent(state: TutorState) -> TutorState:
     )
 
     can_enter_coding = bool(result.get("can_enter_coding", False))
-    message = (
-        result.get("message")
-        or result.get("guide_question")
-        or "关于这份计划，你接下来准备补充什么？"
-    )
+    response_language = state.get("response_language", "en")
+    if can_enter_coding:
+        message = (
+            "这份计划已经可以支持你开始实现了。"
+            if response_language == "zh"
+            else "Your plan is ready to support implementation."
+        )
+    else:
+        message = (
+            result.get("message")
+            or result.get("guide_question")
+            or (
+                "关于这份计划，你接下来准备补充什么？"
+                if response_language == "zh"
+                else "What would you add to this plan next?"
+            )
+        )
 
     state["understanding_score"] = result.get("understanding_score", 0)
     state["missing_steps"] = result.get("missing_steps", [])
@@ -129,20 +141,21 @@ def plan_agent(state: TutorState) -> TutorState:
 
     _append_trace(
         state,
-        "Agent 1",
+        "Problem Understanding Agent",
         "Problem understanding",
         f"action={result.get('action', 'unknown')}, plan_complete={result.get('current_state', {}).get('plan_complete', False)}",
     )
     return state
 
 
-def code_analysis_agent(state: TutorState) -> TutorState:
+def code_diagnosis_agent(state: TutorState) -> TutorState:
     if not state.get("student_code", "").strip():
         state["code_error_type"] = "no_error"
         state["issue_type"] = "no_error"
+        state["diagnosis_evidence"] = ""
         return state
 
-    result = run_agent3_diagnosis(
+    result = run_code_diagnosis_agent(
         problem=state.get("problem_content", ""),
         code=state.get("student_code", ""),
         execution_result=state.get("execution_result", ""),
@@ -150,23 +163,29 @@ def code_analysis_agent(state: TutorState) -> TutorState:
     state["code_error_type"] = result.get("issue_type", "logical_error")
     state["issue_type"] = state["code_error_type"]
     state["misconception"] = result.get("misconception", "")
+    state["diagnosis_evidence"] = result.get("evidence", "")
     diagnostic_prefix = "failed diagnostic tags:"
     for line in state.get("execution_result", "").splitlines():
         if line.lower().startswith(diagnostic_prefix):
             first_tag = line.split(":", 1)[1].split(",", 1)[0].strip()
             if first_tag:
                 state["misconception"] = first_tag
+                state["diagnosis_evidence"] = (
+                    f"{state['diagnosis_evidence']}; failed diagnostic tag: {first_tag}"
+                    if state["diagnosis_evidence"]
+                    else f"failed diagnostic tag: {first_tag}"
+                )
             break
     _append_trace(
         state,
-        "Agent 3",
+        "Code Diagnosis Agent",
         "Code analysis",
-        f"issue_type={state['code_error_type']}",
+        f"issue_type={state['code_error_type']}, evidence_available={bool(state['diagnosis_evidence'])}",
     )
     return state
 
 
-def answer_evaluation_agent(state: TutorState) -> TutorState:
+def student_answer_evaluator(state: TutorState) -> TutorState:
     latest_answer = state.get("student_answer", "") or ""
     if not latest_answer.strip():
         return state
@@ -185,10 +204,10 @@ def answer_evaluation_agent(state: TutorState) -> TutorState:
     )
     state["short_term_memory_context_count"] = len(memory_context)
     state["short_term_memory_used_by"] = (
-        ["answer_evaluation_agent"] if memory_context else []
+        ["student_answer_evaluator"] if memory_context else []
     )
     state["profile_memory_used_by"] = (
-        ["answer_evaluation_agent"] if profile_summary else []
+        ["student_answer_evaluator"] if profile_summary else []
     )
     state["learner_state"] = learner_state
     diagnosis = learner_state.get("latestAnswer", {})
@@ -202,14 +221,14 @@ def answer_evaluation_agent(state: TutorState) -> TutorState:
     return state
 
 
-def monitor_agent(state: TutorState) -> TutorState:
+def learning_state_monitor(state: TutorState) -> TutorState:
     chat_history = "\n".join(
         f"{message.get('role', 'unknown')}: {message.get('content', '')}"
         for message in state.get("messages", [])
     ) or "(no messages yet)"
     learner_state = state.get("learner_state", {})
     latest_answer = learner_state.get("latestAnswer", {})
-    result = run_agent4_monitor(
+    result = run_learning_state_monitor_agent(
         chat_history=chat_history,
         issue_type=state.get("issue_type", "no_error"),
         current_hint_level=state.get("hint_level", 0),
@@ -218,6 +237,8 @@ def monitor_agent(state: TutorState) -> TutorState:
         consecutive_off_target=int(learner_state.get("consecutiveOffTarget", 0) or 0),
         latest_answer_quality=latest_answer.get("quality", "uncertain"),
         latest_student_answer=state.get("student_answer", "") or "",
+        idle_duration_ms=int(state.get("idle_duration_ms", 0) or 0),
+        requested_action=state.get("action", "message"),
     )
     state["student_state"] = result.get("student_state", "beginner")
     state["confusion_level"] = result.get("confusion_level", 0)
@@ -225,7 +246,7 @@ def monitor_agent(state: TutorState) -> TutorState:
     monitored_hint_level = result.get("hint_level", state.get("hint_level", 0))
     state["hint_level"] = (
         min(3, int(state.get("hint_level", 0) or 0) + 1)
-        if state.get("action") == "smaller_hint"
+        if state.get("action") in {"smaller_hint", "idle_help"}
         else monitored_hint_level
     )
     learner_state["hintLevel"] = state["hint_level"]
@@ -233,14 +254,14 @@ def monitor_agent(state: TutorState) -> TutorState:
     state["learner_state"] = learner_state
     _append_trace(
         state,
-        "Agent 4",
+        "Learning State Monitor",
         "Learning monitor",
         f"student_state={state['student_state']}, is_stuck={state['is_stuck']}, hint_level={state['hint_level']}",
     )
     return state
 
 
-def socratic_agent(state: TutorState) -> TutorState:
+def socratic_dialogue_agent(state: TutorState) -> TutorState:
     learner_state = dict(state.get("learner_state", {}))
     if state.get("stage") == "debug":
         diagnostic_focus = state.get("issue_type") or learner_state.get("currentFocus") or "logical_error"
@@ -295,13 +316,15 @@ def socratic_agent(state: TutorState) -> TutorState:
             "instruction": "Respond to the Python implementation request directly with a small conceptual hint, then ask one focused question.",
         }
 
-    result = agent2_graph.invoke({
+    result = socratic_dialogue_graph.invoke({
+        "response_language": state.get("response_language", "en"),
         "problem": state.get("problem_content", ""),
         "student_code": state.get("student_code", ""),
         "conversation_history": state.get("messages", []),
         "stage": state.get("stage", "coding"),
         "issue_type": state.get("issue_type", "no_error"),
         "misconception": state.get("misconception", ""),
+        "diagnosis_evidence": state.get("diagnosis_evidence", ""),
         "student_state": state.get("student_state", "beginner"),
         "hint_level": state.get("hint_level", 0),
         "requested_action": state.get("action", "message"),
@@ -340,31 +363,32 @@ def socratic_agent(state: TutorState) -> TutorState:
     )
     _append_trace(
         state,
-        "Agent 2",
+        "Socratic Dialogue Agent",
         "Socratic dialogue",
         f"stage={state['stage']}, path={state['intervention_path']}, action={state['pedagogical_action']}, hint_level={state['hint_level']}, validated={state['question_validation'].get('valid', False)}",
     )
     return state
 
 
-def assessment_agent(state: TutorState) -> TutorState:
+def reflection_summary_agent(state: TutorState) -> TutorState:
     chat_history = "\n".join(
         f"{message.get('role', 'unknown')}: {message.get('content', '')}"
         for message in state.get("messages", [])
     ) or "(no messages yet)"
-    result = run_agent5(
+    result = run_reflection_summary_agent(
         problem=state.get("problem_content", ""),
         code=state.get("student_code", ""),
         error_records=[],
         chat_history=chat_history,
         reflection_text=state.get("student_reflection", ""),
+        response_language=state.get("response_language", "en"),
     )
     state["learning_summary"] = result.get("summary", "")
     state["tutor_message"] = state["learning_summary"]
     state["question_type"] = "reflection"
     _append_trace(
         state,
-        "Agent 5",
+        "Reflection Summary Agent",
         "Reflection assessment",
         "Generated learning summary.",
     )

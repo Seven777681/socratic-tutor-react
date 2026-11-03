@@ -20,6 +20,7 @@ export type TutorActionType =
   | "message"
   | "rephrase"
   | "smaller_hint"
+  | "idle_help"
   | "check_reasoning"
   | "debug"
   | "check_edge_cases"
@@ -120,6 +121,7 @@ export interface TutorRequest {
   };
   latestPrediction?: string;
   hintLevel?: number;
+  idleDurationMs?: number;
   conversationId: string;
   stage: GuidanceStage;
   entryPath: "understand" | "plan" | "code";

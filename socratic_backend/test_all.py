@@ -1,31 +1,37 @@
-from agent_services import run_agent1, run_agent2, run_agent3, run_agent4, run_agent5
+from agent_services import (
+    run_basic_learning_state_monitor,
+    run_problem_understanding_agent,
+    run_reflection_summary_agent,
+    run_socratic_dialogue_agent,
+    run_static_code_analysis_agent,
+)
 
 
 def main():
     # Test problem: Calculate the average of three scores
     problem = "Input three integer scores and calculate their average value."
 
-    print("=== Testing Agent 1 (Plan Review) ===")
+    print("=== Testing Problem Understanding Agent ===")
     approach = "Add the three scores and divide by 3."
     steps = ["1. Input three scores", "2. Calculate the sum", "3. Divide the sum by 3"]
-    agent1_result = run_agent1(problem, approach, "\n".join(steps))
-    print(agent1_result)
+    understanding_result = run_problem_understanding_agent(problem, approach, "\n".join(steps))
+    print(understanding_result)
 
-    print("\n=== Testing Agent 3 (Code Analysis) ===")
+    print("\n=== Testing Code Analysis Agent ===")
     code = "a = 90\nb = 80\nc = 70\ntotal = a + b + c\navg = total / 2\nprint(avg)"
     predict_output = "80"
-    agent3_result = run_agent3(problem, code, predict_output)
-    print(agent3_result)
+    code_analysis_result = run_static_code_analysis_agent(problem, code, predict_output)
+    print(code_analysis_result)
 
-    print("\n=== Testing Agent 4 (Metacognitive Monitoring) ===")
+    print("\n=== Testing Learning State Monitor ===")
     chat_history = "Student keeps getting wrong average results."
     error_records = ["Calculation Error"]
     idle_over_1min = True
-    agent4_result = run_agent4(chat_history, error_records, idle_over_1min)
-    print(agent4_result)
+    monitor_result = run_basic_learning_state_monitor(chat_history, error_records, idle_over_1min)
+    print(monitor_result)
 
-    print("\n=== Testing Agent 2 (Socratic Dialogue) ===")
-    agent2_result = run_agent2(
+    print("\n=== Testing Socratic Dialogue Agent ===")
+    dialogue_result = run_socratic_dialogue_agent(
         problem=problem,
         code=code,
         error_type="Calculation Error",
@@ -34,17 +40,17 @@ def main():
         hint_level=1,
         chat_history="Student keeps getting wrong average results."
     )
-    print(agent2_result)
+    print(dialogue_result)
 
-    print("\n=== Testing Agent 5 (Reflection Summary) ===")
-    agent5_result = run_agent5(
+    print("\n=== Testing Reflection Summary Agent ===")
+    reflection_result = run_reflection_summary_agent(
         problem=problem,
         code=code,
         error_records=["Calculation Error"],
         chat_history="Student made calculation error in average calculation.",
         reflection_text="I confused dividing by 2 instead of 3."
     )
-    print(agent5_result)
+    print(reflection_result)
 
 
 if __name__ == "__main__":

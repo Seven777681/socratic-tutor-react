@@ -1,0 +1,648 @@
+{
+  "schema_version": 1,
+  "name": "Socratic Tutor fixed dialogue regression set",
+  "description": "Stable dialogue cases for evaluating language, learning-state updates, Socratic strategy, repetition, stage progression, debugging, hints, memory use, and reflection.",
+  "global_assertions": {
+    "max_student_facing_questions": 1,
+    "must_not_reveal_complete_solution": true,
+    "must_not_claim_unseen_student_evidence": true,
+    "must_preserve_python_identifiers": true,
+    "must_follow_latest_student_message_language": true
+  },
+  "cases": [
+    {
+      "id": "understand-goal-correct-en",
+      "category": "understanding",
+      "title": "Correct goal answer advances focus",
+      "task_id": "qb-find-maximum",
+      "input": {
+        "ui_language": "en",
+        "stage": "understand",
+        "current_focus": "problem_goal",
+        "hint_level": 0,
+        "conversation": [
+          {"role": "tutor", "content": "What is the program trying to find?"}
+        ],
+        "student_message": "It needs to find the largest number in the input list.",
+        "current_code": ""
+      },
+      "expected": {
+        "response_language": "en",
+        "answer_quality": "correct",
+        "focus_must_change": true,
+        "allowed_next_focus": ["input", "algorithm", "plan_submission"],
+        "must_not_repeat": ["What is the program trying to find?"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "understand-goal-vague-en",
+      "category": "understanding",
+      "title": "Vague goal answer stays on one missing idea",
+      "task_id": "qb-find-maximum",
+      "input": {
+        "ui_language": "en",
+        "stage": "understand",
+        "current_focus": "problem_goal",
+        "hint_level": 0,
+        "conversation": [
+          {"role": "tutor", "content": "What result should this program produce?"}
+        ],
+        "student_message": "It processes some numbers.",
+        "current_code": ""
+      },
+      "expected": {
+        "response_language": "en",
+        "answer_quality": "partial",
+        "focus_must_change": false,
+        "allowed_strategies": ["ASK_CONCEPTUAL", "ASK_METACOGNITIVE"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "understand-multiple-concepts-zh",
+      "category": "understanding",
+      "title": "One answer can resolve several concepts",
+      "task_id": "qb-loop-sum",
+      "input": {
+        "ui_language": "zh",
+        "stage": "understand",
+        "current_focus": "problem_goal",
+        "hint_level": 0,
+        "conversation": [],
+        "student_message": "程序读入一个整数 n，然后把 1 到 n 的所有整数累加，最后输出总和。",
+        "current_code": ""
+      },
+      "expected": {
+        "response_language": "zh",
+        "answer_quality": "correct",
+        "resolved_concepts_must_include": ["problem_goal", "input", "output", "algorithm"],
+        "allowed_next_focus": ["plan_submission", "plan_complete"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "understand-off-target-zh",
+      "category": "understanding",
+      "title": "Off-target answer is not treated as mastery",
+      "task_id": "qb-even-odd-counter",
+      "input": {
+        "ui_language": "zh",
+        "stage": "understand",
+        "current_focus": "input",
+        "hint_level": 0,
+        "conversation": [
+          {"role": "tutor", "content": "这个程序会接收什么输入？"}
+        ],
+        "student_message": "我觉得可以用 if。",
+        "current_code": ""
+      },
+      "expected": {
+        "response_language": "zh",
+        "answer_quality": "off_target",
+        "focus_must_change": false,
+        "expected_focus": "input",
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "language-chinese-question-english-ui",
+      "category": "language",
+      "title": "Chinese question overrides English UI",
+      "task_id": "qb-first-while-loop",
+      "input": {
+        "ui_language": "en",
+        "stage": "code",
+        "current_focus": "coding_progress",
+        "hint_level": 1,
+        "conversation": [],
+        "student_message": "为什么这个循环一直没有停止？",
+        "current_code": "number = 1\nwhile number <= 3:\n    print(number)"
+      },
+      "expected": {
+        "response_language": "zh",
+        "allowed_strategies": ["ASK_METACOGNITIVE", "ASK_TECHNICAL"],
+        "must_reference_current_code": true,
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "language-english-question-chinese-ui",
+      "category": "language",
+      "title": "English question overrides Chinese UI",
+      "task_id": "qb-range-count",
+      "input": {
+        "ui_language": "zh",
+        "stage": "code",
+        "current_focus": "coding_progress",
+        "hint_level": 1,
+        "conversation": [],
+        "student_message": "Why does range(1, 5) stop before printing 5?",
+        "current_code": "for number in range(1, 5):\n    print(number)"
+      },
+      "expected": {
+        "response_language": "en",
+        "allowed_strategies": ["ASK_CONCEPTUAL", "ASK_TECHNICAL"],
+        "must_preserve_terms": ["range(1, 5)"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "language-chinese-with-python-identifiers",
+      "category": "language",
+      "title": "Chinese question keeps Python identifiers unchanged",
+      "task_id": "qb-first-variable",
+      "input": {
+        "ui_language": "en",
+        "stage": "code",
+        "current_focus": "coding_progress",
+        "hint_level": 1,
+        "conversation": [],
+        "student_message": "我应该怎样给 language 变量赋值？",
+        "current_code": "language = \"\"\nprint(language)"
+      },
+      "expected": {
+        "response_language": "zh",
+        "must_preserve_terms": ["language"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true,
+        "must_not_contain": ["language = \"Python\""]
+      }
+    },
+    {
+      "id": "plan-empty-needs-start",
+      "category": "planning",
+      "title": "Empty plan receives one small starting question",
+      "task_id": "qb-number-converter",
+      "input": {
+        "ui_language": "en",
+        "stage": "plan",
+        "current_focus": "problem_goal",
+        "hint_level": 0,
+        "planning_data": {"status": "editing", "approach": "", "steps": []},
+        "conversation": [],
+        "student_message": "I do not know how to start.",
+        "current_code": ""
+      },
+      "expected": {
+        "response_language": "en",
+        "can_enter_coding": false,
+        "allowed_strategies": ["ASK_CONCEPTUAL", "ASK_METACOGNITIVE"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "plan-partial-targets-missing-step",
+      "category": "planning",
+      "title": "Partial plan targets only the missing conversion step",
+      "task_id": "qb-number-converter",
+      "input": {
+        "ui_language": "en",
+        "stage": "plan",
+        "current_focus": "algorithm",
+        "hint_level": 1,
+        "planning_data": {
+          "status": "reviewing",
+          "approach": "Read two values and print their sum.",
+          "steps": ["Read both values", "Add them", "Print the result"]
+        },
+        "conversation": [],
+        "student_message": "This is my plan.",
+        "current_code": ""
+      },
+      "expected": {
+        "response_language": "en",
+        "can_enter_coding": false,
+        "expected_focus": "algorithm",
+        "must_include_any": ["number", "integer", "convert", "type"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "plan-sufficient-allows-coding",
+      "category": "planning",
+      "title": "Sufficient plan advances instead of asking more basics",
+      "task_id": "qb-find-maximum",
+      "input": {
+        "ui_language": "en",
+        "stage": "plan",
+        "current_focus": "plan_submission",
+        "hint_level": 0,
+        "planning_data": {
+          "status": "reviewing",
+          "approach": "Track the largest value seen so far.",
+          "steps": ["Read the numbers", "Use the first value as the current largest", "Compare each remaining value and update the largest", "Print the largest"]
+        },
+        "conversation": [],
+        "student_message": "I will compare each value and update the stored maximum when needed.",
+        "current_code": ""
+      },
+      "expected": {
+        "response_language": "en",
+        "can_enter_coding": true,
+        "expected_focus": "plan_complete",
+        "must_not_repeat_basic_concepts": ["program goal", "input", "output"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "code-specific-python-request",
+      "category": "coding",
+      "title": "Concrete Python request receives a relevant conceptual hint",
+      "task_id": "qb-find-maximum",
+      "input": {
+        "ui_language": "en",
+        "stage": "code",
+        "current_focus": "coding_progress",
+        "hint_level": 1,
+        "conversation": [],
+        "student_message": "How do I initialize the maximum from the first list item in Python?",
+        "current_code": "numbers = list(map(int, input().split()))\nlargest = 0"
+      },
+      "expected": {
+        "response_language": "en",
+        "allowed_strategies": ["ASK_TECHNICAL", "PROVIDE_EXAMPLE"],
+        "must_address_specific_request": true,
+        "max_questions": 1,
+        "must_not_reveal_solution": true,
+        "must_not_contain": ["largest = numbers[0]"]
+      }
+    },
+    {
+      "id": "debug-syntax-error",
+      "category": "debugging",
+      "title": "Syntax error question points to structure without fixing code",
+      "task_id": "qb-first-if",
+      "input": {
+        "ui_language": "en",
+        "stage": "debug",
+        "current_focus": "syntax_error",
+        "hint_level": 1,
+        "conversation": [],
+        "student_message": "I do not understand this syntax error.",
+        "current_code": "number = int(input())\nif number > 0\n    print(\"Positive\")",
+        "latest_run_result": {"status": "error", "stderr": "SyntaxError: expected ':'", "error_type": "SyntaxError"}
+      },
+      "expected": {
+        "response_language": "en",
+        "allowed_strategies": ["ASK_TECHNICAL", "PROVIDE_EXAMPLE"],
+        "must_use_error_evidence": true,
+        "max_questions": 1,
+        "must_not_reveal_solution": true,
+        "must_not_contain": ["if number > 0:"]
+      }
+    },
+    {
+      "id": "debug-runtime-name-error-zh",
+      "category": "debugging",
+      "title": "Runtime error follows Chinese question",
+      "task_id": "qb-update-variable",
+      "input": {
+        "ui_language": "en",
+        "stage": "debug",
+        "current_focus": "runtime_error",
+        "hint_level": 1,
+        "conversation": [],
+        "student_message": "为什么说 score 没有定义？",
+        "current_code": "score = 5\nscroe = score + 2\nprint(scroe)",
+        "latest_run_result": {"status": "error", "stderr": "NameError: name 'score' is not defined", "error_type": "NameError"}
+      },
+      "expected": {
+        "response_language": "zh",
+        "must_preserve_terms": ["score"],
+        "must_use_error_evidence": true,
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "debug-logical-off-by-one",
+      "category": "debugging",
+      "title": "Wrong output prompts a trace or boundary comparison",
+      "task_id": "qb-range-count",
+      "input": {
+        "ui_language": "en",
+        "stage": "debug",
+        "current_focus": "logical_error",
+        "hint_level": 1,
+        "conversation": [],
+        "student_message": "It prints 1 to 4, but I expected 1 to 5.",
+        "current_code": "for number in range(1, 5):\n    print(number)",
+        "latest_run_result": {"status": "failed", "stdout": "1\n2\n3\n4", "error_type": "WrongOutput"}
+      },
+      "expected": {
+        "response_language": "en",
+        "allowed_strategies": ["ASK_METACOGNITIVE", "ASK_TECHNICAL"],
+        "must_include_any": ["stop", "range", "last"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true,
+        "must_not_contain": ["range(1, 6)"]
+      }
+    },
+    {
+      "id": "successful-run-checks-edge-case",
+      "category": "evaluation",
+      "title": "Successful visible run leads to reasoning or edge-case check",
+      "task_id": "qb-find-maximum",
+      "input": {
+        "ui_language": "en",
+        "stage": "reflect",
+        "current_focus": "reflection_learning",
+        "hint_level": 0,
+        "conversation": [],
+        "student_message": "The example test passes now.",
+        "current_code": "numbers = list(map(int, input().split()))\nlargest = numbers[0]\nfor value in numbers[1:]:\n    if value > largest:\n        largest = value\nprint(largest)",
+        "latest_run_result": {"status": "success", "stdout": "9", "passed_tests": 1, "total_tests": 1}
+      },
+      "expected": {
+        "response_language": "en",
+        "allowed_strategies": ["ASK_METACOGNITIVE", "SUMMARIZE_RULE", "ALLOW_NEXT_STEP"],
+        "must_include_any": ["negative", "edge", "why", "first"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "hint-level-one-broad",
+      "category": "hinting",
+      "title": "First hint remains broad",
+      "task_id": "qb-even-odd-counter",
+      "input": {
+        "ui_language": "en",
+        "stage": "code",
+        "current_focus": "coding_progress",
+        "hint_level": 1,
+        "conversation": [],
+        "student_message": "Can I have a hint?",
+        "current_code": "number = int(input())"
+      },
+      "expected": {
+        "response_language": "en",
+        "allowed_strategies": ["ASK_CONCEPTUAL", "ASK_METACOGNITIVE"],
+        "hint_specificity": "broad",
+        "max_questions": 1,
+        "must_not_reveal_solution": true,
+        "must_not_contain": ["number % 2", "== 0"]
+      }
+    },
+    {
+      "id": "hint-level-two-focused",
+      "category": "hinting",
+      "title": "Second hint names the relevant concept",
+      "task_id": "qb-even-odd-counter",
+      "input": {
+        "ui_language": "en",
+        "stage": "code",
+        "current_focus": "coding_progress",
+        "hint_level": 2,
+        "conversation": [
+          {"role": "tutor", "content": "What property distinguishes even and odd numbers?"},
+          {"role": "student", "content": "I am still not sure."}
+        ],
+        "student_message": "Please make the hint more specific.",
+        "current_code": "number = int(input())"
+      },
+      "expected": {
+        "response_language": "en",
+        "allowed_strategies": ["ASK_TECHNICAL", "PROVIDE_EXAMPLE"],
+        "hint_specificity": "focused",
+        "must_include_any": ["remainder", "divisible", "modulo"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true,
+        "must_not_contain": ["if number % 2 == 0"]
+      }
+    },
+    {
+      "id": "hint-level-three-analogy",
+      "category": "hinting",
+      "title": "Third hint may provide a tiny analogous example",
+      "task_id": "qb-even-odd-counter",
+      "input": {
+        "ui_language": "en",
+        "stage": "code",
+        "current_focus": "coding_progress",
+        "hint_level": 3,
+        "conversation": [
+          {"role": "tutor", "content": "What remainder would an even number have after division by 2?"},
+          {"role": "student", "content": "I still cannot connect that to the condition."}
+        ],
+        "student_message": "Show me a small example, but not the answer.",
+        "current_code": "number = int(input())"
+      },
+      "expected": {
+        "response_language": "en",
+        "allowed_strategies": ["PROVIDE_EXAMPLE", "PROVIDE_PSEUDOCODE"],
+        "hint_specificity": "analogy",
+        "max_questions": 1,
+        "must_not_reveal_solution": true,
+        "must_not_contain": ["if number % 2 == 0", "print(\"Even\")"]
+      }
+    },
+    {
+      "id": "repetition-avoid-same-intent",
+      "category": "repetition",
+      "title": "Tutor does not rephrase the same question repeatedly",
+      "task_id": "qb-first-while-loop",
+      "input": {
+        "ui_language": "en",
+        "stage": "debug",
+        "current_focus": "logical_error",
+        "hint_level": 2,
+        "conversation": [
+          {"role": "tutor", "content": "What changes the value of number during each loop iteration?"},
+          {"role": "student", "content": "I do not know."},
+          {"role": "tutor", "content": "Which statement updates number before the condition is checked again?"}
+        ],
+        "student_message": "I still do not understand.",
+        "current_code": "number = 1\nwhile number <= 3:\n    print(number)"
+      },
+      "expected": {
+        "response_language": "en",
+        "must_change_question_intent": true,
+        "allowed_strategies": ["PROVIDE_EXAMPLE", "PROVIDE_PSEUDOCODE"],
+        "must_not_repeat": ["what changes number", "which statement updates number"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "direct-answer-request-resists-solution",
+      "category": "safety_pedagogy",
+      "title": "Direct solution request still advances learning",
+      "task_id": "qb-loop-sum",
+      "input": {
+        "ui_language": "en",
+        "stage": "code",
+        "current_focus": "coding_progress",
+        "hint_level": 2,
+        "conversation": [],
+        "student_message": "Just give me the complete code so I can submit it.",
+        "current_code": "n = int(input())"
+      },
+      "expected": {
+        "response_language": "en",
+        "allowed_strategies": ["ASK_TECHNICAL", "PROVIDE_PSEUDOCODE"],
+        "must_acknowledge_intent": true,
+        "max_questions": 1,
+        "must_not_reveal_solution": true,
+        "must_not_contain": ["for i in range(1, n + 1)", "```python"]
+      }
+    },
+    {
+      "id": "correct-answer-does-not-repeat",
+      "category": "state_progression",
+      "title": "Correct answer resolves focus immediately",
+      "task_id": "qb-range-count",
+      "input": {
+        "ui_language": "en",
+        "stage": "understand",
+        "current_focus": "output",
+        "hint_level": 0,
+        "conversation": [
+          {"role": "tutor", "content": "Which values should be printed?"}
+        ],
+        "student_message": "It should print the integers 1, 2, 3, 4, and 5, each on its own line.",
+        "current_code": ""
+      },
+      "expected": {
+        "response_language": "en",
+        "answer_quality": "correct",
+        "focus_must_change": true,
+        "must_not_repeat": ["which values should be printed", "what should the output be"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "language-switch-current-message-wins",
+      "category": "language",
+      "title": "Latest English message overrides earlier Chinese conversation",
+      "task_id": "qb-first-comparison",
+      "input": {
+        "ui_language": "zh",
+        "stage": "code",
+        "current_focus": "coding_progress",
+        "hint_level": 1,
+        "conversation": [
+          {"role": "student", "content": "我不理解比较运算。"},
+          {"role": "tutor", "content": "你希望比较哪两个值？"}
+        ],
+        "student_message": "Can you explain what the greater-than operator checks?",
+        "current_code": "first = int(input())\nsecond = int(input())"
+      },
+      "expected": {
+        "response_language": "en",
+        "must_follow_latest_message": true,
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "reflection-summary-zh",
+      "category": "reflection",
+      "title": "Chinese reflection receives a Chinese learning summary",
+      "task_id": "qb-find-maximum",
+      "input": {
+        "ui_language": "en",
+        "stage": "reflect",
+        "current_focus": "reflection_learning",
+        "hint_level": 0,
+        "conversation": [],
+        "student_message": "我学会了不能把最大值初始化为 0，因为输入可能全部是负数。",
+        "current_code": "numbers = list(map(int, input().split()))\nlargest = numbers[0]\nfor value in numbers[1:]:\n    if value > largest:\n        largest = value\nprint(largest)"
+      },
+      "expected": {
+        "response_language": "zh",
+        "response_mode": "summary",
+        "must_include_any": ["负数", "初始化", "第一个值"],
+        "max_questions": 0,
+        "must_not_reveal_solution": false
+      }
+    },
+    {
+      "id": "reflection-summary-en",
+      "category": "reflection",
+      "title": "English reflection receives an English learning summary",
+      "task_id": "qb-first-while-loop",
+      "input": {
+        "ui_language": "zh",
+        "stage": "reflect",
+        "current_focus": "reflection_learning",
+        "hint_level": 0,
+        "conversation": [],
+        "student_message": "I learned that a while loop needs an update that eventually makes its condition false.",
+        "current_code": "number = 1\nwhile number <= 3:\n    print(number)\n    number += 1"
+      },
+      "expected": {
+        "response_language": "en",
+        "response_mode": "summary",
+        "must_include_any": ["condition", "update", "termination"],
+        "max_questions": 0,
+        "must_not_reveal_solution": false
+      }
+    },
+    {
+      "id": "memory-current-evidence-overrides-stale",
+      "category": "memory",
+      "title": "Current explicit evidence overrides stale misconception memory",
+      "task_id": "qb-integer-input",
+      "input": {
+        "ui_language": "en",
+        "stage": "code",
+        "current_focus": "coding_progress",
+        "hint_level": 0,
+        "task_memory": {
+          "active_misconception": "Student does not understand converting input text to an integer.",
+          "conversation_summary": "Student previously forgot int()."
+        },
+        "conversation": [],
+        "student_message": "I used int(input()) so the value is numeric before I add 1.",
+        "current_code": "number = int(input())\nprint(number + 1)"
+      },
+      "expected": {
+        "response_language": "en",
+        "current_evidence_has_priority": true,
+        "resolved_concepts_must_include": ["input_conversion"],
+        "must_not_repeat": ["how will you convert the input", "input is text"],
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    },
+    {
+      "id": "memory-unrelated-task-does-not-leak",
+      "category": "memory",
+      "title": "Unrelated task memory does not control the current response",
+      "task_id": "qb-string-formatter",
+      "input": {
+        "ui_language": "en",
+        "stage": "understand",
+        "current_focus": "problem_goal",
+        "hint_level": 0,
+        "user_profile": {
+          "struggling_concepts": ["while-loop termination"],
+          "profile_summary": "The learner previously struggled with while loops."
+        },
+        "conversation": [],
+        "student_message": "This task needs to print the exact text Hello, Python!",
+        "current_code": ""
+      },
+      "expected": {
+        "response_language": "en",
+        "must_ignore_unrelated_memory": ["while loop", "termination"],
+        "answer_quality": "correct",
+        "focus_must_change": true,
+        "max_questions": 1,
+        "must_not_reveal_solution": true
+      }
+    }
+  ]
+}

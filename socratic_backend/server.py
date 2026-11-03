@@ -106,6 +106,7 @@ class TutorRequest(BaseModel):
     planningData: Optional[PlanningData] = None
     latestPrediction: Optional[str] = None
     hintLevel: Optional[int] = 0
+    idleDurationMs: Optional[int] = 0
     conversationId: str
     stage: str
     entryPath: str
@@ -303,6 +304,25 @@ def _is_dialogue_reset_request(message: str) -> bool:
     )
 
 
+def _resolve_response_language(req: TutorRequest) -> str:
+    """Follow the student's latest written language; use the UI as fallback."""
+    language_source = req.studentMessage.strip()
+    if not language_source:
+        language_source = next(
+            (
+                message.content.strip()
+                for message in reversed(req.conversation)
+                if message.role == "student" and message.content.strip()
+            ),
+            "",
+        )
+    if re.search(r"[\u3400-\u9fff]", language_source):
+        return "zh"
+    if re.search(r"[A-Za-z]", language_source):
+        return "en"
+    return "zh" if req.uiLanguage == "zh" else "en"
+
+
 def get_tutor_content(req: TutorRequest, account_id: str):
     request_started = time.perf_counter()
     task_memory = memory_manager.load_task_memory(account_id, req.taskId)
@@ -365,7 +385,7 @@ def get_tutor_content(req: TutorRequest, account_id: str):
         "",
     )
     initial_state = {
-        "response_language": "zh" if req.uiLanguage == "zh" else "en",
+        "response_language": _resolve_response_language(req),
         "task_id": req.taskId,
         "problem_content": problem,
         "action": req.action,
@@ -422,6 +442,7 @@ def get_tutor_content(req: TutorRequest, account_id: str):
         "profile_memory_loaded": bool(user_profile_summary),
         "profile_memory_used_by": [],
         "hint_level": req.hintLevel or 0,
+        "idle_duration_ms": max(0, req.idleDurationMs or 0),
         "confusion_level": 0,
         "is_stuck": False,
         "code_error_type": "No Error",

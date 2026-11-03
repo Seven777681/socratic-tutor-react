@@ -58,9 +58,9 @@ so no field remapping is needed on either side.
 
 | Frontend stage/action | Agent(s) called |
 |---|---|
-| `stage === "plan"` or `action === "review_plan"` | Agent 1 (plan review) |
-| `action === "generate_reflection_summary"` | Agent 5 (reflection) |
-| everything else (coding/debugging) | Agent 3 (code analysis) → Agent 4 (monitor) → Agent 2 (Socratic dialogue) |
+| `stage === "plan"` or `action === "review_plan"` | Problem Understanding Agent |
+| `action === "generate_reflection_summary"` | Reflection Summary Agent |
+| everything else (coding/debugging) | Code Diagnosis Agent → Learning State Monitor → Socratic Dialogue Agent |
 
 ## Notes
 

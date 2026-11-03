@@ -2,13 +2,18 @@ import json
 import re
 
 from llm_base import base_llm_call
-from prompts import AGENT1_PROMPT, AGENT2_PROMPT, AGENT3_PROMPT, AGENT4_PROMPT, AGENT5_PROMPT
+from prompts import (
+    CODE_ANALYSIS_PROMPT,
+    LEARNING_STATE_MONITOR_PROMPT,
+    REFLECTION_SUMMARY_PROMPT,
+    SOCRATIC_DIALOGUE_PROMPT,
+)
 
 def _field_value(line: str):
     return line.split(":", 1)[1].strip()
 
-AGENT1_REACT_SYSTEM = """
-You are Agent1, the Problem Understanding Agent, using ReAct.
+PROBLEM_UNDERSTANDING_REACT_SYSTEM = """
+You are the Problem Understanding Agent, using ReAct.
 
 You may call exactly one tool per turn from this whitelist:
 - parse_problem_requirements
@@ -198,14 +203,14 @@ def score_understanding(requirements: dict, plan_analysis: dict):
         score += 1
     return max(0, min(10, score))
 
-def _agent1_tool_score_understanding(requirements: dict, plan_analysis: dict):
+def _score_plan_understanding(requirements: dict, plan_analysis: dict):
     score = score_understanding(requirements, plan_analysis)
     return {
         "understanding_score": score,
         "can_enter_coding": score >= 7,
     }
 
-def create_agent1_trace(requirements: dict, plan_analysis: dict, score: int):
+def create_problem_understanding_trace(requirements: dict, plan_analysis: dict, score: int):
     return [
         {
             "thought": "Understand the programming problem before judging the student's plan.",
@@ -226,7 +231,7 @@ def create_agent1_trace(requirements: dict, plan_analysis: dict, score: int):
         },
     ]
 
-AGENT1_TOOLS = {
+PROBLEM_UNDERSTANDING_TOOLS = {
     "parse_problem_requirements": lambda args: parse_problem_requirements(args.get("problem", "")),
     "analyze_student_state": lambda args: analyze_student_state(
         args.get("problem", ""),
@@ -254,7 +259,7 @@ def _parse_react_action(text: str):
         return None
     return action, action_input
 
-def _parse_agent1_final(text: str):
+def _parse_problem_understanding_final(text: str):
     if "Final Answer:" not in text:
         return None
     final_text = text.split("Final Answer:", 1)[1]
@@ -267,7 +272,7 @@ def _parse_agent1_final(text: str):
         return None
     return parsed if isinstance(parsed, dict) else None
 
-def _choose_agent1_action(state_info: dict):
+def _choose_problem_understanding_action(state_info: dict):
     state = state_info["current_state"]
     if state["plan_complete"]:
         return "ALLOW_CODING", "你的计划已经体现出足够的理解，可以开始编码了。"
@@ -279,7 +284,7 @@ def _choose_agent1_action(state_info: dict):
         return "ASK_ALGORITHM", "你准备通过哪些步骤逐步解决这道题？"
     return "REQUEST_PLAN", "请在编码前简要写下你的方法和步骤。"
 
-def _agent1_json_to_legacy(result: dict, state_info: dict | None = None):
+def _problem_understanding_json_to_result(result: dict, state_info: dict | None = None):
     state = (
         dict(state_info.get("current_state", {}))
         if state_info
@@ -294,7 +299,7 @@ def _agent1_json_to_legacy(result: dict, state_info: dict | None = None):
     score += 2 if state.get("input_output_understanding") else 0
     score += 2 if state.get("algorithm_idea") else 0
     score += 4 if plan_complete else 0
-    action, message = _choose_agent1_action({"current_state": state})
+    action, message = _choose_problem_understanding_action({"current_state": state})
 
     return {
         **result,
@@ -319,7 +324,7 @@ def _state_info_from_react_trace(trace: list[dict]):
             return observation
     return None
 
-def _run_agent1_react_loop(problem: str, approach: str, steps: str, student_answer: str = "", max_turns: int = 4):
+def _run_problem_understanding_react_loop(problem: str, approach: str, steps: str, student_answer: str = "", max_turns: int = 4):
     scratchpad = ""
     trace = []
     prompt_input = (
@@ -331,10 +336,10 @@ def _run_agent1_react_loop(problem: str, approach: str, steps: str, student_answ
 
     for _ in range(max_turns):
         response_text = base_llm_call(
-            AGENT1_REACT_SYSTEM,
+            PROBLEM_UNDERSTANDING_REACT_SYSTEM,
             f"{prompt_input}\nPrevious ReAct steps:\n{scratchpad}".strip(),
         )
-        final = _parse_agent1_final(response_text)
+        final = _parse_problem_understanding_final(response_text)
         if final:
             state_info = _state_info_from_react_trace(trace) or evaluate_learning_state_semantically(
                 problem,
@@ -343,16 +348,16 @@ def _run_agent1_react_loop(problem: str, approach: str, steps: str, student_answ
                 student_answer,
             )
             final["react_trace"] = trace
-            return _agent1_json_to_legacy(final, state_info)
+            return _problem_understanding_json_to_result(final, state_info)
 
         parsed = _parse_react_action(response_text)
         if not parsed:
             break
         action, action_input = parsed
-        if action not in AGENT1_TOOLS:
+        if action not in PROBLEM_UNDERSTANDING_TOOLS:
             break
 
-        observation = AGENT1_TOOLS[action](action_input)
+        observation = PROBLEM_UNDERSTANDING_TOOLS[action](action_input)
         thought_match = re.search(r"^Thought:\s*(.+)$", response_text, re.MULTILINE)
         thought = thought_match.group(1).strip() if thought_match else "Choose and execute the next tool."
         trace.append({
@@ -370,13 +375,13 @@ def _run_agent1_react_loop(problem: str, approach: str, steps: str, student_answ
 
     return None
 
-def _infer_agent1_fallback(problem: str, approach: str, steps: str, student_answer: str = ""):
+def _infer_problem_understanding_fallback(problem: str, approach: str, steps: str, student_answer: str = ""):
     requirements = parse_problem_requirements(problem)
     plan_analysis = analyze_plan_steps(approach, steps, student_answer)
     state_info = evaluate_learning_state_semantically(problem, approach, steps, student_answer)
     score = score_understanding(requirements, plan_analysis)
     missing_steps = plan_analysis["missing_steps"]
-    action, message = _choose_agent1_action(state_info)
+    action, message = _choose_problem_understanding_action(state_info)
     agent_json = {
         "reasoning_summary": "Updated the student's planning-stage learning state and selected the next pedagogical action.",
         "current_state": state_info["current_state"],
@@ -388,23 +393,23 @@ def _infer_agent1_fallback(problem: str, approach: str, steps: str, student_answ
         "understanding_score": score,
         "missing_steps": missing_steps,
         "can_enter_coding": action == "ALLOW_CODING",
-        "react_trace": create_agent1_trace(requirements, plan_analysis, score),
+        "react_trace": create_problem_understanding_trace(requirements, plan_analysis, score),
         "guide_question": message,
     }
 
-def run_agent1(problem: str, approach: str, steps: str, student_answer: str = ""):
-    react_result = _run_agent1_react_loop(problem, approach, steps, student_answer)
+def run_problem_understanding_agent(problem: str, approach: str, steps: str, student_answer: str = ""):
+    react_result = _run_problem_understanding_react_loop(problem, approach, steps, student_answer)
     if react_result:
-        fallback = _infer_agent1_fallback(problem, approach, steps, student_answer)
+        fallback = _infer_problem_understanding_fallback(problem, approach, steps, student_answer)
         result = {**fallback, **react_result}
         result["can_enter_coding"] = result.get("action") == "ALLOW_CODING" or result.get("can_enter_coding", False)
         if result["can_enter_coding"]:
             result["guide_question"] = result.get("message", "你的计划已经体现出足够的理解，可以开始编码了。")
         return result
 
-    return _infer_agent1_fallback(problem, approach, steps, student_answer)
+    return _infer_problem_understanding_fallback(problem, approach, steps, student_answer)
 
-def run_agent1_personalized(
+def run_personalized_problem_understanding_agent(
     problem: str,
     approach: str,
     steps: str,
@@ -415,7 +420,7 @@ def run_agent1_personalized(
     previous_learner_state = previous_learner_state or {}
     fallback = analyze_student_state(problem, approach, steps, accumulated_answers)
     prompt = """
-You are Agent 1, the Problem Understanding Agent. Diagnose the student's explicit
+You are the Problem Understanding Agent. Diagnose the student's explicit
 evidence during Planning. Do not teach, ask a question, or provide a solution.
 
 Return only valid JSON:
@@ -673,14 +678,14 @@ Rules:
         "can_enter_coding": can_enter_coding,
     }
 
-def run_agent2(problem: str, code: str, error_type: str, confusion_level: int, is_stuck: bool, hint_level: int, chat_history: str):
+def run_socratic_dialogue_agent(problem: str, code: str, error_type: str, confusion_level: int, is_stuck: bool, hint_level: int, chat_history: str):
     user_input = f"Problem: {problem}\nCode: {code}\nError Type: {error_type}\nConfusion Level: {confusion_level}\nIs Stuck: {is_stuck}\nHint Level: {hint_level}\nChat History: {chat_history}"
-    response_text = base_llm_call(AGENT2_PROMPT, user_input)
+    response_text = base_llm_call(SOCRATIC_DIALOGUE_PROMPT, user_input)
     return {"question": response_text.split("question:")[-1].strip()}
 
-def run_agent3(problem: str, code: str, predict_output: str):
+def run_static_code_analysis_agent(problem: str, code: str, predict_output: str):
     user_input = f"Problem: {problem}\nCode: {code}\nPredicted Output: {predict_output}"
-    response_text = base_llm_call(AGENT3_PROMPT, user_input)
+    response_text = base_llm_call(CODE_ANALYSIS_PROMPT, user_input)
     return {"error_type": response_text.split("error_type:")[-1].strip()}
 
 
@@ -782,9 +787,9 @@ Use only evidence written by the student. Do not output chain-of-thought.
     })
     return learner_state
 
-def run_agent3_diagnosis(problem: str, code: str, execution_result: str):
+def run_code_diagnosis_agent(problem: str, code: str, execution_result: str):
     prompt = """
-You are Agent 3, the Code Analysis Agent. Analyze the student's code and execution
+You are the Code Diagnosis Agent. Analyze the student's code and execution
 result for other agents. Do not address the student and do not fix the code.
 
 Return only valid JSON:
@@ -832,9 +837,9 @@ and an unsuitable overall procedure as algorithm_error. Do not output chain-of-t
         "evidence": str(parsed.get("evidence") or "execution result and code behavior do not align")[:180],
     }
 
-def run_agent4(chat_history: str, error_records: list, idle_over_1min: bool):
+def run_basic_learning_state_monitor(chat_history: str, error_records: list, idle_over_1min: bool):
     user_input = f"Chat History: {chat_history}\nError Records: {', '.join(error_records)}\nIdle Over 1min: {idle_over_1min}"
-    response_text = base_llm_call(AGENT4_PROMPT, user_input)
+    response_text = base_llm_call(LEARNING_STATE_MONITOR_PROMPT, user_input)
     result = {}
     for line in response_text.splitlines():
         if line.startswith("confusion_level:"):
@@ -843,7 +848,7 @@ def run_agent4(chat_history: str, error_records: list, idle_over_1min: bool):
             result["is_stuck"] = _field_value(line).lower() == "true"
     return result
 
-def run_agent4_monitor(
+def run_learning_state_monitor_agent(
     chat_history: str,
     issue_type: str,
     current_hint_level: int,
@@ -852,9 +857,11 @@ def run_agent4_monitor(
     consecutive_off_target: int = 0,
     latest_answer_quality: str = "uncertain",
     latest_student_answer: str = "",
+    idle_duration_ms: int = 0,
+    requested_action: str = "message",
 ):
     prompt = """
-You are Agent 4, the Metacognitive Monitoring Agent. Assess learner struggle from
+You are the Learning State Monitor. Assess learner struggle from
 conversation memory and the latest diagnostic signal. Do not speak to the student.
 
 Return only valid JSON:
@@ -866,8 +873,9 @@ Return only valid JSON:
 
 Set is_stuck true only when there is evidence such as repeated failed reasoning,
 repeated similar errors, repeated requests for an answer, or explicit inability to
-continue. One new error alone is not enough. confusion_level must be 0-3. Do not
-output chain-of-thought.
+continue. An idle duration counts as evidence only when requested_action is
+idle_help and it is at least 60000 milliseconds. One new error alone is not enough.
+confusion_level must be 0-3. Do not output chain-of-thought.
 """
     response_text = base_llm_call(
         prompt,
@@ -880,6 +888,8 @@ output chain-of-thought.
             f"\nConsecutive off-target answers: {consecutive_off_target}"
             f"\nLatest answer quality: {latest_answer_quality}"
             f"\nLatest student answer: {latest_student_answer}"
+            f"\nIdle duration milliseconds: {idle_duration_ms}"
+            f"\nRequested action: {requested_action}"
         ),
     )
     match = re.search(r"\{.*\}", response_text, re.DOTALL)
@@ -903,9 +913,11 @@ output chain-of-thought.
         token in lower_latest_answer
         for token in ("don't know", "do not know", "i'm stuck", "i am stuck", "不知道", "不会")
     )
+    idle_help_requested = requested_action == "idle_help" and idle_duration_ms >= 60_000
     is_stuck = (
         bool(parsed.get("is_stuck", False))
         or explicit_stuck
+        or idle_help_requested
         or attempts_on_focus >= 2
         or consecutive_off_target >= 2
     )
@@ -922,7 +934,22 @@ output chain-of-thought.
         "hint_level": hint_level,
     }
 
-def run_agent5(problem: str, code: str, error_records: list, chat_history: str, reflection_text: str):
+def run_reflection_summary_agent(
+    problem: str,
+    code: str,
+    error_records: list,
+    chat_history: str,
+    reflection_text: str,
+    response_language: str = "en",
+):
     user_input = f"Problem: {problem}\nCode: {code}\nError Records: {', '.join(error_records)}\nChat History: {chat_history}\nReflection: {reflection_text}"
-    response_text = base_llm_call(AGENT5_PROMPT, user_input)
+    language_instruction = (
+        "Always write the complete student-facing summary in natural Simplified Chinese."
+        if response_language == "zh"
+        else "Always write the complete student-facing summary in natural English."
+    )
+    response_text = base_llm_call(
+        f"{REFLECTION_SUMMARY_PROMPT}\n[Language Requirement]\n{language_instruction}",
+        user_input,
+    )
     return {"summary": response_text.split("summary:")[-1].strip()}

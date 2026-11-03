@@ -458,7 +458,11 @@ def log_intervention(*, session_id: str, task_id: str, state: dict, tutor_questi
         "student_plan": state.get("plan_form", {}), "student_code": state.get("student_code", ""),
         "execution_result": state.get("execution_result", ""),
         "detected_misconception": state.get("misconception", ""),
-        "agent": "Agent 1" if state.get("stage") == "plan" else "Agent 2",
+        "agent": (
+            "Problem Understanding Agent"
+            if state.get("stage") == "plan"
+            else "Socratic Dialogue Agent"
+        ),
         "hint_level": state.get("hint_level"), "intervention_path": state.get("intervention_path"),
         "tutor_question": tutor_question, "student_response": state.get("student_answer", ""),
         "pedagogical_action": state.get("pedagogical_action") or state.get("selected_action"),

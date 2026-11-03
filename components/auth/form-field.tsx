@@ -41,7 +41,7 @@ export function FormField({
           onChange={onChange}
           aria-invalid={Boolean(error)}
           aria-describedby={describedBy}
-          className={`h-[52px] w-full rounded-[12px] border bg-[#FBFCFF] text-base font-semibold text-slate-950 outline-none transition duration-300 placeholder:font-medium placeholder:text-slate-400 hover:border-indigo-300 focus:-translate-y-0.5 focus:border-[#6255f6] focus:bg-white focus:shadow-[0_10px_30px_rgba(98,85,246,0.12)] focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:bg-slate-100 ${
+          className={`h-[52px] w-full rounded-[12px] border bg-[#FBFCFF] text-base font-semibold text-slate-950 outline-none transition duration-300 placeholder:font-medium placeholder:text-slate-400 hover:border-indigo-300 focus:border-[#6255f6] focus:bg-white focus:shadow-[0_8px_24px_rgba(98,85,246,0.10)] focus:ring-4 focus:ring-violet-100 disabled:cursor-not-allowed disabled:bg-slate-100 ${
             icon ? "pl-12 pr-4" : "px-4"
           } ${error ? "border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-red-100" : "border-slate-200"} ${className}`}
           {...inputProps}
