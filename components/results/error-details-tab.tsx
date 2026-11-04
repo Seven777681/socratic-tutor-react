@@ -46,6 +46,24 @@ export function ErrorDetailsTab({
               <p className="text-sm font-extrabold text-rose-800">
                 {error.title}
               </p>
+              <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-rose-700">
+                {error.message}
+              </p>
+              {error.hint ? (
+                <p className="mt-2 rounded-lg bg-white/75 px-3 py-2 text-xs font-semibold leading-5 text-slate-600">
+                  {error.hint}
+                </p>
+              ) : null}
+              {result.stderr ? (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-bold text-rose-700">
+                    Technical details
+                  </summary>
+                  <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-950 p-3 font-mono text-[11px] leading-5 text-slate-100">
+                    {result.stderr}
+                  </pre>
+                </details>
+              ) : null}
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
