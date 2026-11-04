@@ -15,9 +15,23 @@ export async function POST(request: Request) {
       body: JSON.stringify(body),
       cache: "no-store",
     });
-    const data = await response.json().catch(() => ({}));
+    const responseText = await response.text();
+    let data: Record<string, unknown> = {};
+    try {
+      data = responseText ? JSON.parse(responseText) as Record<string, unknown> : {};
+    } catch {
+      data = {
+        error: response.ok
+          ? "Task completion returned an unreadable response."
+          : `Task completion backend returned HTTP ${response.status}.`,
+      };
+    }
+    if (!response.ok && !data.error && !data.detail) {
+      data.error = `Task completion backend returned HTTP ${response.status}.`;
+    }
     return NextResponse.json(data, { status: response.status });
-  } catch {
+  } catch (error) {
+    console.error("Task completion proxy failed:", error);
     return NextResponse.json(
       { error: "Task completion service is unavailable." },
       { status: 503 },

@@ -1605,13 +1605,29 @@ def complete_task(req: StudyTaskCompleteRequest):
     _require_active_study_session(req.studySessionId)
     if req.taskId in {"task_1_maximum", "task_4_minimum"}:
         raise HTTPException(status_code=403, detail="Assessment tasks must use the assessment submission flow.")
-    complete_study_task(
-        task_id=req.taskId,
-        plan=req.plan,
-        code=req.code,
-        entry_path=req.entryPath,
-        study_session_id=req.studySessionId,
-    )
+    try:
+        complete_study_task(
+            task_id=req.taskId,
+            plan=req.plan,
+            code=req.code,
+            entry_path=req.entryPath,
+            study_session_id=req.studySessionId,
+        )
+    except Exception as error:
+        reference = uuid.uuid4().hex[:10]
+        print(
+            f"TASK_COMPLETION_FAILED reference={reference} "
+            f"error_type={type(error).__name__} error={error}",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "The learning record could not be saved. "
+                f"Check the backend log reference {reference}."
+            ),
+        ) from error
     return {"completed": True}
 
 

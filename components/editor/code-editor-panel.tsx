@@ -673,11 +673,11 @@ export function CodeEditorPanel({
     if (isGeneratingReflection) return;
     setIsGeneratingReflection(true);
     try {
-      const studySessionId = await ensureStudySession();
-      const response = await fetch("/api/study/task/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const submitCompletion = (studySessionId: string) =>
+        fetch("/api/study/task/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
           taskId,
           studySessionId,
           entryPath,
@@ -687,8 +687,16 @@ export function CodeEditorPanel({
             steps: learningState.planningDraft.steps,
           },
           code: currentCode,
-        }),
-      });
+          }),
+        });
+
+      let studySessionId = await ensureStudySession();
+      let response = await submitCompletion(studySessionId);
+      if (response.status === 401) {
+        window.sessionStorage.removeItem("socratic-study-session-id");
+        studySessionId = await ensureStudySession();
+        response = await submitCompletion(studySessionId);
+      }
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as
           | { error?: string; detail?: string }
