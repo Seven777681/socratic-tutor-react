@@ -13,6 +13,7 @@ import type {
 } from "@/types/auth";
 import { isValidEmail } from "@/lib/auth/username-utils";
 import { saveAuthSession } from "@/lib/auth/client-auth";
+import { ensureStudySession } from "@/services/study-session";
 import { useLanguage } from "@/components/i18n/language-provider";
 
 const initialValues: RegisterFormValues = {
@@ -213,6 +214,7 @@ export function RegisterForm() {
       }
 
       saveAuthSession(result.user, result.token);
+      await ensureStudySession();
       setIsCreated(true);
       setSuccessMessage("Account created. Redirecting to dashboard...");
 

@@ -8,6 +8,7 @@ import { PasswordInput } from "@/components/auth/password-input";
 import type { AuthResponse, LoginFormErrors, LoginFormValues } from "@/types/auth";
 import { isValidUsername } from "@/lib/auth/username-utils";
 import { saveAuthSession } from "@/lib/auth/client-auth";
+import { ensureStudySession } from "@/services/study-session";
 
 const initialValues: LoginFormValues = {
   username: "",
@@ -87,6 +88,7 @@ export function LoginForm() {
       }
 
       saveAuthSession(result.user, result.token);
+      await ensureStudySession();
       setIsSignedIn(true);
       setSuccessMessage("Signed in. Redirecting to dashboard...");
 

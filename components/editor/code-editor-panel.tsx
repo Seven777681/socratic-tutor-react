@@ -26,6 +26,7 @@ import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { useTaskLearningState } from "@/hooks/use-task-learning-state";
 import type { PlanningDraft } from "@/hooks/use-task-learning-state";
 import { runCode } from "@/services/code-runner-service";
+import { ensureStudySession } from "@/services/study-session";
 import {
   difficultyLabels,
   topicLabels,
@@ -144,6 +145,13 @@ export function CodeEditorPanel({
   useEffect(() => {
     setStdin(getExampleProgramInput(firstExampleInput));
   }, [firstExampleInput, taskId]);
+
+  useEffect(() => {
+    if (!getAuthToken()) return;
+    void ensureStudySession().catch((error) => {
+      console.warn("Study session could not be prepared.", error);
+    });
+  }, []);
 
   const chooseLearningPath = (path: "understand" | "plan" | "code") => {
     if (
@@ -665,12 +673,13 @@ export function CodeEditorPanel({
     if (isGeneratingReflection) return;
     setIsGeneratingReflection(true);
     try {
+      const studySessionId = await ensureStudySession();
       const response = await fetch("/api/study/task/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           taskId,
-          studySessionId: window.sessionStorage.getItem("socratic-study-session-id"),
+          studySessionId,
           entryPath,
           plan: {
             status: learningState.planningDraft.status,

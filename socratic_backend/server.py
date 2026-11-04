@@ -830,6 +830,61 @@ def _next_student_display_name() -> str:
     return f"Student {max(sequence_numbers, default=0) + 1:03d}"
 
 
+def _start_or_resume_account_study_session(account_id: str) -> StudySessionStartResponse:
+    """Give a signed-in account a stable study identity without a U-code."""
+    users = (
+        database.table("users")
+        .select("id,user_code")
+        .eq("id", account_id)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if users:
+        user_id = users[0]["id"]
+        user_code = users[0]["user_code"]
+    else:
+        user_id = account_id
+        user_code = f"A{account_id.replace('-', '')[:31]}"
+        database.table("users").insert({
+            "id": user_id,
+            "user_code": user_code,
+        }).execute()
+
+    active_sessions = (
+        database.table("study_sessions")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("status", "active")
+        .order("started_at", desc=True)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if active_sessions:
+        return StudySessionStartResponse(
+            userId=user_id,
+            userCode=user_code,
+            studySessionId=active_sessions[0]["id"],
+            resumed=True,
+        )
+
+    session_id = str(uuid.uuid4())
+    database.table("study_sessions").insert({
+        "id": session_id,
+        "user_id": user_id,
+        "status": "active",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "client_version": "account-study-session-v1",
+    }).execute()
+    return StudySessionStartResponse(
+        userId=user_id,
+        userCode=user_code,
+        studySessionId=session_id,
+        resumed=False,
+    )
+
+
 @app.post("/api/auth/register")
 def register_account(req: AuthRegisterRequest):
     username = normalize_email(req.username)
@@ -1510,6 +1565,12 @@ def start_study_session(req: StudySessionStartRequest):
         studySessionId=session_id,
         resumed=False,
     )
+
+
+@app.post("/api/study/session/account", response_model=StudySessionStartResponse)
+def start_account_study_session(request: Request):
+    account_id = _require_account(request)
+    return _start_or_resume_account_study_session(account_id)
 
 
 @app.post("/api/study/run")
